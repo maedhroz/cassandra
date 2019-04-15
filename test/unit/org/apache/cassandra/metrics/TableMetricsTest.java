@@ -19,6 +19,7 @@
 package org.apache.cassandra.metrics;
 
 import java.io.IOException;
+import java.util.function.LongSupplier;
 
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -234,5 +235,45 @@ public class TableMetricsTest extends SchemaLoader
 
     private static void assertGreaterThan(double actual, double expectedLessThan) {
         assertTrue("Expected " + actual + " > " + expectedLessThan, actual > expectedLessThan);
+    }
+
+    @Test
+    public void testMetricsCleanupOnDrop()
+    {
+        String tableName = TABLE +"_metrics_cleanup";
+        CassandraMetricsRegistry registry = CassandraMetricsRegistry.Metrics;
+        LongSupplier count = () -> registry.getNames().stream().filter(n -> n.contains(tableName)).count();
+
+        recreateTable(tableName);
+        // some metrics
+        assertTrue(count.getAsLong() > 0);
+        session.execute(String.format("DROP TABLE IF EXISTS %s.%s", KEYSPACE, tableName));
+
+        // no metrics after drop
+        assertEquals(0, count.getAsLong());
+    }
+
+    @Test
+    public void testViewMetricsCleanupOnDrop()
+    {
+        String tableName = TABLE +"_metrics_cleanup";
+        String viewName = TABLE + "_materialized_view_cleanup";
+
+        CassandraMetricsRegistry registry = CassandraMetricsRegistry.Metrics;
+        LongSupplier count = () -> registry.getNames().stream().filter(n -> n.contains(viewName)).count();
+
+        // no metrics before create
+        assertEquals(0, count.getAsLong());
+
+        recreateTable(tableName);
+        session.execute(String.format("CREATE MATERIALIZED VIEW %s.%s AS SELECT id,val1 FROM %s.%s WHERE id IS NOT NULL AND val1 IS NOT NULL PRIMARY KEY (id,val1);", KEYSPACE, viewName, KEYSPACE, tableName));
+
+        // some metrics
+        assertTrue(count.getAsLong() > 0);
+
+        session.execute(String.format("DROP MATERIALIZED VIEW IF EXISTS %s.%s;", KEYSPACE, viewName));
+
+        // no metrics after drop
+        assertEquals(0, count.getAsLong());
     }
 }
