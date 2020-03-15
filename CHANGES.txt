@@ -1,4 +1,7 @@
 4.0-alpha5
+ * Standaridize storage configuration parameters' names. Backward compatibility with the old names.
+   Add the possibility for the user to provide in the form of a suffix different units for Memory, Time, and Rate parameters, i.e.
+   commitlog_sync_period = 500ms/500s/500ns, etc.(CASSANDRA-15234-3)
  * Fail startup if -Xmn is set when the G1 garbage collector is used (CASSANDRA-15839)
  * generateSplits method replaced the generateRandomTokens for ReplicationAwareTokenAllocator. (CASSANDRA-15877)
  * Several mbeans are not unregistered when dropping a keyspace and table (CASSANDRA-14888)

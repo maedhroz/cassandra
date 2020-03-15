@@ -22,19 +22,26 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.Field;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
-
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
-
-import org.apache.commons.lang3.SystemUtils;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,7 +64,8 @@ public class YamlConfigurationLoader implements ConfigurationLoader
     /**
      * Inspect the classpath to find storage configuration file
      */
-    private static URL getStorageConfigURL() throws ConfigurationException
+    @VisibleForTesting
+    public static URL getStorageConfigURL() throws ConfigurationException
     {
         String configUrl = System.getProperty("cassandra.config");
         if (configUrl == null)
@@ -92,12 +100,15 @@ public class YamlConfigurationLoader implements ConfigurationLoader
     }
 
     private static URL storageConfigURL;
+    private static String content;
 
     @Override
     public Config loadConfig() throws ConfigurationException
     {
         if (storageConfigURL == null)
             storageConfigURL = getStorageConfigURL();
+        content = YamlConfigurationLoader.readStorageConfig(storageConfigURL);
+        isConfigFileValid();
         return loadConfig(storageConfigURL);
     }
 
@@ -118,7 +129,8 @@ public class YamlConfigurationLoader implements ConfigurationLoader
             }
 
             Constructor constructor = new CustomConstructor(Config.class);
-            PropertiesChecker propertiesChecker = new PropertiesChecker();
+            Map<Class<?>, Map<String, Replacement>> replacements = getReplacements(Config.class);
+            PropertiesChecker propertiesChecker = new PropertiesChecker(replacements);
             constructor.setPropertyUtils(propertiesChecker);
             Yaml yaml = new Yaml(constructor);
             Config result = loadConfig(yaml, configBytes);
@@ -127,9 +139,47 @@ public class YamlConfigurationLoader implements ConfigurationLoader
         }
         catch (YAMLException e)
         {
-            throw new ConfigurationException("Invalid yaml: " + url + SystemUtils.LINE_SEPARATOR
-                                             +  " Error: " + e.getMessage(), false);
+            throw new ConfigurationException("Invalid yaml: " + url, e);
         }
+    }
+
+    private static String readStorageConfig(URL url)
+    {
+        String content = "";
+
+        try
+        {
+            content = new String (Files.readAllBytes(Paths.get(String.valueOf(url).substring(5))));
+
+        }
+        catch (IOException e)
+        {
+            e.printStackTrace();
+        }
+
+        return content;
+    }
+
+    private static void isConfigFileValid()
+    {
+        if (isBlank("commitlog_sync_period") || isBlank("commitlog_sync_period"))
+        {
+            throw new IllegalArgumentException("You should provide a value for commitlog_sync_period or comment it in " +
+                                               "order to get a default one");
+        }
+
+        if (isBlank("commitlog_sync_group_window") || isBlank("commitlog_sync_group_window"))
+        {
+            throw new IllegalArgumentException("You should provide a value for commitlog_sync_group_window or comment it in " +
+                                               "order to get a default one");
+        }
+    }
+
+    private static boolean isBlank(String property)
+    {
+        Pattern p = Pattern.compile(String.format("%s%s *: *$", '^', property), Pattern.MULTILINE);
+        Matcher m = p.matcher(content);
+        return m.find();
     }
 
     static class CustomConstructor extends Constructor
@@ -186,15 +236,55 @@ public class YamlConfigurationLoader implements ConfigurationLoader
 
         private final Set<String> nullProperties = new HashSet<>();
 
-        public PropertiesChecker()
+        private final Map<Class<?>, Map<String, Replacement>> replacements;
+
+        public PropertiesChecker(Map<Class<?>, Map<String, Replacement>> replacements)
         {
+            this.replacements = Objects.requireNonNull(replacements, "replacements");
             setSkipMissingProperties(true);
         }
 
         @Override
         public Property getProperty(Class<? extends Object> type, String name) throws IntrospectionException
         {
-            final Property result = super.getProperty(type, name);
+            final Property result;
+            Map<String, Replacement> typeReplacements = replacements.getOrDefault(type, Collections.emptyMap());
+            if(typeReplacements.containsKey(name))
+            {
+                Replacement replacement = typeReplacements.get(name);
+                Converter converter = replacement.converter;
+                Property newProperty = super.getProperty(type, replacement.newName);
+                result = new Property(replacement.oldName, replacement.oldType)
+                {
+                    public Class<?>[] getActualTypeArguments()
+                    {
+                        return newProperty.getActualTypeArguments();
+                    }
+
+                    public void set(Object o, Object o1) throws Exception
+                    {
+                        Object migratedValue = converter.apply(o1);
+                        newProperty.set(o, migratedValue);
+                    }
+
+                    public Object get(Object o)
+                    {
+                        return newProperty.get(o);
+                    }
+                };
+                if (replacement.scheduledRemoveBy != null)
+                {
+                    logger.warn("{} parameter has a new name and value format; it is scheduled to be removed by {}. For more information, please refer to NEWS.txt", name, replacement.scheduledRemoveBy);
+                }
+                else
+                {
+                    logger.warn("{} parameter has a new name and value format. For more information, please refer to NEWS.txt", name);
+                }
+            }
+            else
+            {
+                result = super.getProperty(type, name);
+            }
 
             if (result instanceof MissingProperty)
             {
@@ -210,6 +300,7 @@ public class YamlConfigurationLoader implements ConfigurationLoader
                     {
                         nullProperties.add(getName());
                     }
+
                     result.set(object, value);
                 }
 
@@ -238,6 +329,122 @@ public class YamlConfigurationLoader implements ConfigurationLoader
             {
                 throw new ConfigurationException("Invalid yaml. Please remove properties " + missingProperties + " from your cassandra.yaml", false);
             }
+        }
+    }
+
+    public static Map<Class<? extends Object>, Map<String, Replacement>> getReplacements(Class<? extends Object> klass)
+    {
+        List<Replacement> replacements = getReplacementsRecursive(klass);
+        Map<Class<? extends Object>, Map<String, Replacement>> objectOldNames = new HashMap<>();
+        for (Replacement r : replacements)
+        {
+            Map<String, Replacement> oldNames = objectOldNames.computeIfAbsent(r.parent, ignore -> new HashMap<>());
+            oldNames.put(r.oldName, r);
+        }
+        return objectOldNames;
+    }
+
+    public static List<Replacement> getReplacementsRecursive(Class<? extends Object> klass)
+    {
+        Set<Class<?>> seen = new HashSet<>(); // to make sure not to process the same type twice
+        Map<Class<? extends Converter>, Converter> converterCache = new HashMap<>();
+        List<Replacement> accum = new ArrayList<>();
+        getReplacementsRecursive(seen, converterCache, accum, klass);
+        return accum.isEmpty() ? Collections.emptyList() : accum;
+    }
+
+    private static void getReplacementsRecursive(Set<Class<?>> seen,
+                                                 Map<Class<? extends Converter>, Converter> converterCache,
+                                                 List<Replacement> accum,
+                                                 Class<?> klass)
+    {
+        accum.addAll(getReplacements(converterCache, klass));
+        for (Field field : klass.getDeclaredFields())
+        {
+            if (seen.add(field.getType()))
+            {
+                // first time looking at this type, walk it
+                getReplacementsRecursive(seen, converterCache, accum, field.getType());
+            }
+        }
+    }
+
+    private static List<Replacement> getReplacements(Map<Class<? extends Converter>, Converter> converterCache, Class<? extends Object> klass)
+    {
+        List<Replacement> replacements = new ArrayList<>();
+        for (Field field : klass.getDeclaredFields())
+        {
+            String newName = field.getName();
+            Class<?> newType = field.getType();
+            final ReplacesList[] byType = field.getAnnotationsByType(ReplacesList.class);
+            if (byType == null || byType.length == 0)
+            {
+                Replaces r = field.getAnnotation(Replaces.class);
+                if (r != null)
+                {
+                    addReplacement(converterCache, klass, replacements, newName, newType, r);
+                }
+            }
+            else
+            {
+                for (ReplacesList replacesList : byType)
+                {
+                    for (Replaces r : replacesList.value())
+                    {
+                        addReplacement(converterCache, klass, replacements, newName, newType, r);
+                    }
+                }
+            }
+        }
+        return replacements.isEmpty() ? Collections.emptyList() : replacements;
+    }
+
+    private static void addReplacement(Map<Class<? extends Converter>, Converter> converterCache,
+                                       Class<?> klass,
+                                       List<Replacement> replacements,
+                                       String newName, Class<?> newType,
+                                       Replaces r)
+    {
+        String oldName = r.oldName();
+        Converter converter = converterCache.computeIfAbsent(r.converter(), converterKlass -> {
+            try
+            {
+                return converterKlass.newInstance();
+            }
+            catch (IllegalAccessException | InstantiationException e)
+            {
+                throw new RuntimeException("Unable to create converter of type " + converterKlass, e);
+            }
+        });
+        String scheduledRemoveBy = r.scheduledRemoveBy();
+        if ("".equals(scheduledRemoveBy))
+            scheduledRemoveBy = null;
+
+        Class<?> oldType = converter.getInputType();
+        if (oldType == null)
+            oldType = newType;
+        replacements.add(new Replacement(klass, oldName, oldType, newName, converter, scheduledRemoveBy));
+    }
+
+    static final class Replacement
+    {
+        public final Class<? extends Object> parent;
+        public final String oldName;
+        public final Class<?> oldType;
+        public final String newName;
+        public final Converter converter;
+        public final String scheduledRemoveBy;
+
+        Replacement(Class<? extends Object> parent,
+                    String oldName, Class<?> oldType,
+                    String newName, Converter converter, String scheduledRemoveBy)
+        {
+            this.parent = Objects.requireNonNull(parent);
+            this.oldName = Objects.requireNonNull(oldName);
+            this.oldType = Objects.requireNonNull(oldType);
+            this.newName = Objects.requireNonNull(newName);
+            this.converter = Objects.requireNonNull(converter);
+            this.scheduledRemoveBy = scheduledRemoveBy;
         }
     }
 }

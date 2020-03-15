@@ -250,6 +250,93 @@ Upgrading
       four digits need to be prefixed with a plus or minus sign.
     - cqlsh now returns a non-zero code in case of errors. This is a backward incompatible change so it may
       break existing scripts that rely on the current behavior. See CASSANDRA-15623 for more details.
+    - there is a new cassandra.yaml version. Units suffixes should be provided for all rates(bps|mbps|kbps|Kbps|Mbps),
+      memory (kb|KB|mb|MB|gb|GB|b|B) and duration(d|D|h|H|s|S|ms|MS|mS|Ms|us|US|uS|Us|µs|µS|ns|NS|nS|Nsm|M|m)
+      parameters.
+      Backward compatibility with the old cassandra.yaml file will be in place until the next major version.
+    - The following cassandra.yaml parameters' names have been changed:
+      enable_user_defined_functions is user_defined_functions_enabled.
+      enable_scripted_user_defined_functions is scripted_user_defined_functions_enabled.
+      cross_node_timeout is internode_timeout.
+      native_transport_max_threads is max_native_transport_threads.
+      native_transport_max_frame_size_in_mb is max_native_transport_frame_size_in_mb.
+      native_transport_max_concurrent_connections is max_native_transport_concurrent_connections_in_mb.
+      native_transport_max_concurrent_connections_per_ip is max_native_transport_concurrent_connections_per_ip.
+      otc_coalescing_strategy is outbound_connection_coalescing_strategy.
+      otc_coalescing_window_us is outbound_connection_coalescing_window_us.
+      otc_coalescing_enough_coalesced_messages is outbound_connection_coalescing_enough_coalesced_messages.
+      otc_backlog_expiration_interval_ms is outbound_connection_backlog_expiration_interval_ms.
+      enable_legacy_ssl_storage_port is legacy_ssl_storage_port_enabled.
+      enable_materialized_views is materialized_views_enabled.
+      enable_sasi_indexes is sasi_indexes_enabled.
+      enable_transient_replication is transient_replication_enabled.
+      max_hint_window_in_ms is max_hint_window.
+      native_transport_idle_timeout_in_ms is native_transport_idle_timeout.
+      request_timeout_in_ms is request_timeout.
+      read_request_timeout_in_ms is read_request_timeout.
+      range_request_timeout_in_ms is range_request_timeout.
+      write_request_timeout_in_ms is write_request_timeout.
+      counter_write_request_timeout_in_ms is counter_write_request_timeout.
+      cas_contention_timeout_in_ms is cas_contention_timeout.
+      truncate_request_timeout_in_ms is truncate_request_timeout.
+      streaming_keep_alive_period_in_secs is streaming_keep_alive_period.
+      slow_query_log_timeout_in_ms is slow_query_log_timeout.
+      internode_tcp_connect_timeout_in_ms is internode_tcp_connect_timeout.
+      internode_tcp_user_timeout_in_ms is internode_tcp_user_timeout.
+      commitlog_sync_group_window_in_ms is commitlog_sync_group_window.
+      commitlog_sync_period_in_ms is commitlog_sync_period.
+      periodic_commitlog_sync_lag_block_in_ms is periodic_commitlog_sync_lag_block.
+      cdc_free_space_check_interval_ms is cdc_free_space_check_interval.
+      dynamic_snitch_update_interval_in_ms is dynamic_snitch_update_interval.
+      dynamic_snitch_reset_interval_in_ms is dynamic_snitch_reset_interval.
+      gc_log_threshold_in_ms is gc_log_threshold.
+      hints_flush_period_in_ms is hints_flush_period.
+      gc_warn_threshold_in_ms is gc_warn_threshold.
+      tracetype_query_ttl_in_s is tracetype_query_ttl.
+      tracetype_repair_ttl_in_s is tracetype_repair_ttl
+      permissions_validity_in_ms is permissions_validity.
+      permissions_update_interval_in_ms is permissions_update_interval.
+      roles_validity_in_ms is roles_validity.
+      roles_update_interval_in_ms is roles_update_interval.
+      credentials_validity_in_ms is credentials_validity.
+      credentials_update_interval_in_ms is credentials_update_interval.
+      index_summary_resize_interval_in_minutes is index_summary_resize_interval.
+      max_hints_file_size_in_mb is max_hints_file_size.
+      memtable_heap_space_in_mb is memtable_heap_space.
+      memtable_offheap_space_in_mb is memtable_offheap_space.
+      repair_session_space_in_mb is repair_session_space.
+      internode_application_send_queue_capacity_in_bytes is internode_application_send_queue_capacity.
+      internode_application_send_queue_reserve_endpoint_capacity_in_bytes is internode_application_send_queue_reserve_endpoint_capacity.
+      internode_application_send_queue_reserve_global_capacity_in_bytes is internode_application_send_queue_reserve_global_capacity.
+      internode_application_receive_queue_capacity_in_bytes is internode_application_receive_queue_capacity.
+      internode_application_receive_queue_reserve_endpoint_capacity_in_bytes is internode_application_receive_queue_reserve_endpoint_capacity.
+      internode_application_receive_queue_reserve_global_capacity_in_bytes is internode_application_receive_queue_reserve_global_capacity.
+      max_native_transport_frame_size is max_native_transport_frame_size_in_mb.
+      native_transport_frame_block_size is native_transport_frame_block_size_in_kb.
+      max_value_size is max_value_size_in_mb.
+      column_index_size is column_index_size_in_kb.
+      column_index_cache_size_in_kb is column_index_cache_size.
+      batch_size_warn_threshold_in_kb is atch_size_warn_threshold.
+      batch_size_fail_threshold_in_kb is batch_size_fail_threshold.
+      compaction_large_partition_warning_threshold_mb is compaction_large_partition_warning_threshold.
+      commitlog_total_space_in_mb is commitlog_total_space.
+      commitlog_segment_size_in_mb is commitlog_segment_size.
+      max_mutation_size_in_kb is max_mutation_size.
+      cdc_total_space_in_mb is cdc_total_space.
+      hinted_handoff_throttle_in_kb is hinted_handoff_throttle.
+      batchlog_replay_throttle_in_kb is batchlog_replay_throttle.
+      trickle_fsync_interval_in_kb is trickle_fsync_interval.
+      sstable_preemptive_open_interval_in_mb is sstable_preemptive_open_interval.
+      counter_cache_size_in_mb is counter_cache_size.
+      file_cache_size_in_mb is file_cache_size.
+      index_summary_capacity_in_mb is index_summary_capacity.
+      prepared_statements_cache_size_mb is prepared_statements_cache_size.
+      key_cache_size_in_mb is ey_cache_size.
+      row_cache_size_in_mb is row_cache_size.
+      compaction_throughput_mb_per_sec is compaction_throughput.
+      stream_throughput_outbound_megabits_per_sec is stream_throughput_outbound.
+      inter_dc_stream_throughput_outbound_megabits_per_sec is inter_dc_stream_throughput_outbound.
+      Backward compatibility with the old names will be in place until the next Cassandra major version.
 
 
 Deprecation

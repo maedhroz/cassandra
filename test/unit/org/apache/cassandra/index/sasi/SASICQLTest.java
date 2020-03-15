@@ -109,10 +109,10 @@ public class SASICQLTest extends CQLTester
     {
         createTable("CREATE TABLE %s (k int PRIMARY KEY, v int)");
 
-        boolean enableSASIIndexes = DatabaseDescriptor.getEnableSASIIndexes();
+        boolean enableSASIIndexes = DatabaseDescriptor.getSASIIndexesEnabled();
         try
         {
-            DatabaseDescriptor.setEnableSASIIndexes(false);
+            DatabaseDescriptor.setSASIIndexesEnabled(false);
             createIndex("CREATE CUSTOM INDEX ON %s (v) USING 'org.apache.cassandra.index.sasi.SASIIndex'");
             Assert.fail("Should not be able to create a SASI index if they are disabled");
         }
@@ -125,7 +125,7 @@ public class SASICQLTest extends CQLTester
         }
         finally
         {
-            DatabaseDescriptor.setEnableSASIIndexes(enableSASIIndexes);
+            DatabaseDescriptor.setSASIIndexesEnabled(enableSASIIndexes);
         }
     }
 
