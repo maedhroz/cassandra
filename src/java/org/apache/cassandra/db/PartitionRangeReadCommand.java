@@ -48,7 +48,6 @@ import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.DataOutputPlus;
 import org.apache.cassandra.metrics.TableMetrics;
 import org.apache.cassandra.net.Verb;
-import org.apache.cassandra.schema.IndexMetadata;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.service.StorageProxy;
@@ -72,10 +71,10 @@ public class PartitionRangeReadCommand extends ReadCommand implements PartitionR
                                       RowFilter rowFilter,
                                       DataLimits limits,
                                       DataRange dataRange,
-                                      IndexMetadata index,
+                                      Index.QueryPlan indexQueryPlan,
                                       boolean trackWarnings)
     {
-        super(Kind.PARTITION_RANGE, isDigest, digestVersion, acceptsTransient, metadata, nowInSec, columnFilter, rowFilter, limits, index, trackWarnings);
+        super(Kind.PARTITION_RANGE, isDigest, digestVersion, acceptsTransient, metadata, nowInSec, columnFilter, rowFilter, limits, indexQueryPlan, trackWarnings);
         this.dataRange = dataRange;
     }
 
@@ -88,7 +87,7 @@ public class PartitionRangeReadCommand extends ReadCommand implements PartitionR
                                                     RowFilter rowFilter,
                                                     DataLimits limits,
                                                     DataRange dataRange,
-                                                    IndexMetadata index,
+                                                    Index.QueryPlan indexQueryPlan,
                                                     boolean trackWarnings)
     {
         if (metadata.isVirtual())
@@ -102,7 +101,7 @@ public class PartitionRangeReadCommand extends ReadCommand implements PartitionR
                                                              rowFilter,
                                                              limits,
                                                              dataRange,
-                                                             index,
+                                                             indexQueryPlan,
                                                              trackWarnings);
         }
         return new PartitionRangeReadCommand(isDigest,
@@ -114,7 +113,7 @@ public class PartitionRangeReadCommand extends ReadCommand implements PartitionR
                                              rowFilter,
                                              limits,
                                              dataRange,
-                                             index,
+                                             indexQueryPlan,
                                              trackWarnings);
     }
 
@@ -134,7 +133,7 @@ public class PartitionRangeReadCommand extends ReadCommand implements PartitionR
                       rowFilter,
                       limits,
                       dataRange,
-                      findIndex(metadata, rowFilter),
+                      findIndexQueryPlan(metadata, rowFilter),
                       false);
     }
 
@@ -207,7 +206,7 @@ public class PartitionRangeReadCommand extends ReadCommand implements PartitionR
                       rowFilter(),
                       isRangeContinuation ? limits() : limits().withoutState(),
                       dataRange().forSubRange(range),
-                      indexMetadata(),
+                      indexQueryPlan(),
                       isTrackingWarnings());
     }
 
@@ -222,7 +221,7 @@ public class PartitionRangeReadCommand extends ReadCommand implements PartitionR
                       rowFilter(),
                       limits(),
                       dataRange(),
-                      indexMetadata(),
+                      indexQueryPlan(),
                       isTrackingWarnings());
     }
 
@@ -238,7 +237,7 @@ public class PartitionRangeReadCommand extends ReadCommand implements PartitionR
                       rowFilter(),
                       limits(),
                       dataRange(),
-                      indexMetadata(),
+                      indexQueryPlan(),
                       isTrackingWarnings());
     }
 
@@ -254,7 +253,7 @@ public class PartitionRangeReadCommand extends ReadCommand implements PartitionR
                       rowFilter(),
                       limits(),
                       dataRange(),
-                      indexMetadata(),
+                      indexQueryPlan(),
                       isTrackingWarnings());
     }
 
@@ -270,7 +269,7 @@ public class PartitionRangeReadCommand extends ReadCommand implements PartitionR
                       rowFilter(),
                       newLimits,
                       dataRange(),
-                      indexMetadata(),
+                      indexQueryPlan(),
                       isTrackingWarnings());
     }
 
@@ -286,7 +285,7 @@ public class PartitionRangeReadCommand extends ReadCommand implements PartitionR
                       rowFilter(),
                       newLimits,
                       newDataRange,
-                      indexMetadata(),
+                      indexQueryPlan(),
                       isTrackingWarnings());
     }
 
@@ -437,9 +436,8 @@ public class PartitionRangeReadCommand extends ReadCommand implements PartitionR
      */
     public PartitionIterator postReconciliationProcessing(PartitionIterator result)
     {
-        ColumnFamilyStore cfs = Keyspace.open(metadata().keyspace).getColumnFamilyStore(metadata().name);
-        Index index = getIndex(cfs);
-        return index == null ? result : index.postProcessorFor(this).apply(result, this);
+        Index.QueryPlan queryPlan = indexQueryPlan();
+        return queryPlan == null ? result : queryPlan.postProcessor().apply(result);
     }
 
     @Override
@@ -493,11 +491,11 @@ public class PartitionRangeReadCommand extends ReadCommand implements PartitionR
                                        ColumnFilter columnFilter,
                                        RowFilter rowFilter,
                                        DataLimits limits,
-                                       IndexMetadata index)
+                                       Index.QueryPlan indexQueryPlan)
         throws IOException
         {
             DataRange range = DataRange.serializer.deserialize(in, version, metadata);
-            return PartitionRangeReadCommand.create(isDigest, digestVersion, acceptsTransient, metadata, nowInSec, columnFilter, rowFilter, limits, range, index, false);
+            return new PartitionRangeReadCommand(isDigest, digestVersion, acceptsTransient, metadata, nowInSec, columnFilter, rowFilter, limits, range, indexQueryPlan, false);
         }
     }
 
@@ -512,10 +510,10 @@ public class PartitionRangeReadCommand extends ReadCommand implements PartitionR
                                                       RowFilter rowFilter,
                                                       DataLimits limits,
                                                       DataRange dataRange,
-                                                      IndexMetadata index,
+                                                      Index.QueryPlan indexQueryPlan,
                                                       boolean trackWarnings)
         {
-            super(isDigest, digestVersion, acceptsTransient, metadata, nowInSec, columnFilter, rowFilter, limits, dataRange, index, trackWarnings);
+            super(isDigest, digestVersion, acceptsTransient, metadata, nowInSec, columnFilter, rowFilter, limits, dataRange, indexQueryPlan, trackWarnings);
         }
 
         @Override
