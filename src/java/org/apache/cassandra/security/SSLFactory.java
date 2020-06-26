@@ -414,7 +414,7 @@ public final class SSLFactory
         }
         catch (Exception e)
         {
-            throw new IOException("Failed to create SSL context using server_encryption_options!", e);
+            throw new IOException("Failed to create SSL context using internode_encryption!", e);
         }
 
         try

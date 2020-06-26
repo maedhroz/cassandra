@@ -312,7 +312,8 @@ public class Config
     public Duration dynamic_snitch_reset_interval = new Duration("10m");
     public double dynamic_snitch_badness_threshold = 0.1;
 
-    public EncryptionOptions.ServerEncryptionOptions server_encryption_options = new EncryptionOptions.ServerEncryptionOptions();
+    @Replaces(oldName = "server_encryption_options", scheduledRemoveBy = "5.0")
+    public EncryptionOptions.ServerEncryptionOptions internode_encryption = new EncryptionOptions.ServerEncryptionOptions();
     public EncryptionOptions client_encryption_options = new EncryptionOptions();
 
     public InternodeCompression internode_compression = InternodeCompression.none;
@@ -702,7 +703,7 @@ public class Config
 
     private static final List<String> SENSITIVE_KEYS = new ArrayList<String>() {{
         add("client_encryption_options");
-        add("server_encryption_options");
+        add("internode_encryption");
     }};
 
     public static void log(Config config)

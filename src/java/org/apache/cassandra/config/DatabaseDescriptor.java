@@ -49,7 +49,6 @@ import org.apache.cassandra.auth.IInternodeAuthenticator;
 import org.apache.cassandra.auth.INetworkAuthorizer;
 import org.apache.cassandra.auth.IRoleManager;
 import org.apache.cassandra.config.Config.CommitLogSync;
-import org.apache.cassandra.config.EncryptionOptions.ServerEncryptionOptions.InternodeEncryption;
 import org.apache.cassandra.config.DataStorage.DataStorageUnit;
 import org.apache.cassandra.db.ConsistencyLevel;
 import org.apache.cassandra.db.commitlog.AbstractCommitLogSegmentManager;
@@ -985,7 +984,7 @@ public class DatabaseDescriptor
     {
         try
         {
-            SSLFactory.initHotReloading(conf.server_encryption_options, conf.client_encryption_options, false);
+            SSLFactory.initHotReloading(conf.internode_encryption, conf.client_encryption_options, false);
         }
         catch(IOException e)
         {
@@ -2340,12 +2339,12 @@ public class DatabaseDescriptor
 
     public static EncryptionOptions.ServerEncryptionOptions getInternodeMessagingEncyptionOptions()
     {
-        return conf.server_encryption_options;
+        return conf.internode_encryption;
     }
 
     public static void setInternodeMessagingEncyptionOptions(EncryptionOptions.ServerEncryptionOptions encryptionOptions)
     {
-        conf.server_encryption_options = encryptionOptions;
+        conf.internode_encryption = encryptionOptions;
     }
 
     public static EncryptionOptions getNativeProtocolEncryptionOptions()

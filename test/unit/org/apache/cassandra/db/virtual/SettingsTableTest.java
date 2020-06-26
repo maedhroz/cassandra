@@ -140,36 +140,36 @@ public class SettingsTableTest extends CQLTester
         Assert.assertEquals(9, executeNet(all).all().size());
 
         check(pre + "algorithm", null);
-        config.server_encryption_options = config.server_encryption_options.withAlgorithm("SUPERSSL");
+        config.internode_encryption = config.internode_encryption.withAlgorithm("SUPERSSL");
         check(pre + "algorithm", "SUPERSSL");
 
         check(pre + "cipher_suites", "[]");
-        config.server_encryption_options = config.server_encryption_options.withCipherSuites("c1", "c2");
+        config.internode_encryption = config.internode_encryption.withCipherSuites("c1", "c2");
         check(pre + "cipher_suites", "[c1, c2]");
 
-        check(pre + "protocol", config.server_encryption_options.protocol);
-        config.server_encryption_options = config.server_encryption_options.withProtocol("TLSv5");
+        check(pre + "protocol", config.internode_encryption.protocol);
+        config.internode_encryption = config.internode_encryption.withProtocol("TLSv5");
         check(pre + "protocol", "TLSv5");
 
         check(pre + "optional", "true");
-        config.server_encryption_options = config.server_encryption_options.withOptional(false);
+        config.internode_encryption = config.internode_encryption.withOptional(false);
         check(pre + "optional", "false");
 
         check(pre + "client_auth", "false");
-        config.server_encryption_options = config.server_encryption_options.withRequireClientAuth(true);
+        config.internode_encryption = config.internode_encryption.withRequireClientAuth(true);
         check(pre + "client_auth", "true");
 
         check(pre + "endpoint_verification", "false");
-        config.server_encryption_options = config.server_encryption_options.withRequireEndpointVerification(true);
+        config.internode_encryption = config.internode_encryption.withRequireEndpointVerification(true);
         check(pre + "endpoint_verification", "true");
 
         check(pre + "internode_encryption", "none");
-        config.server_encryption_options = config.server_encryption_options.withInternodeEncryption(InternodeEncryption.all);
+        config.internode_encryption = config.internode_encryption.withInternodeEncryption(InternodeEncryption.all);
         check(pre + "internode_encryption", "all");
         check(pre + "enabled", "true");
 
         check(pre + "legacy_ssl_storage_port", "false");
-        config.server_encryption_options = config.server_encryption_options.withLegacySslStoragePort(true);
+        config.internode_encryption = config.internode_encryption.withLegacySslStoragePort(true);
         check(pre + "legacy_ssl_storage_port", "true");
     }
 
