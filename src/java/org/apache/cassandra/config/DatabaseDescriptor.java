@@ -20,12 +20,24 @@ package org.apache.cassandra.config;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
-import java.net.*;
+import java.net.Inet4Address;
+import java.net.Inet6Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.nio.file.FileStore;
 import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.Enumeration;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -35,12 +47,11 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
-
+import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.audit.AuditLogOptions;
-import org.apache.cassandra.fql.FullQueryLoggerOptions;
 import org.apache.cassandra.auth.AllowAllInternodeAuthenticator;
 import org.apache.cassandra.auth.AuthConfig;
 import org.apache.cassandra.auth.IAuthenticator;
@@ -57,6 +68,7 @@ import org.apache.cassandra.db.commitlog.CommitLogSegmentManagerCDC;
 import org.apache.cassandra.db.commitlog.CommitLogSegmentManagerStandard;
 import org.apache.cassandra.dht.IPartitioner;
 import org.apache.cassandra.exceptions.ConfigurationException;
+import org.apache.cassandra.fql.FullQueryLoggerOptions;
 import org.apache.cassandra.io.FSWriteError;
 import org.apache.cassandra.io.util.DiskOptimizationStrategy;
 import org.apache.cassandra.io.util.FileUtils;
@@ -74,8 +86,6 @@ import org.apache.cassandra.security.EncryptionContext;
 import org.apache.cassandra.security.SSLFactory;
 import org.apache.cassandra.service.CacheService.CacheType;
 import org.apache.cassandra.utils.FBUtilities;
-
-import org.apache.commons.lang3.StringUtils;
 
 import static org.apache.cassandra.io.util.FileUtils.ONE_GB;
 import static org.apache.cassandra.io.util.FileUtils.ONE_MB;
@@ -377,7 +387,7 @@ public class DatabaseDescriptor
 
         if (conf.commitlog_sync == Config.CommitLogSync.batch)
         {
-            if (!conf.commitlog_sync_period.toString().equals("0ms"))
+            if (conf.commitlog_sync_period.toMilliseconds() != 0)
             {
                 throw new ConfigurationException("Batch sync specified, but commitlog_sync_period found.", false);
             }
@@ -385,11 +395,11 @@ public class DatabaseDescriptor
         }
         else if (conf.commitlog_sync == CommitLogSync.group)
         {
-            if (conf.commitlog_sync_group_window.toString().equals("0ms"))
+            if (conf.commitlog_sync_group_window.toMilliseconds() == 0)
             {
                 throw new ConfigurationException("Missing value for commitlog_sync_group_window.", false);
             }
-            if (!conf.commitlog_sync_period.toString().equals("0ms"))
+            if (conf.commitlog_sync_period.toMilliseconds() != 0)
             {
                 throw new ConfigurationException("Group sync specified, but commitlog_sync_period found. Only specify commitlog_sync_group_window when using group sync", false);
             }
@@ -1212,7 +1222,7 @@ public class DatabaseDescriptor
 
     public static int getPermissionsUpdateInterval()
     {
-        return conf.permissions_update_interval.toString().equals("0ms")
+        return conf.permissions_update_interval.toMilliseconds() == 0
              ? conf.permissions_validity.toMillisecondsAsInt()
              : conf.permissions_update_interval.toMillisecondsAsInt();
     }
@@ -1244,7 +1254,7 @@ public class DatabaseDescriptor
 
     public static int getRolesUpdateInterval()
     {
-        return conf.roles_update_interval.toString().equals("0ms")
+        return conf.roles_update_interval.toMilliseconds() == 0
              ? conf.roles_validity.toMillisecondsAsInt()
              : conf.roles_update_interval.toMillisecondsAsInt();
     }
@@ -1276,7 +1286,7 @@ public class DatabaseDescriptor
 
     public static int getCredentialsUpdateInterval()
     {
-        return conf.credentials_update_interval.toString().equals("0ms")
+        return conf.credentials_update_interval.toMilliseconds() == 0
                ? conf.credentials_validity.toMillisecondsAsInt()
                : conf.credentials_update_interval.toMillisecondsAsInt();
     }
