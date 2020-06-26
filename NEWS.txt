@@ -262,6 +262,7 @@ Upgrading
       native_transport_max_frame_size_in_mb is max_native_transport_frame_size_in_mb.
       native_transport_max_concurrent_connections is max_native_transport_concurrent_connections_in_mb.
       native_transport_max_concurrent_connections_per_ip is max_native_transport_concurrent_connections_per_ip.
+      otc_coalescing_window_us_default is outbound_connection_coalescing_window_us_default
       otc_coalescing_strategy is outbound_connection_coalescing_strategy.
       otc_coalescing_window_us is outbound_connection_coalescing_window_us.
       otc_coalescing_enough_coalesced_messages is outbound_connection_coalescing_enough_coalesced_messages.

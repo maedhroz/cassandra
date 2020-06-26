@@ -426,9 +426,10 @@ public class Config
      * for coalescing to be enabled.
      */
 
+    @Replaces(oldName = "otc_coalescing_window_us_default", scheduledRemoveBy = "5.0")
+    public static final int outbound_connection_coalescing_window_us_default = 200;
     @Replaces(oldName = "otc_coalescing_window_us", scheduledRemoveBy = "5.0")
-    public static final int otc_coalescing_window_us_default = 200;
-    public int outbound_connection_coalescing_window_us = otc_coalescing_window_us_default;
+    public int outbound_connection_coalescing_window_us = outbound_connection_coalescing_window_us_default;
 
     @Replaces(oldName = "outbound_connection_coalescing_enough_coalesced_messages", scheduledRemoveBy = "5.0")
     public int outbound_connection_coalescing_enough_coalesced_messages = 8;
