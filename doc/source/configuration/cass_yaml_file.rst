@@ -84,7 +84,7 @@ perform hinted handoff
     #    - DC1
     #    - DC2
 
-``max_hint_window_in_ms``
+``max_hint_window``
 -------------------------
 This defines the maximum amount of time a dead host will have hints
 generated.  After it has been dead this long, new hints for it will not be
@@ -92,7 +92,7 @@ created until it has been seen alive and gone down again.
 
 *Default Value:* 10800000 # 3 hours
 
-``hinted_handoff_throttle_in_kb``
+``hinted_handoff_throttle``
 ---------------------------------
 
 Maximum throttle in KBs per second, per delivery thread.  This will be
@@ -121,7 +121,7 @@ If not set, the default directory is $CASSANDRA_HOME/data/hints.
 
 *Default Value:*  /var/lib/cassandra/hints
 
-``hints_flush_period_in_ms``
+``hints_flush_period``
 ----------------------------
 
 How often hints should be flushed from the internal buffers to disk.
@@ -129,7 +129,7 @@ Will *not* trigger fsync.
 
 *Default Value:* 10000
 
-``max_hints_file_size_in_mb``
+``max_hints_file_size``
 -----------------------------
 
 Maximum size for a single hints file, in megabytes.
@@ -150,7 +150,7 @@ are supported.
     #     parameters:
     #         -
 
-``batchlog_replay_throttle_in_kb``
+``batchlog_replay_throttle``
 ----------------------------------
 Maximum throttle in KBs per second, total. This will be
 reduced proportionally to the number of nodes in the cluster.
@@ -214,7 +214,7 @@ CassandraNetworkAuthorizer}.
 
 *Default Value:* AllowAllNetworkAuthorizer
 
-``roles_validity_in_ms``
+``roles_validity``
 ------------------------
 
 Validity period for roles cache (fetching granted roles can be an expensive
@@ -226,20 +226,20 @@ Will be disabled automatically for AllowAllAuthenticator.
 
 *Default Value:* 2000
 
-``roles_update_interval_in_ms``
+``roles_update_interval``
 -------------------------------
 *This option is commented out by default.*
 
 Refresh interval for roles cache (if enabled).
 After this interval, cache entries become eligible for refresh. Upon next
 access, an async reload is scheduled and the old value returned until it
-completes. If roles_validity_in_ms is non-zero, then this must be
+completes. If roles_validity is non-zero, then this must be
 also.
-Defaults to the same value as roles_validity_in_ms.
+Defaults to the same value as roles_validity.
 
 *Default Value:* 2000
 
-``permissions_validity_in_ms``
+``permissions_validity``
 ------------------------------
 
 Validity period for permissions cache (fetching permissions can be an
@@ -249,20 +249,20 @@ Will be disabled automatically for AllowAllAuthorizer.
 
 *Default Value:* 2000
 
-``permissions_update_interval_in_ms``
+``permissions_update_interval``
 -------------------------------------
 *This option is commented out by default.*
 
 Refresh interval for permissions cache (if enabled).
 After this interval, cache entries become eligible for refresh. Upon next
 access, an async reload is scheduled and the old value returned until it
-completes. If permissions_validity_in_ms is non-zero, then this must be
+completes. If permissions_validity is non-zero, then this must be
 also.
-Defaults to the same value as permissions_validity_in_ms.
+Defaults to the same value as permissions_validity.
 
 *Default Value:* 2000
 
-``credentials_validity_in_ms``
+``credentials_validity``
 ------------------------------
 
 Validity period for credentials cache. This cache is tightly coupled to
@@ -277,16 +277,16 @@ Defaults to 2000, set to 0 to disable credentials caching.
 
 *Default Value:* 2000
 
-``credentials_update_interval_in_ms``
+``credentials_update_interval``
 -------------------------------------
 *This option is commented out by default.*
 
 Refresh interval for credentials cache (if enabled).
 After this interval, cache entries become eligible for refresh. Upon next
 access, an async reload is scheduled and the old value returned until it
-completes. If credentials_validity_in_ms is non-zero, then this must be
+completes. If credentials_validity is non-zero, then this must be
 also.
-Defaults to the same value as credentials_validity_in_ms.
+Defaults to the same value as credentials_validity.
 
 *Default Value:* 2000
 
@@ -396,7 +396,7 @@ ignore
 
 *Default Value:* stop
 
-``prepared_statements_cache_size_mb``
+``prepared_statements_cache_size``
 -------------------------------------
 
 Maximum size of the native protocol prepared statement cache
@@ -417,7 +417,7 @@ Constantly re-preparing statements is a performance penalty.
 
 Default value ("auto") is 1/256th of the heap or 10MB, whichever is greater
 
-``key_cache_size_in_mb``
+``key_cache_size``
 ------------------------
 
 Maximum size of the key cache in memory.
@@ -472,7 +472,7 @@ org.apache.cassandra.cache.SerializingCacheProvider
 
 *Default Value:* org.apache.cassandra.cache.OHCProvider
 
-``row_cache_size_in_mb``
+``row_cache_size``
 ------------------------
 
 Maximum size of the row cache in memory.
@@ -509,7 +509,7 @@ Specify 0 (which is the default), meaning all keys are going to be saved
 
 *Default Value:* 100
 
-``counter_cache_size_in_mb``
+``counter_cache_size``
 ----------------------------
 
 Maximum size of the counter cache in memory.
@@ -569,13 +569,13 @@ almost no value, and is being removed.
 
 *Default Value:* 2
 
-``commitlog_sync_group_window_in_ms``
+``commitlog_sync_group_window``
 -------------------------------------
 *This option is commented out by default.*
 
 group mode is similar to batch mode, where Cassandra will not ack writes
 until the commit log has been flushed to disk. The difference is group
-mode will wait up to commitlog_sync_group_window_in_ms between flushes.
+mode will wait up to commitlog_sync_group_window between flushes.
 
 
 *Default Value:* 1000
@@ -584,24 +584,24 @@ mode will wait up to commitlog_sync_group_window_in_ms between flushes.
 ------------------
 
 the default option is "periodic" where writes may be acked immediately
-and the CommitLog is simply synced every commitlog_sync_period_in_ms
+and the CommitLog is simply synced every commitlog_sync_period
 milliseconds.
 
 *Default Value:* periodic
 
-``commitlog_sync_period_in_ms``
+``commitlog_sync_period``
 -------------------------------
 
 *Default Value:* 10000
 
-``periodic_commitlog_sync_lag_block_in_ms``
+``periodic_commitlog_sync_lag_block``
 -------------------------------------------
 *This option is commented out by default.*
 
 When in periodic commitlog mode, the number of milliseconds to block writes
 while waiting for a slow disk flush to complete.
 
-``commitlog_segment_size_in_mb``
+``commitlog_segment_size``
 --------------------------------
 
 The size of the individual commitlog file segments.  A commitlog
@@ -613,12 +613,12 @@ The default size is 32, which is almost always fine, but if you are
 archiving commitlog segments (see commitlog_archiving.properties),
 then you probably want a finer granularity of archiving; 8 or 16 MB
 is reasonable.
-Max mutation size is also configurable via max_mutation_size_in_kb setting in
-cassandra.yaml. The default is half the size commitlog_segment_size_in_mb * 1024.
-This should be positive and less than 2048.
+Max mutation size is also configurable via max_mutation_size setting in
+cassandra.yaml. The default is half the size commitlog_segment_size.
+This should be positive and less than 2048MB.
 
-NOTE: If max_mutation_size_in_kb is set explicitly then commitlog_segment_size_in_mb must
-be set to at least twice the size of max_mutation_size_in_kb / 1024
+NOTE: If max_mutation_size is set explicitly then commitlog_segment_size_in_mb must
+be set to at least twice the size of max_mutation_size in MB.
 
 
 *Default Value:* 32
@@ -713,7 +713,7 @@ be limited by the less of concurrent reads or concurrent writes.
 
 *Default Value:* 32
 
-``file_cache_size_in_mb``
+``file_cache_size``
 -------------------------
 *This option is commented out by default.*
 
@@ -734,7 +734,7 @@ Memory is only allocated when needed.
 
 Flag indicating whether to allocate on or off heap when the sstable buffer
 pool is exhausted, that is when it has exceeded the maximum memory
-file_cache_size_in_mb, beyond which it will not cache buffers but allocate on request.
+file_cache_size, beyond which it will not cache buffers but allocate on request.
 
 
 *Default Value:* true
@@ -750,7 +750,7 @@ spinning (for spinning disks)
 
 *Default Value:* ssd
 
-``memtable_heap_space_in_mb``
+``memtable_heap_space``
 -----------------------------
 *This option is commented out by default.*
 
@@ -761,7 +761,7 @@ If omitted, Cassandra will set both to 1/4 the size of the heap.
 
 *Default Value:* 2048
 
-``memtable_offheap_space_in_mb``
+``memtable_offheap_space``
 --------------------------------
 *This option is commented out by default.*
 
@@ -802,7 +802,7 @@ offheap_objects
 
 *Default Value:* heap_buffers
 
-``repair_session_space_in_mb``
+``repair_session_space``
 ------------------------------
 *This option is commented out by default.*
 
@@ -816,7 +816,7 @@ this or using subrange repair.
 For more details see https://issues.apache.org/jira/browse/CASSANDRA-14096.
 
 
-``commitlog_total_space_in_mb``
+``commitlog_total_space``
 -------------------------------
 *This option is commented out by default.*
 
@@ -866,7 +866,7 @@ to never stall waiting for flushing to free memory.
 
 *Default Value:* 2
 
-``cdc_total_space_in_mb``
+``cdc_total_space``
 -------------------------
 *This option is commented out by default.*
 
@@ -881,7 +881,7 @@ of the drive where cdc_raw_directory resides.
 
 *Default Value:* 4096
 
-``cdc_free_space_check_interval_ms``
+``cdc_free_space_check_interval``
 ------------------------------------
 *This option is commented out by default.*
 
@@ -891,7 +891,7 @@ new space for cdc-tracked tables has been made available. Default to 250ms
 
 *Default Value:* 250
 
-``index_summary_capacity_in_mb``
+``index_summary_capacity``
 --------------------------------
 
 A fixed memory pool size in MB for for SSTable index summaries. If left
@@ -901,7 +901,7 @@ shrink their index summaries in order to meet this limit.  However, this
 is a best-effort process. In extreme conditions Cassandra may need to use
 more than this amount of memory.
 
-``index_summary_resize_interval_in_minutes``
+``index_summary_resize_interval``
 --------------------------------------------
 
 How frequently index summaries should be resampled.  This is done
@@ -922,9 +922,9 @@ necessarily on platters.
 
 *Default Value:* false
 
-``trickle_fsync_interval_in_kb``
+``trickle_fsync_interval``
 --------------------------------
-
+sstable_preemptive_open_interval
 *Default Value:* 10240
 
 ``storage_port``
@@ -1042,7 +1042,7 @@ keeping native_transport_port unencrypted.
 
 *Default Value:* 9142
 
-``native_transport_max_threads``
+``max_native_transport_threads``
 --------------------------------
 *This option is commented out by default.*
 The maximum threads for handling requests (note that idle threads are stopped
@@ -1050,7 +1050,7 @@ after 30 seconds so there is not corresponding minimum setting).
 
 *Default Value:* 128
 
-``native_transport_max_frame_size_in_mb``
+``max_native_transport_frame_size``
 -----------------------------------------
 *This option is commented out by default.*
 
@@ -1060,7 +1060,7 @@ you may want to adjust max_value_size_in_mb accordingly. This should be positive
 
 *Default Value:* 256
 
-``native_transport_frame_block_size_in_kb``
+``native_transport_frame_block_size``
 -------------------------------------------
 *This option is commented out by default.*
 
@@ -1078,7 +1078,7 @@ The default is -1, which means unlimited.
 
 *Default Value:* -1
 
-``native_transport_max_concurrent_connections_per_ip``
+``max_native_transport_concurrent_connections_per_ip``
 ------------------------------------------------------
 *This option is commented out by default.*
 
@@ -1095,7 +1095,7 @@ The default is true, which means all supported protocols will be honored.
 
 *Default Value:* true
 
-``native_transport_idle_timeout_in_ms``
+``native_transport_idle_timeout``
 ---------------------------------------
 *This option is commented out by default.*
 
@@ -1217,7 +1217,7 @@ lose data on truncation or drop.
 
 *Default Value:* true
 
-``column_index_size_in_kb``
+``column_index_size``
 ---------------------------
 
 Granularity of the collation index of rows within a partition.
@@ -1233,7 +1233,7 @@ number of rows per partition.  The competing goals are these:
 
 *Default Value:* 64
 
-``column_index_cache_size_in_kb``
+``column_index_cache_size``
 ---------------------------------
 
 Per sstable indexed key cache entries (the collation index in memory
@@ -1257,7 +1257,7 @@ workload, by mitigating the tendency of small sstables to accumulate
 during a single long running compactions. The default is usually
 fine and if you experience problems with compaction running too
 slowly or too fast, you should look at
-compaction_throughput_mb_per_sec first.
+compaction_throughput first.
 
 concurrent_compactors defaults to the smaller of (number of disks,
 number of cores), with a minimum of 2 and a maximum of 8.
@@ -1295,7 +1295,7 @@ of compaction, including validation compaction.
 
 *Default Value:* 16
 
-``sstable_preemptive_open_interval_in_mb``
+``sstable_preemptive_open_interval``
 ------------------------------------------
 
 When compacting, the replacement sstable(s) can be opened before they
@@ -1312,7 +1312,7 @@ between the sstables, reducing page cache churn and keeping hot rows hot
 When enabled, permits Cassandra to zero-copy stream entire eligible
 SSTables between nodes, including every component.
 This speeds up the network transfer significantly subject to
-throttling specified by stream_throughput_outbound_megabits_per_sec.
+throttling specified by stream_throughput_outbound.
 Enabling this will reduce the GC pressure on sending and receiving node.
 When unset, the default is enabled. While this feature tries to keep the
 disks balanced, it cannot guarantee it. This feature will be automatically
@@ -1322,7 +1322,7 @@ will benefit as well when used in combination with CASSANDRA-6696.
 
 *Default Value:* true
 
-``stream_throughput_outbound_megabits_per_sec``
+``stream_throughput_outbound``
 -----------------------------------------------
 *This option is commented out by default.*
 
@@ -1334,7 +1334,7 @@ When unset, the default is 200 Mbps or 25 MB/s.
 
 *Default Value:* 200
 
-``inter_dc_stream_throughput_outbound_megabits_per_sec``
+``inter_dc_stream_throughput_outbound``
 --------------------------------------------------------
 *This option is commented out by default.*
 
@@ -1346,7 +1346,7 @@ When unset, the default is 200 Mbps or 25 MB/s
 
 *Default Value:* 200
 
-``read_request_timeout_in_ms``
+``read_request_timeout``
 ------------------------------
 
 How long the coordinator should wait for read operations to complete.
@@ -1354,28 +1354,28 @@ Lowest acceptable value is 10 ms.
 
 *Default Value:* 5000
 
-``range_request_timeout_in_ms``
+``range_request_timeout``
 -------------------------------
 How long the coordinator should wait for seq or index scans to complete.
 Lowest acceptable value is 10 ms.
 
 *Default Value:* 10000
 
-``write_request_timeout_in_ms``
+``write_request_timeout``
 -------------------------------
 How long the coordinator should wait for writes to complete.
 Lowest acceptable value is 10 ms.
 
 *Default Value:* 2000
 
-``counter_write_request_timeout_in_ms``
+``counter_write_request_timeout``
 ---------------------------------------
 How long the coordinator should wait for counter writes to complete.
 Lowest acceptable value is 10 ms.
 
 *Default Value:* 5000
 
-``cas_contention_timeout_in_ms``
+``cas_contention_timeout``
 --------------------------------
 How long a coordinator should continue to retry a CAS operation
 that contends with other proposals for the same row.
@@ -1383,7 +1383,7 @@ Lowest acceptable value is 10 ms.
 
 *Default Value:* 1000
 
-``truncate_request_timeout_in_ms``
+``truncate_request_timeout``
 ----------------------------------
 How long the coordinator should wait for truncates to complete
 (This can be much longer, because unless auto_snapshot is disabled
@@ -1392,14 +1392,14 @@ Lowest acceptable value is 10 ms.
 
 *Default Value:* 60000
 
-``request_timeout_in_ms``
+``request_timeout``
 -------------------------
 The default timeout for other, miscellaneous operations.
 Lowest acceptable value is 10 ms.
 
 *Default Value:* 10000
 
-``internode_application_send_queue_capacity_in_bytes``
+``internode_application_send_queue_capacity``
 ------------------------------------------------------
 *This option is commented out by default.*
 
@@ -1407,13 +1407,13 @@ Defensive settings for protecting Cassandra from true network partitions.
 See (CASSANDRA-14358) for details.
 
 The amount of time to wait for internode tcp connections to establish.
-internode_tcp_connect_timeout_in_ms = 2000
+internode_tcp_connect_timeout = 2000
 
 The amount of time unacknowledged data is allowed on a connection before we throw out the connection
 Note this is only supported on Linux + epoll, and it appears to behave oddly above a setting of 30000
 (it takes much longer than 30s) as of Linux 4.12. If you want something that high set this to 0
 which picks up the OS default and configure the net.ipv4.tcp_retries2 sysctl to be ~8.
-internode_tcp_user_timeout_in_ms = 30000
+internode_tcp_user_timeout = 30000
 
 The maximum continuous period a connection may be unwritable in application space
 internode_application_timeout_in_ms = 30000
@@ -1424,7 +1424,7 @@ size of the message being sent or received.
 
 The basic per-link limit is consumed in isolation before any endpoint or global limit is imposed.
 Each node-pair has three links: urgent, small and large.  So any given node may have a maximum of
-N*3*(internode_application_send_queue_capacity_in_bytes+internode_application_receive_queue_capacity_in_bytes)
+N*3*(internode_application_send_queue_capacity+internode_application_receive_queue_capacity)
 messages queued without any coordination between them although in practice, with token-aware routing, only RF*tokens
 nodes should need to communicate with significant bandwidth.
 
@@ -1436,37 +1436,37 @@ on all links to or from any node in the cluster.
 
 *Default Value:* 4194304                       #4MiB
 
-``internode_application_send_queue_reserve_endpoint_capacity_in_bytes``
+``internode_application_send_queue_reserve_endpoint_capacity``
 -----------------------------------------------------------------------
 *This option is commented out by default.*
 
 *Default Value:* 134217728    #128MiB
 
-``internode_application_send_queue_reserve_global_capacity_in_bytes``
+``internode_application_send_queue_reserve_global_capacity``
 ---------------------------------------------------------------------
 *This option is commented out by default.*
 
 *Default Value:* 536870912      #512MiB
 
-``internode_application_receive_queue_capacity_in_bytes``
+``internode_application_receive_queue_capacity``
 ---------------------------------------------------------
 *This option is commented out by default.*
 
 *Default Value:* 4194304                    #4MiB
 
-``internode_application_receive_queue_reserve_endpoint_capacity_in_bytes``
+``internode_application_receive_queue_reserve_endpoint_capacity``
 --------------------------------------------------------------------------
 *This option is commented out by default.*
 
 *Default Value:* 134217728 #128MiB
 
-``internode_application_receive_queue_reserve_global_capacity_in_bytes``
+``internode_application_receive_queue_reserve_global_capacity``
 ------------------------------------------------------------------------
 *This option is commented out by default.*
 
 *Default Value:* 536870912   #512MiB
 
-``slow_query_log_timeout_in_ms``
+``slow_query_log_timeout``
 --------------------------------
 
 
@@ -1476,7 +1476,7 @@ can be identified. Set this value to zero to disable slow query logging.
 
 *Default Value:* 500
 
-``cross_node_timeout``
+``internode_timeout``
 ----------------------
 *This option is commented out by default.*
 
@@ -1491,7 +1491,7 @@ since this is a requirement for general correctness of last write wins.
 
 *Default Value:* true
 
-``streaming_keep_alive_period_in_secs``
+``streaming_keep_alive_period``
 ---------------------------------------
 *This option is commented out by default.*
 
@@ -1593,7 +1593,7 @@ of the snitch, which will be assumed to be on your classpath.
 
 *Default Value:* SimpleSnitch
 
-``dynamic_snitch_update_interval_in_ms``
+``dynamic_snitch_update_interval``
 ----------------------------------------
 
 controls how often to perform the more expensive part of host score
@@ -1601,7 +1601,7 @@ calculation
 
 *Default Value:* 100 
 
-``dynamic_snitch_reset_interval_in_ms``
+``dynamic_snitch_reset_interval``
 ---------------------------------------
 controls how often to reset all host scores, allowing a bad host to
 possibly recover
@@ -1651,7 +1651,7 @@ http://download.oracle.com/javase/8/docs/technotes/guides/security/jsse/JSSERefG
         optional: false
         # if enabled, will open up an encrypted listening socket on ssl_storage_port. Should be used
         # during upgrade to 4.0; otherwise, set to false.
-        enable_legacy_ssl_storage_port: false
+        legacy_ssl_storage_port_enabled: false
         # on outbound connections, determine which type of peers to securely connect to. 'enabled' must be set to true.
         internode_encryption: none
         keystore: conf/.keystore
@@ -1724,17 +1724,17 @@ TTL for different trace types used during logging of the repair process.
 
 *Default Value:* 604800
 
-``enable_user_defined_functions``
+``user_defined_functions_enabled``
 ---------------------------------
 
-If unset, all GC Pauses greater than gc_log_threshold_in_ms will log at
+If unset, all GC Pauses greater than gc_log_threshold will log at
 INFO level
 UDFs (user defined functions) are disabled by default.
 As of Cassandra 3.0 there is a sandbox in place that should prevent execution of evil code.
 
 *Default Value:* false
 
-``enable_scripted_user_defined_functions``
+``scripted_user_defined_functions_enabled``
 ------------------------------------------
 
 Enables scripted UDFs (JavaScript UDFs).
@@ -1812,7 +1812,7 @@ using the StorageService mbean.
 
 *Default Value:* 100000
 
-``batch_size_warn_threshold_in_kb``
+``batch_size_warn_threshold``
 -----------------------------------
 
 Log WARN on any multiple-partition batch size exceeding this value. 5kb per batch by default.
@@ -1820,7 +1820,7 @@ Caution should be taken on increasing the size of this threshold as it can lead 
 
 *Default Value:* 5
 
-``batch_size_fail_threshold_in_kb``
+``batch_size_fail_threshold``
 -----------------------------------
 
 Fail any multiple-partition batch exceeding this value. 50kb (10x warn threshold) by default.
@@ -1834,14 +1834,14 @@ Log WARN on any batches not of type LOGGED than span across more partitions than
 
 *Default Value:* 10
 
-``compaction_large_partition_warning_threshold_mb``
+``compaction_large_partition_warning_threshold``
 ---------------------------------------------------
 
 Log a warning when compacting partitions larger than this value
 
 *Default Value:* 100
 
-``gc_log_threshold_in_ms``
+``gc_log_threshold``
 --------------------------
 *This option is commented out by default.*
 
@@ -1850,17 +1850,17 @@ This threshold can be adjusted to minimize logging if necessary
 
 *Default Value:* 200
 
-``gc_warn_threshold_in_ms``
+``gc_warn_threshold``
 ---------------------------
 *This option is commented out by default.*
 
-GC Pauses greater than gc_warn_threshold_in_ms will be logged at WARN level
+GC Pauses greater than gc_warn_threshold will be logged at WARN level
 Adjust the threshold based on your application throughput requirement. Setting to 0
 will deactivate the feature.
 
 *Default Value:* 1000
 
-``max_value_size_in_mb``
+``max_value_size``
 ------------------------
 *This option is commented out by default.*
 
@@ -1893,7 +1893,7 @@ if SLOW at the speed of the slowest one.
 New strategies can be added. Implementors need to implement org.apache.cassandra.net.BackpressureStrategy and
 provide a public constructor accepting a Map<String, Object>.
 
-``otc_coalescing_strategy``
+``outbound_connection_coalescing_strategy``
 ---------------------------
 *This option is commented out by default.*
 
@@ -1916,7 +1916,7 @@ You can also specify a subclass of CoalescingStrategies.CoalescingStrategy by na
 
 *Default Value:* DISABLED
 
-``otc_coalescing_window_us``
+``outbound_connection_coalescing_window_us``
 ----------------------------
 *This option is commented out by default.*
 
@@ -1927,7 +1927,7 @@ for coalescing to be enabled.
 
 *Default Value:* 200
 
-``otc_coalescing_enough_coalesced_messages``
+``outbound_connection_coalescing_enough_coalesced_messages``
 --------------------------------------------
 *This option is commented out by default.*
 
@@ -1935,7 +1935,7 @@ Do not try to coalesce messages if we already got that many messages. This shoul
 
 *Default Value:* 8
 
-``otc_backlog_expiration_interval_ms``
+``outbound_connection_backlog_expiration_interval``
 --------------------------------------
 *This option is commented out by default.*
 
@@ -2045,7 +2045,7 @@ mismatches are less actionable than confirmed ones.
 
 *Default Value:* false
 
-``enable_materialized_views``
+``materialized_views_enabled``
 -----------------------------
 
 ########################
@@ -2057,7 +2057,7 @@ Materialized views are considered experimental and are not recommended for produ
 
 *Default Value:* false
 
-``enable_sasi_indexes``
+``sasi_indexes_enabled``
 -----------------------
 
 Enables SASI index creation on this node.
@@ -2065,7 +2065,7 @@ SASI indexes are considered experimental and are not recommended for production 
 
 *Default Value:* false
 
-``enable_transient_replication``
+``transient_replication_enabled``
 --------------------------------
 
 Enables creation of transiently replicated keyspaces on this node.

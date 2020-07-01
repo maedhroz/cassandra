@@ -259,14 +259,14 @@ Upgrading
       enable_scripted_user_defined_functions is scripted_user_defined_functions_enabled.
       cross_node_timeout is internode_timeout.
       native_transport_max_threads is max_native_transport_threads.
-      native_transport_max_frame_size_in_mb is max_native_transport_frame_size_in_mb.
-      native_transport_max_concurrent_connections is max_native_transport_concurrent_connections_in_mb.
+      native_transport_max_frame_size_in_mb is max_native_transport_frame_size.
+      native_transport_max_concurrent_connections is max_native_transport_concurrent_connections.
       native_transport_max_concurrent_connections_per_ip is max_native_transport_concurrent_connections_per_ip.
       otc_coalescing_window_us_default is outbound_connection_coalescing_window_us_default
       otc_coalescing_strategy is outbound_connection_coalescing_strategy.
       otc_coalescing_window_us is outbound_connection_coalescing_window_us.
       otc_coalescing_enough_coalesced_messages is outbound_connection_coalescing_enough_coalesced_messages.
-      otc_backlog_expiration_interval_ms is outbound_connection_backlog_expiration_interval_ms.
+      otc_backlog_expiration_interval_ms is outbound_connection_backlog_expiration_interval.
       enable_legacy_ssl_storage_port is legacy_ssl_storage_port_enabled.
       enable_materialized_views is materialized_views_enabled.
       enable_sasi_indexes is sasi_indexes_enabled.
@@ -312,12 +312,11 @@ Upgrading
       internode_application_receive_queue_capacity_in_bytes is internode_application_receive_queue_capacity.
       internode_application_receive_queue_reserve_endpoint_capacity_in_bytes is internode_application_receive_queue_reserve_endpoint_capacity.
       internode_application_receive_queue_reserve_global_capacity_in_bytes is internode_application_receive_queue_reserve_global_capacity.
-      max_native_transport_frame_size is max_native_transport_frame_size_in_mb.
-      native_transport_frame_block_size is native_transport_frame_block_size_in_kb.
+      native_transport_frame_block_size_in_kb is native_transport_frame_block_size.
       max_value_size is max_value_size_in_mb.
-      column_index_size is column_index_size_in_kb.
+      column_index_size_in_kb is column_index_size.
       column_index_cache_size_in_kb is column_index_cache_size.
-      batch_size_warn_threshold_in_kb is atch_size_warn_threshold.
+      batch_size_warn_threshold_in_kb is batch_size_warn_threshold.
       batch_size_fail_threshold_in_kb is batch_size_fail_threshold.
       compaction_large_partition_warning_threshold_mb is compaction_large_partition_warning_threshold.
       commitlog_total_space_in_mb is commitlog_total_space.

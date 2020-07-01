@@ -9,7 +9,7 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ ElementType.FIELD})
 @Repeatable(ReplacesList.class)
-public @interface Replaces
+@interface Replaces
 {
     String oldName();
 
