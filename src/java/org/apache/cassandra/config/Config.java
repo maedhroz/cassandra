@@ -409,7 +409,7 @@ public class Config
      */
     public volatile ConsistencyLevel ideal_consistency_level = null;
 
-    /*enable_legacy_ssl_storage_port
+    /*
      * Strategy to use for coalescing messages in {@link OutboundConnections}.
      * Can be fixed, movingaverage, timehorizon, disabled. Setting is case and leading/trailing
      * whitespace insensitive. You can also specify a subclass of
