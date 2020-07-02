@@ -181,9 +181,10 @@ public class YamlConfigurationLoader implements ConfigurationLoader
         return m.find();
     }
 
-    static class CustomConstructor extends Constructor
+    @VisibleForTesting
+    public static class CustomConstructor extends Constructor
     {
-        CustomConstructor(Class<?> theRoot)
+        public CustomConstructor(Class<?> theRoot)
         {
             super(theRoot);
 
@@ -229,7 +230,8 @@ public class YamlConfigurationLoader implements ConfigurationLoader
      * Utility class to check that there are no extra properties and that properties that are not null by default
      * are not set to null.
      */
-    private static class PropertiesChecker extends PropertyUtils
+    @VisibleForTesting
+    public static class PropertiesChecker extends PropertyUtils
     {
         private final Set<String> missingProperties = new HashSet<>();
 
@@ -278,6 +280,11 @@ public class YamlConfigurationLoader implements ConfigurationLoader
                 else
                 {
                     logger.warn("{} parameter has a new name and value format. For more information, please refer to NEWS.txt", name);
+                }
+
+                if(replacement.deprecated)
+                {
+                    logger.warn("{} parameter has been deprecated. It has a new name and value format; For more information, please refer to NEWS.txt", name);
                 }
             }
             else
@@ -331,6 +338,7 @@ public class YamlConfigurationLoader implements ConfigurationLoader
         }
     }
 
+    @VisibleForTesting
     public static Map<Class<? extends Object>, Map<String, Replacement>> getReplacements(Class<? extends Object> klass)
     {
         List<Replacement> replacements = getReplacementsRecursive(klass);
@@ -415,17 +423,24 @@ public class YamlConfigurationLoader implements ConfigurationLoader
                 throw new RuntimeException("Unable to create converter of type " + converterKlass, e);
             }
         });
+
         String scheduledRemoveBy = r.scheduledRemoveBy();
         if ("".equals(scheduledRemoveBy))
             scheduledRemoveBy = null;
 
+        boolean deprecated;
+        if (r.deprecated())
+            deprecated = true;
+        else
+            deprecated = false;
+
         Class<?> oldType = converter.getInputType();
         if (oldType == null)
             oldType = newType;
-        replacements.add(new Replacement(klass, oldName, oldType, newName, converter, scheduledRemoveBy));
+        replacements.add(new Replacement(klass, oldName, oldType, newName, converter, scheduledRemoveBy, deprecated));
     }
 
-    static final class Replacement
+    public static final class Replacement
     {
         public final Class<? extends Object> parent;
         public final String oldName;
@@ -433,10 +448,11 @@ public class YamlConfigurationLoader implements ConfigurationLoader
         public final String newName;
         public final Converter converter;
         public final String scheduledRemoveBy;
+        public final boolean deprecated;
 
         Replacement(Class<? extends Object> parent,
                     String oldName, Class<?> oldType,
-                    String newName, Converter converter, String scheduledRemoveBy)
+                    String newName, Converter converter, String scheduledRemoveBy, boolean deprecated)
         {
             this.parent = Objects.requireNonNull(parent);
             this.oldName = Objects.requireNonNull(oldName);
@@ -444,6 +460,7 @@ public class YamlConfigurationLoader implements ConfigurationLoader
             this.newName = Objects.requireNonNull(newName);
             this.converter = Objects.requireNonNull(converter);
             this.scheduledRemoveBy = scheduledRemoveBy;
+            this.deprecated = deprecated;
         }
     }
 }

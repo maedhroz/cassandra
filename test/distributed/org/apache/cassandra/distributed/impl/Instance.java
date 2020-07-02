@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -47,7 +48,10 @@ import org.apache.cassandra.concurrent.ScheduledExecutors;
 import org.apache.cassandra.concurrent.SharedExecutorPool;
 import org.apache.cassandra.concurrent.Stage;
 import org.apache.cassandra.config.Config;
+import org.apache.cassandra.config.DataStorage;
 import org.apache.cassandra.config.DatabaseDescriptor;
+import org.apache.cassandra.config.Duration;
+import org.apache.cassandra.config.YamlConfigurationLoader;
 import org.apache.cassandra.cql3.CQLStatement;
 import org.apache.cassandra.cql3.QueryHandler;
 import org.apache.cassandra.cql3.QueryOptions;
@@ -109,8 +113,18 @@ import org.apache.cassandra.utils.Throwables;
 import org.apache.cassandra.utils.concurrent.Ref;
 import org.apache.cassandra.utils.memory.BufferPool;
 import org.apache.cassandra.utils.progress.jmx.JMXBroadcastExecutor;
+import org.yaml.snakeyaml.composer.Composer;
+import org.yaml.snakeyaml.constructor.Constructor;
+import org.yaml.snakeyaml.error.Mark;
+import org.yaml.snakeyaml.nodes.MappingNode;
+import org.yaml.snakeyaml.nodes.Node;
+import org.yaml.snakeyaml.nodes.NodeTuple;
+import org.yaml.snakeyaml.nodes.ScalarNode;
+import org.yaml.snakeyaml.nodes.SequenceNode;
+import org.yaml.snakeyaml.nodes.Tag;
 
 import static java.util.concurrent.TimeUnit.MINUTES;
+import static org.apache.cassandra.config.YamlConfigurationLoader.getReplacements;
 import static org.apache.cassandra.distributed.api.Feature.GOSSIP;
 import static org.apache.cassandra.distributed.api.Feature.NATIVE_PROTOCOL;
 import static org.apache.cassandra.distributed.api.Feature.NETWORK;
@@ -452,10 +466,56 @@ public class Instance extends IsolatedExecutor implements IInvokableInstance
 
     private Config loadConfig(IInstanceConfig overrides)
     {
-        Config config = new Config();
-        overrides.propagate(config, mapper);
+        Constructor constructor = new YamlConfigurationLoader.CustomConstructor(Config.class);
+        Map<Class<?>, Map<String, YamlConfigurationLoader.Replacement>> replacements = getReplacements(Config.class);
+        YamlConfigurationLoader.PropertiesChecker propertiesChecker = new YamlConfigurationLoader.PropertiesChecker(replacements);
+        constructor.setPropertyUtils(propertiesChecker);
+        constructor.setComposer(new Composer(null, null) {
+            public Node getSingleNode()
+            {
+                return toNode(overrides.getParams());
+            }
+        });
+
+        Config config = (Config) constructor.getSingleData(Config.class);
+
         return config;
     }
+
+    public static Node toNode(Object object)
+    {
+        if (object instanceof Map)
+        {
+            List<NodeTuple> values = new ArrayList<>();
+            for (Map.Entry<Object, Object> e : ((Map<Object, Object>) object).entrySet())
+            {
+                values.add(new NodeTuple(toNode(e.getKey()), toNode(e.getValue())));
+            }
+            return new MappingNode(FAKE_TAG, values, null);
+        }
+        else if (object instanceof Number || object instanceof String || object instanceof Boolean
+                 || object instanceof DataStorage || object instanceof Duration || object instanceof Config.CommitLogSync)
+        {
+            return new ScalarNode(Tag.STR, object.toString(), FAKE_MARK, FAKE_MARK, '\'');
+        }
+        else if(object instanceof String[])
+        {
+            int size = ((String[])object).length;
+            Node values[] = new Node[size];
+            SequenceNode node = new SequenceNode(Tag.STR, Arrays.asList(values), false);
+
+            for (int i =0; i < size; i++)
+                values[i] = new ScalarNode(Tag.STR, ((String[])object)[i], FAKE_MARK, FAKE_MARK, '\'');
+
+            return node;
+        }
+        else
+        {
+            throw new UnsupportedOperationException("unexpected type found: given " + object.getClass());
+        }
+    }
+    private static final Tag FAKE_TAG = new Tag("ignore");
+    private static final Mark FAKE_MARK = new Mark("ignore", 0, 0, 0, "", 0);
 
     private void initializeRing(ICluster cluster)
     {
