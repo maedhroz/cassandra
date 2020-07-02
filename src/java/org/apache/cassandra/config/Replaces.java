@@ -16,4 +16,6 @@ import java.lang.annotation.Target;
     Class<? extends Converter> converter() default Converter.IdentityConverter.class;
 
     String scheduledRemoveBy() default "";
+
+    boolean deprecated() default false;
 }

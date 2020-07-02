@@ -116,6 +116,7 @@ New features
 
 Upgrading
 ---------
+    - Configuration parameter commitlog_sync_batch_window_in_ms has been removed.
     - Sstables for tables using with a frozen UDT written by C* 3.0 appear as corrupted.
 
       Background: The serialization-header in the -Statistics.db sstable component contains the type information
