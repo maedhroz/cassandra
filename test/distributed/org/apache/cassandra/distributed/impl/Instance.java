@@ -466,56 +466,10 @@ public class Instance extends IsolatedExecutor implements IInvokableInstance
 
     private Config loadConfig(IInstanceConfig overrides)
     {
-        Constructor constructor = new YamlConfigurationLoader.CustomConstructor(Config.class);
-        Map<Class<?>, Map<String, YamlConfigurationLoader.Replacement>> replacements = getReplacements(Config.class);
-        YamlConfigurationLoader.PropertiesChecker propertiesChecker = new YamlConfigurationLoader.PropertiesChecker(replacements);
-        constructor.setPropertyUtils(propertiesChecker);
-        constructor.setComposer(new Composer(null, null) {
-            public Node getSingleNode()
-            {
-                return toNode(overrides.getParams());
-            }
-        });
-
-        Config config = (Config) constructor.getSingleData(Config.class);
-
+        Config config = new Config();
+        overrides.propagate(config, mapper);
         return config;
     }
-
-    public static Node toNode(Object object)
-    {
-        if (object instanceof Map)
-        {
-            List<NodeTuple> values = new ArrayList<>();
-            for (Map.Entry<Object, Object> e : ((Map<Object, Object>) object).entrySet())
-            {
-                values.add(new NodeTuple(toNode(e.getKey()), toNode(e.getValue())));
-            }
-            return new MappingNode(FAKE_TAG, values, null);
-        }
-        else if (object instanceof Number || object instanceof String || object instanceof Boolean
-                 || object instanceof DataStorage || object instanceof Duration || object instanceof Config.CommitLogSync)
-        {
-            return new ScalarNode(Tag.STR, object.toString(), FAKE_MARK, FAKE_MARK, '\'');
-        }
-        else if(object instanceof String[])
-        {
-            int size = ((String[])object).length;
-            Node values[] = new Node[size];
-            SequenceNode node = new SequenceNode(Tag.STR, Arrays.asList(values), false);
-
-            for (int i =0; i < size; i++)
-                values[i] = new ScalarNode(Tag.STR, ((String[])object)[i], FAKE_MARK, FAKE_MARK, '\'');
-
-            return node;
-        }
-        else
-        {
-            throw new UnsupportedOperationException("unexpected type found: given " + object.getClass());
-        }
-    }
-    private static final Tag FAKE_TAG = new Tag("ignore");
-    private static final Mark FAKE_MARK = new Mark("ignore", 0, 0, 0, "", 0);
 
     private void initializeRing(ICluster cluster)
     {
