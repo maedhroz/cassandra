@@ -104,16 +104,11 @@ public class DataResolver<E extends Endpoints<E>, P extends ReplicaPlan.ForRead<
             });
         }
 
-        if (!needsReplicaFilteringProtection())
-        {
-            ResolveContext context = new ResolveContext(replicas);
-            return resolveWithReadRepair(context,
-                                         i -> shortReadProtectedResponse(i, context),
-                                         UnaryOperator.identity(),
-                                         repairedDataTracker);
-        }
-
-        return resolveWithReplicaFilteringProtection(replicas, repairedDataTracker);
+        ResolveContext context = new ResolveContext(replicas);
+        return resolveWithReadRepair(context,
+                                     i -> shortReadProtectedResponse(i, context),
+                                     UnaryOperator.identity(),
+                                     repairedDataTracker);
     }
 
     private boolean needsReplicaFilteringProtection()
