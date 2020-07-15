@@ -38,7 +38,7 @@ public class EncryptionOptions
     public final boolean require_client_auth;
     public final boolean require_endpoint_verification;
     // ServerEncryptionOptions does not use the enabled flag at all instead using the existing
-    // internode_encryption option. So we force this private and expose through isEnabled
+    // internode_encryption_options option. So we force this private and expose through isEnabled
     // so users of ServerEncryptionOptions can't accidentally use this when they should use isEnabled
     // Long term we need to refactor ClientEncryptionOptions and ServerEncyrptionOptions to be separate
     // classes so we can choose appropriate configuration for each.

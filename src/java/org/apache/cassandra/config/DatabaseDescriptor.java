@@ -994,7 +994,7 @@ public class DatabaseDescriptor
     {
         try
         {
-            SSLFactory.initHotReloading(conf.internode_encryption, conf.client_encryption_options, false);
+            SSLFactory.initHotReloading(conf.internode_encryption_options, conf.client_encryption_options, false);
         }
         catch(IOException e)
         {
@@ -2349,12 +2349,12 @@ public class DatabaseDescriptor
 
     public static EncryptionOptions.ServerEncryptionOptions getInternodeMessagingEncyptionOptions()
     {
-        return conf.internode_encryption;
+        return conf.internode_encryption_options;
     }
 
     public static void setInternodeMessagingEncyptionOptions(EncryptionOptions.ServerEncryptionOptions encryptionOptions)
     {
-        conf.internode_encryption = encryptionOptions;
+        conf.internode_encryption_options = encryptionOptions;
     }
 
     public static EncryptionOptions getNativeProtocolEncryptionOptions()

@@ -53,7 +53,7 @@ final class SettingsTable extends AbstractVirtualTable
         ImmutableMap.<String, BiConsumer<SimpleDataSet, Field>>builder()
                     .put("audit_logging_options", this::addAuditLoggingOptions)
                     .put("client_encryption_options", this::addEncryptionOptions)
-                    .put("internode_encryption", this::addEncryptionOptions)
+                    .put("internode_encryption_options", this::addEncryptionOptions)
                     .put("transparent_data_encryption_options", this::addTransparentEncryptionOptions)
                     .build();
 

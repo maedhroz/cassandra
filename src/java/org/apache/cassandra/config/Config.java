@@ -298,7 +298,7 @@ public class Config
     public double dynamic_snitch_badness_threshold = 0.1;
 
     @Replaces(oldName = "server_encryption_options", deprecated = true)
-    public EncryptionOptions.ServerEncryptionOptions internode_encryption = new EncryptionOptions.ServerEncryptionOptions();
+    public EncryptionOptions.ServerEncryptionOptions internode_encryption_options = new EncryptionOptions.ServerEncryptionOptions();
     public EncryptionOptions client_encryption_options = new EncryptionOptions();
 
     public InternodeCompression internode_compression = InternodeCompression.none;
@@ -686,7 +686,7 @@ public class Config
 
     private static final List<String> SENSITIVE_KEYS = new ArrayList<String>() {{
         add("client_encryption_options");
-        add("internode_encryption");
+        add("internode_encryption_options");
     }};
 
     public static void log(Config config)
