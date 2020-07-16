@@ -135,7 +135,7 @@ public class DataResolver extends ResponseResolver
         UnfilteredPartitionIterator originalResponse = responses.get(i).payload.makeIterator(command);
 
         return context.needShortReadProtection()
-               ? extendWithShortReadProtection(originalResponse, context.sources[i], context.mergedResultCounter)
+               ? extendWithShortReadProtection(originalResponse, context, i)
                : originalResponse;
     }
 
@@ -596,14 +596,17 @@ public class DataResolver extends ResponseResolver
     }
 
     private UnfilteredPartitionIterator extendWithShortReadProtection(UnfilteredPartitionIterator partitions,
-                                                                      InetAddress source,
-                                                                      DataLimits.Counter mergedResultCounter)
+                                                                      ResolveContext context,
+                                                                      int i)
     {
         DataLimits.Counter singleResultCounter =
             command.limits().newCounter(command.nowInSec(), false, command.selectsFullPartition(), enforceStrictLiveness).onlyCount();
 
-        ShortReadPartitionsProtection protection =
-            new ShortReadPartitionsProtection(source, singleResultCounter, mergedResultCounter);
+        ShortReadPartitionsProtection protection = 
+            new ShortReadPartitionsProtection(context.sources[i],
+                                              () -> responses.clearUnsafe(i), // free up responses from this source for GC
+                                              singleResultCounter,
+                                              context.mergedResultCounter);
 
         /*
          * The order of extention and transformations is important here. Extending with more partitions has to happen
@@ -640,6 +643,7 @@ public class DataResolver extends ResponseResolver
     private class ShortReadPartitionsProtection extends Transformation<UnfilteredRowIterator> implements MorePartitions<UnfilteredPartitionIterator>
     {
         private final InetAddress source;
+        private final Runnable preFetchCallback; // called immediately before fetching more contents
 
         private final DataLimits.Counter singleResultCounter; // unmerged per-source counter
         private final DataLimits.Counter mergedResultCounter; // merged end-result counter
@@ -648,9 +652,10 @@ public class DataResolver extends ResponseResolver
 
         private boolean partitionsFetched; // whether we've seen any new partitions since iteration start or last moreContents() call
 
-        private ShortReadPartitionsProtection(InetAddress source, DataLimits.Counter singleResultCounter, DataLimits.Counter mergedResultCounter)
+        private ShortReadPartitionsProtection(InetAddress source, Runnable preFetchCallback, DataLimits.Counter singleResultCounter, DataLimits.Counter mergedResultCounter)
         {
             this.source = source;
+            this.preFetchCallback = preFetchCallback;
             this.singleResultCounter = singleResultCounter;
             this.mergedResultCounter = mergedResultCounter;
         }
@@ -721,6 +726,10 @@ public class DataResolver extends ResponseResolver
             ColumnFamilyStore.metricsFor(command.metadata().cfId).shortReadProtectionRequests.mark();
             Tracing.trace("Requesting {} extra rows from {} for short read protection", toQuery, source);
 
+            // If we've arrived here, all responses have been consumed, and we're about to request more. Before that
+            // happens, execute the callback, which might be able to free response payloads from the current source..
+            preFetchCallback.run();
+            
             PartitionRangeReadCommand cmd = makeFetchAdditionalPartitionReadCommand(toQuery);
             return executeReadCommand(cmd);
         }
@@ -858,10 +867,6 @@ public class DataResolver extends ResponseResolver
                 ColumnFamilyStore.metricsFor(metadata.cfId).shortReadProtectionRequests.mark();
                 Tracing.trace("Requesting {} extra rows from {} for short read protection", lastQueried, source);
 
-                // If we've arrived here, all responses have been consumed, and we're about to request more. Before that
-                // happens, clear the accumulator and allow garbage collection to free the resources they used.
-                responses.clearUnsafe();
-                
                 SinglePartitionReadCommand cmd = makeFetchAdditionalRowsReadCommand(lastQueried);
                 return UnfilteredPartitionIterators.getOnlyElement(executeReadCommand(cmd), cmd);
             }
