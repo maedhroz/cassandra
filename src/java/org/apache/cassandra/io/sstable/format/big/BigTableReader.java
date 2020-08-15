@@ -53,9 +53,10 @@ public class BigTableReader extends SSTableReader
 {
     private static final Logger logger = LoggerFactory.getLogger(BigTableReader.class);
 
-    BigTableReader(Descriptor desc, Set<Component> components, TableMetadataRef metadata, Long maxDataAge, StatsMetadata sstableMetadata, OpenReason openReason, SerializationHeader header)
+    BigTableReader(Descriptor desc, Set<Component> components, TableMetadataRef metadata, Long maxDataAge, 
+                   StatsMetadata sstableMetadata, OpenReason openReason, SerializationHeader header, IndexSummary summary)
     {
-        super(desc, components, metadata, maxDataAge, sstableMetadata, openReason, header);
+        super(desc, components, metadata, maxDataAge, sstableMetadata, openReason, header, summary);
     }
 
     public UnfilteredRowIterator iterator(DecoratedKey key,

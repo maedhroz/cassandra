@@ -46,6 +46,7 @@ import org.apache.cassandra.schema.TableMetadataRef;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.Pair;
 import org.apache.cassandra.utils.memory.HeapAllocator;
+import sun.security.krb5.internal.crypto.Des;
 
 import static org.apache.cassandra.service.ActiveRepairService.NO_PENDING_REPAIR;
 import static org.apache.cassandra.service.ActiveRepairService.UNREPAIRED_SSTABLE;
@@ -265,7 +266,7 @@ public abstract class SSTable
     }
 
     /** @return An estimate of the number of keys contained in the given index file. */
-    protected long estimateRowsFromIndex(RandomAccessReader ifile) throws IOException
+    protected static long estimateRowsFromIndex(RandomAccessReader ifile, Descriptor descriptor) throws IOException
     {
         // collect sizes for the first 10000 keys, or first 10 megabytes of data
         final int SAMPLES_CAP = 10000, BYTES_CAP = (int)Math.min(10000000, ifile.length());
