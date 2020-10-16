@@ -749,7 +749,7 @@ public class TokenMetadata
     @Deprecated
     public Range<Token> getPrimaryRangeFor(Token right)
     {
-        return getPrimaryRangesFor(Arrays.asList(right)).iterator().next();
+        return getPrimaryRangesFor(Collections.singletonList(right)).iterator().next();
     }
 
     public ArrayList<Token> sortedTokens()

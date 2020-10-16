@@ -107,10 +107,10 @@ public class PendingRangeMaps implements Iterable<Map.Entry<Range<Token>, Endpoi
         this.descendingMapForWrapAround = new TreeMap<>(descendingComparatorForWrapAround);
     }
 
-    static final void addToMap(Range<Token> range,
-                               Replica replica,
-                               NavigableMap<Range<Token>, EndpointsForRange.Builder> ascendingMap,
-                               NavigableMap<Range<Token>, EndpointsForRange.Builder> descendingMap)
+    static void addToMap(Range<Token> range,
+                         Replica replica,
+                         NavigableMap<Range<Token>, EndpointsForRange.Builder> ascendingMap,
+                         NavigableMap<Range<Token>, EndpointsForRange.Builder> descendingMap)
     {
         EndpointsForRange.Builder replicas = ascendingMap.get(range);
         if (replicas == null)
@@ -134,9 +134,9 @@ public class PendingRangeMaps implements Iterable<Map.Entry<Range<Token>, Endpoi
         }
     }
 
-    static final void addIntersections(EndpointsForToken.Builder replicasToAdd,
-                                       NavigableMap<Range<Token>, EndpointsForRange.Builder> smallerMap,
-                                       NavigableMap<Range<Token>, EndpointsForRange.Builder> biggerMap)
+    static void addIntersections(EndpointsForToken.Builder replicasToAdd,
+                                 NavigableMap<Range<Token>, EndpointsForRange.Builder> smallerMap,
+                                 NavigableMap<Range<Token>, EndpointsForRange.Builder> biggerMap)
     {
         // find the intersection of two sets
         for (Range<Token> range : smallerMap.keySet())

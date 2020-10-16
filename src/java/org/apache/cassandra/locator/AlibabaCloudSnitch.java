@@ -56,7 +56,7 @@ public class AlibabaCloudSnitch extends AbstractNetworkTopologySnitch
     private static final int HTTP_CONNECT_TIMEOUT = 30000;
     
     
-    public AlibabaCloudSnitch() throws MalformedURLException, IOException 
+    public AlibabaCloudSnitch() throws IOException 
     {
         String response = alibabaApiCall(ZONE_NAME_QUERY_URL);
         String[] splits = response.split("/");
@@ -75,7 +75,7 @@ public class AlibabaCloudSnitch extends AbstractNetworkTopologySnitch
     
     }
     
-    String alibabaApiCall(String url) throws ConfigurationException, IOException, SocketTimeoutException
+    String alibabaApiCall(String url) throws ConfigurationException, IOException
     {
         // Populate the region and zone by introspection, fail if 404 on metadata
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();

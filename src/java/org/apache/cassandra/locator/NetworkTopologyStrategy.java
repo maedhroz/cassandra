@@ -90,19 +90,19 @@ public class NetworkTopologyStrategy extends AbstractReplicationStrategy
     private static final class DatacenterEndpoints
     {
         /** List accepted endpoints get pushed into. */
-        EndpointsForRange.Builder replicas;
+        final EndpointsForRange.Builder replicas;
 
         /**
          * Racks encountered so far. Replicas are put into separate racks while possible.
          * For efficiency the set is shared between the instances, using the location pair (dc, rack) to make sure
          * clashing names aren't a problem.
          */
-        Set<Pair<String, String>> racks;
+        final Set<Pair<String, String>> racks;
 
         /** Number of replicas left to fill from this DC. */
         int rfLeft;
         int acceptableRackRepeats;
-        int transients;
+        final int transients;
 
         DatacenterEndpoints(ReplicationFactor rf, int rackCount, int nodeCount, EndpointsForRange.Builder replicas, Set<Pair<String, String>> racks)
         {

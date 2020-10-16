@@ -72,7 +72,7 @@ public class CloudstackSnitch extends AbstractNetworkTopologySnitch
     {
         String endpoint = csMetadataEndpoint();
         String zone = csQueryMetadata(endpoint + ZONE_NAME_QUERY_URI);
-        String zone_parts[] = zone.split("-");
+        String[] zone_parts = zone.split("-");
 
         if (zone_parts.length != 3)
         {

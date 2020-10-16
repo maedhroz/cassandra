@@ -78,7 +78,7 @@ public class SimpleStrategy extends AbstractReplicationStrategy
         return rf;
     }
 
-    private final static void validateOptionsInternal(Map<String, String> configOptions) throws ConfigurationException
+    private static void validateOptionsInternal(Map<String, String> configOptions) throws ConfigurationException
     {
         if (configOptions.get(REPLICATION_FACTOR) == null)
             throw new ConfigurationException("SimpleStrategy requires a replication_factor strategy option.");

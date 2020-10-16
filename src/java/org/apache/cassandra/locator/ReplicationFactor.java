@@ -124,7 +124,7 @@ public class ReplicationFactor
 
     public String toParseableString()
     {
-        return String.valueOf(allReplicas) + (hasTransientReplicas() ? "/" + transientReplicas() : "");
+        return allReplicas + (hasTransientReplicas() ? "/" + transientReplicas() : "");
     }
 
     @Override
