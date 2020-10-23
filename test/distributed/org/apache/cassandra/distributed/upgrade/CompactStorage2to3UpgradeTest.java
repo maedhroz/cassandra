@@ -19,7 +19,9 @@
 package org.apache.cassandra.distributed.upgrade;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.junit.Test;
 
@@ -27,9 +29,15 @@ import org.apache.cassandra.distributed.UpgradeableCluster;
 import org.apache.cassandra.distributed.api.ConsistencyLevel;
 import org.apache.cassandra.distributed.api.ICoordinator;
 import org.apache.cassandra.distributed.api.IMessageFilters;
+import org.apache.cassandra.distributed.api.IUpgradeableInstance;
 import org.apache.cassandra.distributed.api.NodeToolResult;
+import org.apache.cassandra.distributed.impl.TracingUtil;
 import org.apache.cassandra.distributed.shared.Versions;
-import static org.apache.cassandra.distributed.shared.AssertUtils.*;
+import org.apache.cassandra.utils.UUIDGen;
+
+import static org.apache.cassandra.distributed.shared.AssertUtils.assertRows;
+import static org.apache.cassandra.distributed.shared.AssertUtils.row;
+import static org.junit.Assert.assertEquals;
 
 public class CompactStorage2to3UpgradeTest extends UpgradeTestBase
 {
@@ -314,6 +322,74 @@ public class CompactStorage2to3UpgradeTest extends UpgradeTestBase
                 }).run();
     }
 
+    @Test
+    public void testSSTableTimestampSkipping() throws Throwable
+    {
+        new TestCase()
+        .nodes(1)
+        .upgrade(Versions.Major.v22, Versions.Major.v30)
+        .setup(cluster -> {
+            cluster.schemaChange("CREATE KEYSPACE ks WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};");
+            // Remove compact storage, and both pre and post-upgrade reads will only hit one SSTable.
+            cluster.schemaChange("CREATE TABLE ks.tbl (pk int, ck int, v text, PRIMARY KEY (pk, ck)) WITH COMPACT STORAGE");
+
+            cluster.get(1).executeInternal("INSERT INTO ks.tbl (pk, ck, v) VALUES (1, 1, '1') USING TIMESTAMP 1000000");
+            cluster.get(1).executeInternal("INSERT INTO ks.tbl (pk, ck, v) VALUES (1, 50, '2') USING TIMESTAMP 1000001");
+            cluster.get(1).executeInternal("INSERT INTO ks.tbl (pk, ck, v) VALUES (1, 100, '3') USING TIMESTAMP 1000002");
+            cluster.get(1).flush("ks");
+
+            cluster.get(1).executeInternal("INSERT INTO ks.tbl (pk, ck, v) VALUES (1, 2, '4') USING TIMESTAMP 2000000");
+            cluster.get(1).executeInternal("INSERT INTO ks.tbl (pk, ck, v) VALUES (1, 51, '5') USING TIMESTAMP 2000001");
+            cluster.get(1).executeInternal("INSERT INTO ks.tbl (pk, ck, v) VALUES (1, 101, '6') USING TIMESTAMP 2000002");
+            cluster.get(1).flush("ks");
+
+            String originalTraceTimeout = TracingUtil.setWaitForTracingEventTimeoutSecs("1");
+
+            try
+            {
+                UUID sessionId = UUIDGen.getTimeUUID();
+                Object[][] rows = cluster.coordinator(1)
+                                         .asyncExecuteWithTracing(sessionId,
+                                                                  "SELECT * FROM ks.tbl WHERE pk = 1 AND ck = 51",
+                                                                  ConsistencyLevel.ONE).get();
+                Object[][] expected = { row(1, 51, "5") };
+                assertRows(rows, expected);
+
+                List<TracingUtil.TraceEntry> traces = TracingUtil.getTrace(cluster, sessionId, ConsistencyLevel.ONE);
+                long sstablesRead = traces.stream().filter(traceEntry -> traceEntry.activity.contains("Merging data from sstable")).count();
+                assertEquals(1L, sstablesRead);
+            }
+            finally
+            {
+                TracingUtil.setWaitForTracingEventTimeoutSecs(originalTraceTimeout);
+            }
+        })
+        .runAfterNodeUpgrade(((cluster, node) -> {
+            IUpgradeableInstance instance = cluster.get(1);
+            instance.nodetool("upgradesstables", "ks", "tbl");
+
+            String originalTraceTimeout = TracingUtil.setWaitForTracingEventTimeoutSecs("1");
+
+            try
+            {
+                UUID sessionId = UUIDGen.getTimeUUID();
+                Object[][] rows = cluster.coordinator(1)
+                                         .asyncExecuteWithTracing(sessionId,
+                                                                  "SELECT * FROM ks.tbl WHERE pk = 1 AND ck = 51",
+                                                                  ConsistencyLevel.ONE).get();
+                Object[][] expected = { row(1, 51, "5") };
+                assertRows(rows, expected);
+
+                List<TracingUtil.TraceEntry> traces = TracingUtil.getTrace(cluster, sessionId, ConsistencyLevel.ONE);
+                long sstablesRead = traces.stream().filter(traceEntry -> traceEntry.activity.contains("Merging data from sstable")).count();
+                assertEquals(2L, sstablesRead);
+            }
+            finally
+            {
+                TracingUtil.setWaitForTracingEventTimeoutSecs(originalTraceTimeout);
+            }
+        })).run();
+    }
 
     private void runQueries(ICoordinator coordinator, ResultsRecorder helper, String[] queries)
     {
