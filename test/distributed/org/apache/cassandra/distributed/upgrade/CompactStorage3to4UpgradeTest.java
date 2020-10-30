@@ -139,6 +139,30 @@ public class CompactStorage3to4UpgradeTest extends UpgradeTestBase
         }
     }
 
+    @Test
+    public void testNullClusteringValues() throws Throwable
+    {
+        new TestCase().nodes(1)
+                      .upgrade(Versions.Major.v30, Versions.Major.v4)
+                      .setup(cluster -> {
+                          String create = "CREATE TABLE %s.%s(k int, c1 int, c2 int, v int, PRIMARY KEY (k, c1, c2)) " +
+                                          "WITH compaction = { 'class':'LeveledCompactionStrategy', 'enabled':'false'} AND COMPACT STORAGE";
+                          cluster.schemaChange(String.format(create, KEYSPACE, TABLE_NAME));
+                          
+                          String insert = "INSERT INTO %s.%s(k, c1, v) values (?, ?, ?)";
+                          cluster.get(1).executeInternal(String.format(insert, KEYSPACE, TABLE_NAME), 1, 1, 1);
+                          cluster.get(1).flush(KEYSPACE);
+
+                          cluster.get(1).executeInternal(String.format(insert, KEYSPACE, TABLE_NAME), 2, 2, 2);
+                          cluster.get(1).flush(KEYSPACE);
+                          
+                          cluster.schemaChange(String.format("ALTER TABLE %s.%s DROP COMPACT STORAGE", KEYSPACE, TABLE_NAME));
+                      })
+                      .runAfterNodeUpgrade((cluster, node) -> {
+                          cluster.get(1).forceCompact(KEYSPACE, TABLE_NAME);
+                      })
+                      .run();
+    }
 
     public void validateResults(DropCompactTestHelper helper, UpgradeableCluster cluster, int node)
     {
