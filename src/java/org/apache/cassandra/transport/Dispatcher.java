@@ -89,12 +89,11 @@ public class Dispatcher
 
         if (backpressure == Overload.REQUESTS)
         {
-            NoSpamLogger.log(logger, NoSpamLogger.Level.INFO, 1, TimeUnit.MINUTES,
-                             "Request breached global limit of {} requests/second and triggered backpressure.", 
-                             ClientResourceLimits.getNativeTransportRequestsPerSecond());
+            String message = String.format("Request breached global limit of %.2f requests/second and triggered backpressure.",
+                                           ClientResourceLimits.getNativeTransportRequestsPerSecond());
             
-            ClientWarn.instance.warn(String.format("Request breached global limit of %f requests/second and triggered backpressure.",
-                                                   ClientResourceLimits.getNativeTransportRequestsPerSecond()));
+            NoSpamLogger.log(logger, NoSpamLogger.Level.INFO, 1, TimeUnit.MINUTES, message);
+            ClientWarn.instance.warn(message);
         }
         else if (backpressure == Overload.BYTES_IN_FLIGHT)
         {

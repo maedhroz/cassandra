@@ -144,8 +144,8 @@ public class NoWaitRateLimiter
     @Override
     public String toString()
     {
-        return String.format("Maximum requests/second is %d. %d stored permits available.", 
-                             (long) getRate(), (long) getStoredPermits());
+        return String.format("Maximum requests/second is %.2f. %.2f stored permits available.", 
+                             getRate(), getStoredPermits());
     }
 
     @NotThreadSafe

@@ -270,7 +270,7 @@ public class CQLMessageHandler<M extends Message> extends AbstractMessageHandler
 
     private OverloadedException buildOverloadedException(Limit endpointReserve, Limit globalReserve, Overload overload) {
         return overload == Overload.REQUESTS
-                ? new OverloadedException(String.format("Request breached global limit of %f requests/second. Server is " +
+                ? new OverloadedException(String.format("Request breached global limit of %.2f requests/second. Server is " +
                                                         "currently in an overloaded state and cannot accept more requests.", 
                                                         requestRateLimiter.getRate()))
                 : new OverloadedException(String.format("Request breached limit on bytes in flight. (Endpoint: %d/%d bytes, Global: %d/%d bytes.) " +

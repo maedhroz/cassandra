@@ -169,8 +169,8 @@ public class PreV5Handlers
                 else if (GLOBAL_REQUEST_LIMITER.reserveAndGetWaitLength() > 0)
                 {
                     NoSpamLogger.log(logger, NoSpamLogger.Level.INFO, 1, TimeUnit.MINUTES,
-                                     "Request breached global limit of {} requests/second and triggered backpressure.",
-                                     GLOBAL_REQUEST_LIMITER.getRate());
+                                     String.format("Request breached global limit of %.2f requests/second and triggered backpressure.",
+                                                   GLOBAL_REQUEST_LIMITER.getRate()));
                     
                     // Force acquire a permit and handle the request, but set backpressure on the channel first.
                     backpressure = Overload.REQUESTS;
@@ -221,7 +221,7 @@ public class PreV5Handlers
                          GLOBAL_REQUEST_LIMITER, request);
 
             OverloadedException exception = overload == Overload.REQUESTS
-                    ? new OverloadedException(String.format("Request breached global limit of %f requests/second. Server is " +
+                    ? new OverloadedException(String.format("Request breached global limit of %.2f requests/second. Server is " +
                                                             "currently in an overloaded state and cannot accept more requests.",
                                                             GLOBAL_REQUEST_LIMITER.getRate()))
                     : new OverloadedException(String.format("Request breached limit on bytes in flight. (%s)) " +
