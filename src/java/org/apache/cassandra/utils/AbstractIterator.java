@@ -22,13 +22,18 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 
 import com.google.common.collect.PeekingIterator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public abstract class AbstractIterator<V> implements Iterator<V>, PeekingIterator<V>, CloseableIterator<V>
 {
+    private static final Logger logger = LoggerFactory.getLogger(AbstractIterator.class);
 
     private static enum State { MUST_FETCH, HAS_NEXT, DONE, FAILED }
     private State state = State.MUST_FETCH;
     private V next;
+
+    private volatile Thread lastThread = null;
 
     protected V endOfData()
     {
@@ -40,6 +45,8 @@ public abstract class AbstractIterator<V> implements Iterator<V>, PeekingIterato
 
     public boolean hasNext()
     {
+        assertSameThread();
+        
         switch (state)
         {
             case MUST_FETCH:
@@ -60,6 +67,8 @@ public abstract class AbstractIterator<V> implements Iterator<V>, PeekingIterato
 
     public V next()
     {
+        assertSameThread();
+        
         if (state != State.HAS_NEXT && !hasNext())
             throw new NoSuchElementException();
 
@@ -67,6 +76,20 @@ public abstract class AbstractIterator<V> implements Iterator<V>, PeekingIterato
         V result = next;
         next = null;
         return result;
+    }
+
+    private void assertSameThread()
+    {
+        Thread current = Thread.currentThread();
+
+        if (lastThread == null)
+        {
+            lastThread = current;
+        }
+        else if (current != lastThread)
+        {
+            throw new AssertionError("last thread: " + lastThread + ", current thread: " + current);
+        }
     }
 
     public V peek()

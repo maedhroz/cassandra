@@ -29,6 +29,8 @@ import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import com.google.common.util.concurrent.Uninterruptibles;
+import org.apache.cassandra.distributed.api.TokenSupplier;
+import org.apache.cassandra.distributed.shared.NetworkTopology;
 import org.junit.Assert;
 import org.junit.Test;
 
@@ -48,6 +50,7 @@ import org.apache.cassandra.service.SnapshotVerbHandler;
 import org.apache.cassandra.service.StorageProxy;
 import org.apache.cassandra.utils.DiagnosticSnapshotService;
 
+import static org.apache.cassandra.distributed.api.Feature.*;
 import static org.apache.cassandra.distributed.shared.AssertUtils.assertRows;
 import static org.junit.Assert.fail;
 
@@ -274,7 +277,10 @@ public class RepairDigestTrackingTest extends TestBaseImpl
         // Asserts that the amount of repaired data read for digest generation is consistent
         // across replicas where one has to read more repaired data to satisfy the original
         // limits of the read request.
-        try (Cluster cluster = init(Cluster.create(2)))
+
+        Cluster.Builder builder = builder().withNodes(2).withConfig(config -> config.with(NETWORK, GOSSIP, NATIVE_PROTOCOL));
+
+        try (Cluster cluster = init(builder.start()))
         {
 
             cluster.get(1).runOnInstance(() -> {

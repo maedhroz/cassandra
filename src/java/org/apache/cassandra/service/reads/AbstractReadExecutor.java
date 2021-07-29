@@ -155,7 +155,9 @@ public abstract class AbstractReadExecutor
         if (hasLocalEndpoint)
         {
             logger.trace("reading {} locally", readCommand.isDigestQuery() ? "digest" : "data");
-            Stage.READ.maybeExecuteImmediately(new LocalReadRunnable(command, handler));
+            LocalReadRunnable localReadRunnable = new LocalReadRunnable(this.command, handler);
+            localReadRunnable.run();
+            //Stage.READ.maybeExecuteImmediately(localReadRunnable);
         }
     }
 
