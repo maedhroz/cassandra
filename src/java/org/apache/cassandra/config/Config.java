@@ -482,7 +482,7 @@ public class Config
      * some overhead, operators may wish to disable it whilst still enabling it for partition reads
      */
     public volatile boolean repaired_data_tracking_for_range_reads_enabled = false;
-    public volatile boolean repaired_data_tracking_for_partition_reads_enabled = false;
+    public volatile boolean repaired_data_tracking_for_partition_reads_enabled = true;
     /* If true, unconfirmed mismatches (those which cannot be considered conclusive proof of out of
      * sync repaired data due to the presence of pending repair sessions, or unrepaired partition
      * deletes) will increment a metric, distinct from confirmed mismatches. If false, unconfirmed
