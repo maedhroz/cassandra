@@ -46,14 +46,14 @@ default_env_vars: &default_env_vars
     # The name of JUnit class to be run multiple times, for example:
     # REPEATED_UTEST_CLASS: org.apache.cassandra.cql3.ViewTest
     # REPEATED_UTEST_CLASS: org.apache.cassandra.distributed.test.PagingTest
-    REPEATED_UTEST_CLASS:
+    REPEATED_UTEST_CLASS: org.apache.cassandra.io.sstable.SSTableReaderTest
     # The optional specific methods within REPEATED_UTEST_CLASS to be run, for example:
     # REPEATED_UTEST_METHODS: testCompoundPartitionKey
     # REPEATED_UTEST_METHODS: testCompoundPartitionKey,testStaticTable
     # Please note that some Ant targets will ignore the -Dtest.methods argument produced by this.
     REPEATED_UTEST_METHODS:
     # The number of times that the repeated JUnit test should be run
-    REPEATED_UTEST_COUNT: 100
+    REPEATED_UTEST_COUNT: 200
     # Whether the test iteration should stop on the first failure
     REPEATED_UTEST_STOP_ON_FAILURE: false
 
@@ -142,12 +142,12 @@ j8_with_dtests_jobs: &j8_with_dtests_jobs
   jobs:
     - j8_build
     # Java 8 unit tests will be run automatically
-    - j8_unit_tests:
-        requires:
-          - j8_build
-    - j8_jvm_dtests:
-        requires:
-          - j8_build
+    #- j8_unit_tests:
+    #    requires:
+    #      - j8_build
+    #- j8_jvm_dtests:
+    #    requires:
+    #      - j8_build
     # Java 11 unit tests (on request, currently not working)
     - start_j11_unit_tests:
         type: approval
@@ -156,9 +156,9 @@ j8_with_dtests_jobs: &j8_with_dtests_jobs
           - start_j11_unit_tests
           - j8_build
     # specialized unit tests (all run on request using Java 8)
-    - j8_cqlshlib_tests:
-        requires:
-          - j8_build
+    #- j8_cqlshlib_tests:
+    #    requires:
+    #      - j8_build
     - start_utests_long:
         type: approval
     - utests_long:
@@ -333,15 +333,15 @@ j11_with_dtests_jobs: &j11_with_dtests_jobs
   jobs:
     - j11_build
     # Java 11 unit tests
-    - j11_unit_tests:
-        requires:
-          - j11_build
-    - j11_jvm_dtests:
-        requires:
-          - j11_build
-    - j11_cqlshlib_tests:
-        requires:
-          - j11_build
+    #- j11_unit_tests:
+    #    requires:
+    #      - j11_build
+    #- j11_jvm_dtests:
+    #    requires:
+    #      - j11_build
+    #- j11_cqlshlib_tests:
+    #    requires:
+    #      - j11_build
     # Java 11 dtests (on request)
     - start_j11_dtests:
         type: approval
