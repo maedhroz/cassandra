@@ -269,19 +269,6 @@ public class RepairJobTest
         // unblock syncComplete callback, session should remove trees
         future.complete(null);
 
-        // The session retains memory in the contained executor until the threads expire, so we wait for the threads
-        // that ran the Tree -> SyncTask conversions to die and release the memory
-        long millisUntilFreed;
-        for (millisUntilFreed = 0; millisUntilFreed < TEST_TIMEOUT_S * 1000; millisUntilFreed += THREAD_TIMEOUT_MILLIS)
-        {
-            // The measured size of the syncingTasks, and result of the computation should be much smaller
-            TimeUnit.MILLISECONDS.sleep(THREAD_TIMEOUT_MILLIS);
-            if (ObjectSizes.measureDeep(session) < 0.8 * singleTreeSize)
-                break;
-        }
-
-        assertThat(millisUntilFreed).isLessThan(TEST_TIMEOUT_S * 1000);
-
         List<SyncStat> results = syncResults.get(TEST_TIMEOUT_S, TimeUnit.SECONDS);
 
         assertThat(ObjectSizes.measureDeep(results)).isLessThan(Math.round(0.2 * singleTreeSize));
@@ -296,6 +283,19 @@ public class RepairJobTest
             .hasSize(2)
             .extracting(Message::verb)
             .containsOnly(Verb.SYNC_REQ);
+
+        // The session retains memory in the contained executor until the threads expire, so we wait for the threads
+        // that ran the Tree -> SyncTask conversions to die and release the memory
+        long millisUntilFreed;
+        for (millisUntilFreed = 0; millisUntilFreed < TEST_TIMEOUT_S * 1000; millisUntilFreed += THREAD_TIMEOUT_MILLIS)
+        {
+            // The measured size of the syncingTasks, and result of the computation should be much smaller
+            TimeUnit.MILLISECONDS.sleep(THREAD_TIMEOUT_MILLIS);
+            if (ObjectSizes.measureDeep(session) < 0.8 * singleTreeSize)
+                break;
+        }
+
+        assertThat(millisUntilFreed).isLessThan(TEST_TIMEOUT_S * 1000);
     }
 
     @Test
