@@ -167,6 +167,10 @@ public enum Verb
     SNAPSHOT_RSP           (87,  P0, rpcTimeout,      MISC,              () -> NoPayload.serializer,                 () -> ResponseVerbHandler.instance                             ),
     SNAPSHOT_REQ           (27,  P0, rpcTimeout,      MISC,              () -> SnapshotCommand.serializer,           () -> SnapshotVerbHandler.instance,        SNAPSHOT_RSP        ),
 
+    // accord
+    ACCORD_PREACCEPT_RSP   (121, P2, writeTimeout,    REQUEST_RESPONSE,  () -> null, () -> null),
+    ACCORD_PREACCEPT_REQ   (120, P2, writeTimeout,    MUTATION, () -> null, () -> null, ACCORD_PREACCEPT_RSP),
+
     // generic failure response
     FAILURE_RSP            (99,  P0, noTimeout,       REQUEST_RESPONSE,  () -> RequestFailureReason.serializer,      () -> ResponseVerbHandler.instance                             ),
 
