@@ -44,8 +44,10 @@ import org.apache.cassandra.metrics.TableMetrics;
 import org.apache.cassandra.net.Verb;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.schema.IndexMetadata;
+import org.apache.cassandra.schema.TableId;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.service.*;
+import org.apache.cassandra.service.accord.api.AccordKey;
 import org.apache.cassandra.tracing.Tracing;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.btree.BTreeSet;
@@ -53,7 +55,7 @@ import org.apache.cassandra.utils.btree.BTreeSet;
 /**
  * A read command that selects a (part of a) single partition.
  */
-public class SinglePartitionReadCommand extends ReadCommand implements SinglePartitionReadQuery
+public class SinglePartitionReadCommand extends ReadCommand implements SinglePartitionReadQuery, AccordKey
 {
     protected static final SelectionDeserializer selectionDeserializer = new Deserializer();
 
@@ -343,6 +345,12 @@ public class SinglePartitionReadCommand extends ReadCommand implements SinglePar
                                               clusteringIndexFilter(),
                                               indexMetadata(),
                                               isTrackingWarnings());
+    }
+
+    @Override
+    public TableId tableId()
+    {
+        return metadata().id;
     }
 
     @Override
