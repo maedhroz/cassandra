@@ -682,7 +682,7 @@ public abstract class ModificationStatement implements CQLStatement.SingleKeyspa
      *
      * @return list of the mutations
      */
-    private List<? extends IMutation> getMutations(QueryOptions options,
+    public List<? extends IMutation> getMutations(QueryOptions options,
                                                          boolean local,
                                                          long timestamp,
                                                          int nowInSeconds,
