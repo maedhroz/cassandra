@@ -1,0 +1,386 @@
+cluster:
+  name: 'Test Cluster'
+  partitioner: org.apache.cassandra.dht.Murmur3Partitioner
+  tokens:
+    count: 16
+    initial_token: <token>
+    allocate_for_keyspace: <keyspace>
+    allocate_for_local_replication_factor: 3
+  snitch:
+    type: SimpleSnitch
+    dynamic:
+      update_interval: 100ms
+      reset_interval: 600000ms
+      badness_threshold: 1.0
+  seed_provider:
+    - class_name: org.apache.cassandra.locator.SimpleSeedProvider
+      parameters:
+        - seeds: "127.0.0.1:7000"
+
+security:
+  cache_warming_enabled: false
+  credentials:
+    authenticator: AllowAllAuthenticator
+    validity_period: 2000ms
+    update_interval: 2000ms
+  permissions:
+    authorizer: AllowAllAuthorizer
+    validity_period: 2000ms
+    update_interval: 2000ms
+    traverse_from_root: false
+    active_update_cache: false
+    read_consistency_level: LOCAL_QUORUM
+    write_consistency_level: EACH_QUORUM
+  roles:
+    manager: CassandraRoleManager
+    validity_period: 2000ms
+    update_interval: 2000ms
+    active_update_cache: false
+  
+storage:
+  sstables:
+    directories:
+      - /var/lib/cassandra/data
+    local_system_data_file_directory: <directory>
+    flush_compression: fast
+    preemptive_open_interval: 50MiB
+    max_value_size: 256MiB
+    automatic_sstable_upgrade: false
+    max_concurrent_automatic_sstable_upgrades: 1
+    chunk_cache:
+      enabled: false
+      size: 512MiB
+    index_summary:
+      capacity: 50MiB
+      resize_interval: 60m
+    column_index:
+      size: 64KiB
+      cache_size: 2KiB
+  disk_failure_policy: stop
+  disk_optimization_strategy: ssd
+  trickle_fsync:
+    enabled: false
+    interval: 10240KiB
+  caching:
+    saved_caches_directory: /var/lib/cassandra/saved_caches
+    load_timeout: 30s
+    keys:
+      size: 100MiB
+      save_period: 4h
+      limit: 100
+    rows:
+      size: 0MiB
+      class: org.apache.cassandra.cache.OHCProvider
+      save_period: 0s
+      limit: 100
+    counters:
+      size: 50MiB
+      save_period: 7200s
+      limit: 100
+  memtable:
+    heap_space: 2048MiB
+    offheap_space: 2048MiB
+    cleanup_threshold: 0.11
+    allocation_type: heap_buffers
+    flush_writers: 2
+  transparent_data_encryption:
+    enabled: false
+    chunk_length_kb: 64
+    cipher: AES/CBC/PKCS5Padding
+    key_alias: testing:1
+    key_provider:
+      - class_name: org.apache.cassandra.security.JKSKeyProvider
+        parameters:
+          - keystore: conf/.keystore
+            keystore_password: cassandra
+            store_type: JCEKS
+            key_password: cassandra
+
+commitlog:
+  directory: /var/lib/cassandra/commitlog
+  commit_failure_policy: stop
+  sync: periodic
+  sync_period: 10000ms
+  periodic_sync_lag_block: 10ms
+  sync_group_window: 1000ms
+  segment_size: 32MiB
+  total_space: 8192MiB
+  compression:
+    - class_name: LZ4Compressor
+      parameters:
+        - <param>
+
+cdc:
+  enabled: false
+  raw_directory: /var/lib/cassandra/cdc_raw
+  total_space: 4096MiB
+  free_space_check_interval: 250ms
+  
+backup:
+  incremental: false
+  snapshot_before_compaction: false
+  auto_snapshot: true
+  snapshot_links_per_second: 0
+
+compaction:
+  concurrent_compactors: 1
+  limits:
+    throughput: 64MiB/s
+  thresholds:
+    large_partition_warning: 100MiB
+    tombstone_warning: 100000
+
+network:
+  buffer_pool_size: 128MiB
+  internode:
+    address: localhost
+    interface: eth0
+    port: 7000
+    prefer_ipv6: false
+    broadcast_address: 1.2.3.4
+    listen_on_broadcast_address: false
+    authorizer: AllowAllNetworkAuthorizer
+    authenticator: org.apache.cassandra.auth.AllowAllInternodeAuthenticator
+    phi_convict_threshold: 8
+    compression: dc
+    inter_dc_tcp_nodelay: false
+    limits:
+      socket_send_buffer_size: 128KiB
+      socket_receive_buffer_size: 128KiB
+      application_send_queue_capacity: 4MiB
+      application_send_queue_reserve_endpoint_capacity: 128MiB
+      application_send_queue_reserve_global_capacity: 512MiB
+      application_receive_queue_capacity: 4MiB
+      application_receive_queue_reserve_endpoint_capacity: 128MiB
+      application_receive_queue_reserve_global_capacity: 512MiB
+    internode_timeout_enabled: true
+    timeouts:
+      tcp_connect: 2000ms
+      tcp_user: 30000ms
+    encryption:
+      type: none
+      legacy_ssl_storage_port_enabled: false
+      keystore: conf/.keystore
+      keystore_password: cassandra
+      require_client_auth: false
+      truststore: conf/.truststore
+      truststore_password: cassandra
+      require_endpoint_verification: false
+  client:
+    enabled: true
+    port: 9042
+    ssl_port: 9142
+    address: localhost
+    broadcast_address: 1.2.3.4
+    interface: eth1
+    prefer_ipv6: false
+    keepalive: true
+    allow_older_protocols: true
+    flush_in_batches_legacy: false
+    limits:
+      frame_size: 16MiB
+      connections: -1
+      connections_per_ip: -1
+      request_handling_threads: 128
+    timeouts:
+      idle: 60000ms
+    encryption:
+      enabled: false
+      keystore: conf/.keystore
+      keystore_password: cassandra
+      require_client_auth: false
+    error_reporting_exclusions:
+      subnets:
+        - 127.0.0.1
+        - 127.0.0.0/31
+
+hinted_handoff:
+  enabled: true
+  disabled_datacenters:
+    - DC1
+    - DC2
+  max_hint_window: 3h
+  hint_window_persistent_enabled: true
+  handoff_throttle: 1024KiB
+  delivery_threads: 2
+  hint_directory: /var/lib/cassandra/hints
+  flush_period: 10000ms
+  max_hints_file_size: 128MiB
+  max_hints_size_per_host: 0MiB
+  auto_cleanup_enabled: false
+  compression:
+    - class_name: LZ4Compressor
+      parameters:
+        - <param>
+
+repair:
+  session_space: 2GiB
+  concurrent_validations: 0
+  tracking:
+    track_for_range_reads_enabled: false
+    track_for_partition_reads_enabled: false
+    report_unconfirmed_mismatches: false
+  
+streaming:
+  limits:
+    connections_per_host: 1
+    throughput:
+      outbound: 24MiB/s
+      inter_dc_outbound: 24MiB/s
+  timeouts:
+    tcp_user: 300000ms
+    keep_alive: 300s
+  entire_sstables:
+    enabled: true
+    limits:
+      throughput:
+        outbound: 24MiB/s
+        inter_dc_outbound: 24MiB/s
+
+denylist:
+  partitions_enabled: false
+  writes_enabled: true
+  reads_enabled: true
+  range_reads_enabled: true
+  refresh_interval: 600s
+  initial_load_retry: 5s
+  consistency_level: QUORUM
+  limits:
+    keys_per_table: 1000
+    keys_total: 10000
+
+requests:
+  default_timeout: 10000ms
+  slow_query_log_timeout: 500ms
+  read:
+    threads: 32
+    timeouts:
+      partition: 5000ms
+      range: 10000ms
+    thresholds:
+      tombstones:
+        warn: 1000
+        fail: 100000
+      coordinator_read_size:
+        warn: 0KiB
+        fail: 0KiB
+      local_read_size:
+        warn: 0KiB
+        fail: 0KiB
+      row_index_size:
+        warn: 0KiB
+        fail: 0KiB
+      fetch_size:
+        warn: 10000
+        fail: 100000
+  write:
+    ideal_consistency_level: EACH_QUORUM
+    threads: 32
+    timeout: 2000ms
+    cas_contention_timeout: 1000ms
+  counter_write:
+    threads: 32
+    timeout: 5000ms
+  truncate:
+    timeout: 60000ms
+    
+cql:
+  prepared_statements_cache_size: 10MiB
+  user_timestamps_enabled: true
+  read_before_write_list_operations_enabled: true
+    
+tracing:
+  query_ttl: 1d
+  repair_ttl: 7d
+    
+replica_filtering_protection:
+  cached_rows_warn_threshold: 2000
+  cached_rows_fail_threshold: 32000
+
+batches:
+  batchlog_replay_throttle: 1024KiB
+  thresholds:
+    batch_size:
+      warn: 5KiB
+      fail: 50KiB
+    unlogged_batch_across_partitions:
+      warn: 10
+      
+logging:
+  gc:
+    info: 200ms
+    warn: 1000ms
+  audit:
+    enabled: false
+    logger:
+      - class_name: BinAuditLogger
+    audit_logs_dir: <directory>
+    included_keyspaces: <list>
+    excluded_keyspaces: system, system_schema, system_virtual_schema
+    included_categories: <list>
+    excluded_categories: <list>
+    included_users: <list>
+    excluded_users: <list>
+    roll_cycle: HOURLY
+    block: true
+    max_queue_weight: 256MiB
+    max_log_size: 16GiB
+  fql:
+    log_dir:
+    roll_cycle: HOURLY
+    block: true
+    max_queue_weight: 256MiB
+    max_log_size: 16GiB
+
+schema:
+  default_replication_factor: 2
+  minimum_replication_factor: 1
+  table_properties:
+    ignored: []
+    disallowed: []
+  thresholds:
+    tables:
+      warn: 150
+      fail: 300
+    keyspaces:
+      warn: 20
+      fail: 40
+    columns_per_table:
+      warn: 50
+      fail: 200
+    secondary_indexes_per_table:
+      warn: 1
+      fail: 3
+    materialized_views_per_table:
+      warn: -1
+      fail: -1
+      
+user_defined_functions:
+  enabled: false
+  scripted_functions_enabled: false
+
+materialized_views:
+  enabled: false
+  limits:
+    builders: 1
+    concurrent_writes: 32
+
+# validate tombstones on reads and compaction
+# can be either "disabled", "warn" or "exception"
+corrupted_tombstone_strategy: disabled
+
+# If enabled, diagnostic events can be helpful for troubleshooting operational issues. Emitted events contain details
+# on internal state and temporal relationships across events, accessible by clients via JMX.
+diagnostic_events_enabled: false
+
+# Enables SASI index creation on this node.
+# SASI indexes are considered experimental and are not recommended for production use.
+sasi_indexes_enabled: false
+
+# Enables creation of transiently replicated keyspaces on this node.
+# Transient replication is experimental and is not recommended for production use.
+transient_replication_enabled: false
+
+# Enables the used of 'ALTER ... DROP COMPACT STORAGE' statements on this node.
+# 'ALTER ... DROP COMPACT STORAGE' is considered experimental and is not recommended for production use.
+drop_compact_storage_enabled: false
