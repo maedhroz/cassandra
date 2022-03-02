@@ -194,6 +194,12 @@ public class OrderPreservingPartitioner implements IPartitioner
         {
             return EMPTY_SIZE + ObjectSizes.sizeOf(token);
         }
+
+        @Override
+        public int tokenHash()
+        {
+            return token.hashCode();
+        }
     }
 
     public StringToken getToken(ByteBuffer key)

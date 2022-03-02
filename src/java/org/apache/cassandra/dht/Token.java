@@ -98,6 +98,7 @@ public abstract class Token implements RingPosition<Token>, Serializable
     abstract public IPartitioner getPartitioner();
     abstract public long getHeapSize();
     abstract public Object getTokenValue();
+    abstract public int tokenHash();
 
     /**
      * Returns a measure for the token space covered between this token and next.
