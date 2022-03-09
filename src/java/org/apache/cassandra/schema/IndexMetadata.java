@@ -38,6 +38,8 @@ import org.apache.cassandra.cql3.statements.schema.IndexTarget;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.exceptions.UnknownIndexException;
 import org.apache.cassandra.index.Index;
+import org.apache.cassandra.index.internal.CassandraIndex;
+import org.apache.cassandra.index.sai.StorageAttachedIndex;
 import org.apache.cassandra.index.sasi.SASIIndex;
 import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.DataOutputPlus;
@@ -64,7 +66,9 @@ public final class IndexMetadata
 
     static
     {
+        indexNameAliases.put(StorageAttachedIndex.class.getSimpleName(), StorageAttachedIndex.class.getCanonicalName());
         indexNameAliases.put(SASIIndex.class.getSimpleName(), SASIIndex.class.getCanonicalName());
+        indexNameAliases.put(StorageAttachedIndex.class.getSimpleName(), StorageAttachedIndex.class.getCanonicalName());
     }
 
     public enum Kind
@@ -145,6 +149,13 @@ public final class IndexMetadata
         }
     }
 
+    public String getIndexClassName()
+    {
+        if (isCustom())
+            return expandAliases(options.get(IndexTarget.CUSTOM_INDEX_OPTION_NAME));
+        return CassandraIndex.class.getName();
+    }
+
     public static String expandAliases(String className)
     {
         return indexNameAliases.getOrDefault(className, className);
@@ -179,6 +190,8 @@ public final class IndexMetadata
         }
         catch (InvocationTargetException e)
         {
+            if (e.getTargetException() instanceof RequestValidationException)
+                throw (RequestValidationException) e.getTargetException();
             if (e.getTargetException() instanceof ConfigurationException)
                 throw (ConfigurationException) e.getTargetException();
             throw new ConfigurationException("Failed to validate custom indexer options: " + options);

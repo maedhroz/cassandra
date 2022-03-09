@@ -20,6 +20,7 @@ package org.apache.cassandra.index;
 import java.lang.reflect.Constructor;
 import java.util.*;
 import java.util.concurrent.Callable;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -29,6 +30,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
@@ -62,22 +64,31 @@ import org.apache.cassandra.db.partitions.PartitionUpdate;
 import org.apache.cassandra.db.partitions.UnfilteredPartitionIterator;
 import org.apache.cassandra.db.rows.*;
 import org.apache.cassandra.exceptions.InvalidRequestException;
+import org.apache.cassandra.exceptions.ReadFailureException;
+import org.apache.cassandra.exceptions.RequestFailureReason;
+import org.apache.cassandra.gms.ApplicationState;
+import org.apache.cassandra.gms.Gossiper;
+import org.apache.cassandra.gms.VersionedValue;
 import org.apache.cassandra.index.Index.IndexBuildingSupport;
 import org.apache.cassandra.index.internal.CassandraIndex;
 import org.apache.cassandra.index.transactions.*;
 import org.apache.cassandra.io.sstable.format.SSTableReader;
+import org.apache.cassandra.locator.Endpoints;
+import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.notifications.INotification;
 import org.apache.cassandra.notifications.INotificationConsumer;
 import org.apache.cassandra.notifications.SSTableAddedNotification;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.schema.IndexMetadata;
 import org.apache.cassandra.schema.Indexes;
+import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.service.pager.SinglePartitionPager;
 import org.apache.cassandra.tracing.Tracing;
 import org.apache.cassandra.transport.ProtocolVersion;
 import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.JVMStabilityInspector;
 import org.apache.cassandra.utils.concurrent.*;
+import org.json.simple.JSONValue;
 
 import static org.apache.cassandra.concurrent.ExecutorFactory.Global.executorFactory;
 import static org.apache.cassandra.utils.ExecutorUtils.awaitTermination;
@@ -135,6 +146,12 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
     // default page size (in rows) when rebuilding the index for a whole partition
     public static final int DEFAULT_PAGE_SIZE = 10000;
 
+    // store per-endpoint index status: the key of inner map is identifier "keyspace.index"
+    public static final Map<InetAddressAndPort, Map<String, Index.Status>> peerIndexStatus = new ConcurrentHashMap<>();
+
+    // executes index status propagation task asynchronously to avoid potential deadlock on SIM
+    private static final ExecutorPlus statusPropagationExecutor = executorFactory().withJmxInternal()
+                                                                                   .sequential("StatusPropagationExecutor");
     /**
      * All registered indexes.
      */
@@ -653,7 +670,8 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
      * @param isNewCF {@code true} if this method is invoked when initializing a new table/columnfamily (i.e. loading a CF at startup),
      * {@code false} for all other cases (i.e. newly added index)
      */
-    private synchronized void markIndexesBuilding(Set<Index> indexes, boolean isFullRebuild, boolean isNewCF)
+    @VisibleForTesting
+    public synchronized void markIndexesBuilding(Set<Index> indexes, boolean isFullRebuild, boolean isNewCF)
     {
         String keyspaceName = baseCfs.keyspace.getName();
 
@@ -765,6 +783,8 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
         writableIndexes.remove(indexName);
         needsFullRebuild.remove(indexName);
         inProgressBuilds.remove(indexName);
+        // remove existing indexing status
+        propagateLocalIndexStatus(keyspace.getName(), indexName, Index.Status.DROPPED);
     }
 
     public Index getIndexByName(String indexName)
@@ -1179,10 +1199,18 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
         return indexes.stream().map(i -> i.getIndexMetadata().name).collect(Collectors.joining(","));
     }
 
-
     public Optional<Index> getBestIndexFor(RowFilter.Expression expression)
     {
         return indexes.values().stream().filter((i) -> i.supportsExpression(expression.column(), expression.operator())).findFirst();
+    }
+
+    public <T extends Index> Optional<T> getBestIndexFor(RowFilter.Expression expression, Class<T> indexType)
+    {
+        return indexes.values()
+                      .stream()
+                      .filter(i -> indexType.isInstance(i) && i.supportsExpression(expression.column(), expression.operator()))
+                      .map(indexType::cast)
+                      .findFirst();
     }
 
     /**
@@ -1708,11 +1736,55 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
         awaitTermination(timeout, units, asyncExecutor, blockingExecutor);
     }
 
+    /**
+     * Remove endpoints whose indexes are not queryable for the specified {@link Index.QueryPlan}.
+     *
+     * @param liveEndpoints current live endpoints where non-queryable endpoints will be removed
+     * @param keyspace to be queried
+     * @param indexQueryPlan index query plan used in the read command
+     * @param level consistency level of read command
+     */
+    public static <E extends Endpoints<E>> E filterForQuery(E liveEndpoints, Keyspace keyspace, Index.QueryPlan indexQueryPlan, ConsistencyLevel level)
+    {
+        E queryableEndpoints = liveEndpoints.filter(replica -> {
+
+            for (Index index : indexQueryPlan.getIndexes())
+            {
+                Index.Status status = getIndexStatus(replica.endpoint(), keyspace.getName(), index.getIndexMetadata().name);
+                if (!index.isQueryable(status))
+                    return false;
+            }
+
+            return true;
+        });
+
+        int initial = liveEndpoints.size();
+        int filtered = queryableEndpoints.size();
+
+        // Throw ReadFailureException if read request cannot satisfy Consistency Level due to non-queryable indexes.
+        // It is to provide a better UX, compared to throwing UnavailableException when the nodes are actually alive.
+        if (initial != filtered)
+        {
+            int required = level.blockFor(keyspace.getReplicationStrategy());
+            if (required <= initial && required > filtered)
+            {
+                Map<InetAddressAndPort, RequestFailureReason> failureReasons = new HashMap<>();
+                liveEndpoints.without(queryableEndpoints.endpoints())
+                             .forEach(replica -> failureReasons.put(replica.endpoint(), RequestFailureReason.INDEX_NOT_AVAILABLE));
+
+                throw new ReadFailureException(level, filtered, required, false, failureReasons);
+            }
+        }
+
+        return queryableEndpoints;
+    }
+
     public void makeIndexNonQueryable(Index index, Index.Status status)
     {
         String name = index.getIndexMetadata().name;
         if (indexes.get(name) == index)
         {
+            propagateLocalIndexStatus(keyspace.getName(), name, status);
             if (!index.isQueryable(status))
                 queryableIndexes.remove(name);
         }
@@ -1723,6 +1795,7 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
         String name = index.getIndexMetadata().name;
         if (indexes.get(name) == index)
         {
+            propagateLocalIndexStatus(keyspace.getName(), name, status);
             if (index.isQueryable(status))
             {
                 if (queryableIndexes.add(name))
@@ -1732,5 +1805,105 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
             if (writableIndexes.put(name, index) == null)
                 logger.info("Index [{}] became writable after successful build.", name);
         }
+    }
+
+    public static Index.Status getIndexStatus(InetAddressAndPort peer, String keyspace, String index)
+    {
+        return peerIndexStatus.getOrDefault(peer, Collections.emptyMap())
+                              .getOrDefault(identifier(keyspace, index), Index.Status.UNKNOWN);
+    }
+
+    public synchronized static void receivePeerIndexStatus(InetAddressAndPort endpoint, VersionedValue versionedValue)
+    {
+        try
+        {
+            if (versionedValue == null)
+                return;
+            if (endpoint.equals(FBUtilities.getBroadcastAddressAndPort()))
+                return;
+
+            Map<String, String> peerStatus = (Map<String, String>) JSONValue.parseWithException(versionedValue.value);
+            Map<String, Index.Status> indexStatus = new ConcurrentHashMap<>();
+
+            for (Map.Entry<String, String> e : peerStatus.entrySet())
+            {
+                String keyspaceIndex = e.getKey();
+                Index.Status status = Index.Status.valueOf(e.getValue());
+                indexStatus.put(keyspaceIndex, status);
+            }
+
+            Map<String, Index.Status> oldStatus = peerIndexStatus.put(endpoint, indexStatus);
+            Map<String, Index.Status> updated = updatedIndexStatuses(oldStatus, indexStatus);
+            Set<String> removed = removedIndexStatuses(oldStatus, indexStatus);
+            if (!updated.isEmpty() || !removed.isEmpty())
+                logger.debug("Received index status for peer {}:\n    Updated: {}\n    Removed: {}",
+                             endpoint, updated, removed);
+        }
+        catch (Throwable e)
+        {
+            logger.warn("Unable to parse index status: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Returns the names of indexes that are present in oldStatus but absent in newStatus.
+     */
+    private static @Nonnull Set<String> removedIndexStatuses(@Nullable Map<String, Index.Status> oldStatus, @Nonnull Map<String, Index.Status> newStatus)
+    {
+        if (oldStatus == null)
+            return Collections.emptySet();
+        Set<String> result = new HashSet<>(oldStatus.keySet());
+        result.removeAll(newStatus.keySet());
+        return result;
+    }
+
+    /**
+     * Returns a new map containing only the entries from newStatus that differ from corresponding entries in oldStatus.
+     */
+    private static @Nonnull Map<String, Index.Status> updatedIndexStatuses(
+    @Nullable Map<String, Index.Status> oldStatus,
+    @Nonnull Map<String, Index.Status> newStatus)
+    {
+        Map<String, Index.Status> delta = new HashMap<>();
+        for (Map.Entry<String, Index.Status> e : newStatus.entrySet())
+        {
+            if (oldStatus == null || e.getValue() != oldStatus.get(e.getKey()))
+                delta.put(e.getKey(), e.getValue());
+        }
+        return delta;
+    }
+
+    @VisibleForTesting
+    public synchronized static void propagateLocalIndexStatus(String keyspace, String index, Index.Status status)
+    {
+        try
+        {
+            Map<String, Index.Status> states = peerIndexStatus.computeIfAbsent(FBUtilities.getBroadcastAddressAndPort(),
+                                                                               k -> new ConcurrentHashMap<>());
+            String keyspaceIndex = identifier(keyspace, index);
+
+            if (status == Index.Status.DROPPED)
+                states.remove(keyspaceIndex);
+            else
+                states.put(keyspaceIndex, status);
+
+            String newStatus = JSONValue.toJSONString(states.entrySet().stream()
+                                                            .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toString())));
+            statusPropagationExecutor.submit(() -> {
+                // schedule gossiper update asynchronously to avoid potential deadlock when another thread is holding
+                // gossiper taskLock.
+                VersionedValue value = StorageService.instance.valueFactory.indexStatus(newStatus);
+                Gossiper.instance.addLocalApplicationState(ApplicationState.INDEX_STATUS, value);
+            });
+        }
+        catch (Throwable e)
+        {
+            logger.warn("Unable to propagate index status: {}", e.getMessage());
+        }
+    }
+
+    private static String identifier(String keyspace, String index)
+    {
+        return new StringBuilder().append(keyspace).append('.').append(index).toString();
     }
 }

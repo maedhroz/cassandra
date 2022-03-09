@@ -301,10 +301,6 @@
       <artifactId>jflex</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.github.rholder</groupId>
-      <artifactId>snowball-stemmer</artifactId>
-    </dependency>
-    <dependency>
       <groupId>com.googlecode.concurrent-trees</groupId>
       <artifactId>concurrent-trees</artifactId>
     </dependency>
@@ -347,6 +343,14 @@
     <dependency>
       <groupId>org.agrona</groupId>
       <artifactId>agrona</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.lucene</groupId>
+      <artifactId>lucene-core</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.apache.lucene</groupId>
+      <artifactId>lucene-analyzers-common</artifactId>
     </dependency>
   </dependencies>
 </project>
