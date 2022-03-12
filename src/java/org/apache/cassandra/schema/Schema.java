@@ -44,6 +44,7 @@ import org.apache.cassandra.schema.KeyspaceMetadata.KeyspaceDiff;
 import org.apache.cassandra.schema.Keyspaces.KeyspacesDiff;
 import org.apache.cassandra.service.PendingRangeCalculatorService;
 import org.apache.cassandra.service.StorageService;
+import org.apache.cassandra.service.accord.AccordKeyspace;
 import org.apache.cassandra.utils.Pair;
 import org.cliffc.high_scale_lib.NonBlockingHashMap;
 
@@ -78,6 +79,7 @@ public final class Schema implements SchemaProvider
         if (DatabaseDescriptor.isDaemonInitialized() || DatabaseDescriptor.isToolInitialized())
         {
             load(SchemaKeyspace.metadata());
+            load(AccordKeyspace.metadata());
             load(SystemKeyspace.metadata());
         }
     }
