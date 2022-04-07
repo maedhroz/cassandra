@@ -55,7 +55,7 @@ import org.apache.cassandra.utils.btree.BTreeSet;
 /**
  * A read command that selects a (part of a) single partition.
  */
-public class SinglePartitionReadCommand extends ReadCommand implements SinglePartitionReadQuery, AccordKey
+public class SinglePartitionReadCommand extends ReadCommand implements SinglePartitionReadQuery
 {
     protected static final SelectionDeserializer selectionDeserializer = new Deserializer();
 
@@ -378,18 +378,6 @@ public class SinglePartitionReadCommand extends ReadCommand implements SinglePar
                                               clusteringIndexFilter(),
                                               indexMetadata(),
                                               isTrackingWarnings());
-    }
-
-    @Override
-    public TableId tableId()
-    {
-        return metadata().id;
-    }
-
-    @Override
-    public int keyHash()
-    {
-        return partitionKey.getToken().tokenHash();
     }
 
     @Override
