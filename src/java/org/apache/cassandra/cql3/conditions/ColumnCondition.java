@@ -346,7 +346,7 @@ public abstract class ColumnCondition
     /**
      * A condition on an element of a collection column.
      */
-    private static final class ElementAccessBound extends Bound
+    public static final class ElementAccessBound extends Bound
     {
         /**
          * The collection element
@@ -358,7 +358,7 @@ public abstract class ColumnCondition
          */
         private final List<ByteBuffer> values;
 
-        private ElementAccessBound(ColumnMetadata column,
+        public ElementAccessBound(ColumnMetadata column,
                                    ByteBuffer collectionElement,
                                    Operator operator,
                                    List<ByteBuffer> values)
@@ -450,7 +450,7 @@ public abstract class ColumnCondition
     /**
      * A condition on an entire collection column.
      */
-    private static final class MultiCellCollectionBound extends Bound
+    public static final class MultiCellCollectionBound extends Bound
     {
         private final List<Term.Terminal> values;
 
@@ -463,7 +463,12 @@ public abstract class ColumnCondition
 
         public boolean appliesTo(Row row)
         {
-            CollectionType<?> type = (CollectionType<?>)column.type;
+            return appliesTo(column, comparisonOperator, values, row);
+        }
+
+        public static boolean appliesTo(ColumnMetadata column, Operator operator, List<Term.Terminal> values, Row row)
+        {
+            CollectionType<?> type = (CollectionType<?>) column.type;
 
             // copy iterator contents so that we can properly reuse them for each comparison with an IN value
             for (Term.Terminal value : values)
@@ -471,20 +476,20 @@ public abstract class ColumnCondition
                 Iterator<Cell<?>> iter = getCells(row, column);
                 if (value == null)
                 {
-                    if (comparisonOperator == Operator.EQ)
+                    if (operator == Operator.EQ)
                     {
                         if (!iter.hasNext())
                             return true;
                         continue;
                     }
 
-                    if (comparisonOperator == Operator.NEQ)
+                    if (operator == Operator.NEQ)
                         return iter.hasNext();
 
-                    throw invalidRequest("Invalid comparison with null for operator \"%s\"", comparisonOperator);
+                    throw invalidRequest("Invalid comparison with null for operator \"%s\"", operator);
                 }
 
-                if (valueAppliesTo(type, iter, value, comparisonOperator))
+                if (valueAppliesTo(type, iter, value, operator))
                     return true;
             }
             return false;

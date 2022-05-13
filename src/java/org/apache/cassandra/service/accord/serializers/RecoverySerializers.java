@@ -36,7 +36,7 @@ import org.apache.cassandra.db.TypeSizes;
 import org.apache.cassandra.io.IVersionedSerializer;
 import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.DataOutputPlus;
-import org.apache.cassandra.service.accord.db.AccordData;
+import org.apache.cassandra.service.accord.txn.TxnData;
 
 import static org.apache.cassandra.utils.NullableSerializer.deserializeNullable;
 import static org.apache.cassandra.utils.NullableSerializer.serializeNullable;
@@ -96,7 +96,7 @@ public class RecoverySerializers
             serializeNullable(CommandSerializers.deps, recoverOk.earlierAcceptedNoWitness, out, version);
             out.writeBoolean(recoverOk.rejectsFastPath);
             serializeNullable(CommandSerializers.writes, recoverOk.writes, out, version);
-            serializeNullable(AccordData.serializer, (AccordData) recoverOk.result, out, version);
+            serializeNullable(TxnData.serializer, (TxnData) recoverOk.result, out, version);
         }
 
         @Override
@@ -142,7 +142,7 @@ public class RecoverySerializers
                                  deserializeNullable(CommandSerializers.deps, in, version),
                                  in.readBoolean(),
                                  deserializeNullable(CommandSerializers.writes, in, version),
-                                 deserializeNullable(AccordData.serializer, in, version),
+                                 deserializeNullable(TxnData.serializer, in, version),
                                  in,
                                  version);
         }
@@ -163,7 +163,7 @@ public class RecoverySerializers
             size += serializedSizeNullable(CommandSerializers.deps, recoverOk.earlierAcceptedNoWitness, version);
             size += TypeSizes.sizeof(recoverOk.rejectsFastPath);
             size += serializedSizeNullable(CommandSerializers.writes, recoverOk.writes, version);
-            size += serializedSizeNullable(AccordData.serializer, (AccordData) recoverOk.result, version);
+            size += serializedSizeNullable(TxnData.serializer, (TxnData) recoverOk.result, version);
             return size;
         }
 

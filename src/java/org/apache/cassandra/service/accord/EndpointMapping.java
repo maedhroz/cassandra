@@ -23,6 +23,7 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 
 import com.google.common.base.Preconditions;
+import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableMap;
 
 import accord.local.Node;
@@ -67,6 +68,11 @@ public class EndpointMapping
         {
             throw new RuntimeException(e);
         }
+    }
+
+    public static ImmutableCollection<Node.Id> knownIds()
+    {
+        return mapping.endpointToId.values();
     }
 
     private static class Mapping

@@ -41,6 +41,7 @@ import org.apache.cassandra.cql3.CQLTester;
 import org.apache.cassandra.cql3.QueryEvents;
 import org.apache.cassandra.exceptions.ConfigurationException;
 import org.apache.cassandra.service.StorageService;
+import org.apache.cassandra.service.accord.AccordService;
 
 import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.instanceOf;
@@ -391,6 +392,22 @@ public class AuditLoggerTest extends CQLTester
         int size = rs.all().size();
 
         assertEquals(0, size);
+    }
+
+    @Test
+    public void testTransactionAuditing()
+    {
+        createTable("CREATE TABLE %s (key int PRIMARY KEY, val int)");
+        AccordService.instance().createEpochFromConfigUnsafe();
+
+        Session session = sessionNet();
+        String query = formatQuery("BEGIN TRANSACTION\n" +
+                                   "  SELECT * FROM %s WHERE key = 0;\n" +
+                                   "COMMIT TRANSACTION");
+
+        session.execute(query);
+        AuditLogEntry logEntry = ((InMemoryAuditLogger) AuditLogManager.instance.getLogger()).inMemQueue.poll();
+        assertLogEntry(query, AuditLogEntryType.TRANSACTION, logEntry, true, null);
     }
 
     @Test

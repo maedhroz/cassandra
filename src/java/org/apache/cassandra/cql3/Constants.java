@@ -229,6 +229,7 @@ public abstract class Constants
             return new Literal(Type.DURATION, text);
         }
 
+        @Override
         public Value prepare(String keyspace, ColumnSpecification receiver) throws InvalidRequestException
         {
             if (!testAssignment(keyspace, receiver).isAssignable())

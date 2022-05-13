@@ -18,11 +18,14 @@
 package org.apache.cassandra.cql3;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 
 import org.apache.cassandra.cql3.functions.Function;
 import org.apache.cassandra.cql3.statements.StatementType;
+import org.apache.cassandra.cql3.transactions.ReferenceOperation;
+import org.apache.cassandra.schema.ColumnMetadata;
 
 import com.google.common.collect.Iterators;
 
@@ -47,9 +50,36 @@ public final class Operations implements Iterable<Operation>
      */
     private final List<Operation> staticOperations = new ArrayList<>();
 
+    private final List<ReferenceOperation> regularSubstitutions = new ArrayList<>();
+    private final List<ReferenceOperation> staticSubstitutions = new ArrayList<>();
+
     public Operations(StatementType type)
     {
         this.type = type;
+    }
+
+    public boolean migrateReadRequiredOperations()
+    {
+        boolean migrated = migrateReadRequiredOperations(staticOperations, staticSubstitutions);
+        migrated |= migrateReadRequiredOperations(regularOperations, regularSubstitutions);
+        return migrated;
+    }
+
+    private static boolean migrateReadRequiredOperations(List<Operation> src, List<ReferenceOperation> dest)
+    {
+        boolean migrated = false;
+        Iterator<Operation> it = src.iterator();
+        while (it.hasNext())
+        {
+            Operation next = it.next();
+            if (next.requiresRead())
+            {
+                it.remove();
+                dest.add(ReferenceOperation.create(next));
+                migrated = true;
+            }
+        }
+        return migrated;
     }
 
     /**
@@ -105,6 +135,14 @@ public final class Operations implements Iterable<Operation>
             regularOperations.add(operation);
     }
 
+    public void add(ColumnMetadata column, ReferenceOperation operation)
+    {
+        if (column.isStatic())
+            staticSubstitutions.add(operation);
+        else
+            regularSubstitutions.add(operation);
+    }
+
     /**
      * Checks if one of the operations requires a read.
      *
@@ -138,9 +176,27 @@ public final class Operations implements Iterable<Operation>
         return Iterators.concat(staticOperations.iterator(), regularOperations.iterator());
     }
 
+    public Collection<ReferenceOperation> refs()
+    {
+        List<ReferenceOperation> list = new ArrayList<>(staticSubstitutions.size() + regularSubstitutions.size());
+        list.addAll(staticSubstitutions);
+        list.addAll(regularSubstitutions);
+        return list;
+    }
+
     public void addFunctionsTo(List<Function> functions)
     {
         regularOperations.forEach(p -> p.addFunctionsTo(functions));
         staticOperations.forEach(p -> p.addFunctionsTo(functions));
+    }
+
+    public List<ReferenceOperation> regularSubstitutions()
+    {
+        return regularSubstitutions;
+    }
+
+    public List<ReferenceOperation> staticSubstitutions()
+    {
+        return staticSubstitutions;
     }
 }

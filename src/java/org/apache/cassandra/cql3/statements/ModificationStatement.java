@@ -20,21 +20,13 @@ package org.apache.cassandra.cql3.statements;
 import java.nio.ByteBuffer;
 import java.util.*;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Iterables;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.auth.Permission;
-import org.apache.cassandra.db.guardrails.Guardrails;
-import org.apache.cassandra.db.marshal.ValueAccessor;
-import org.apache.cassandra.dht.Token;
-import org.apache.cassandra.locator.Replica;
-import org.apache.cassandra.locator.ReplicaLayout;
-import org.apache.cassandra.schema.ColumnMetadata;
-import org.apache.cassandra.schema.Schema;
-import org.apache.cassandra.schema.TableMetadata;
-import org.apache.cassandra.schema.ViewMetadata;
 import org.apache.cassandra.cql3.*;
 import org.apache.cassandra.cql3.conditions.ColumnCondition;
 import org.apache.cassandra.cql3.conditions.ColumnConditions;
@@ -44,13 +36,23 @@ import org.apache.cassandra.cql3.restrictions.StatementRestrictions;
 import org.apache.cassandra.cql3.selection.ResultSetBuilder;
 import org.apache.cassandra.cql3.selection.Selection;
 import org.apache.cassandra.cql3.selection.Selection.Selectors;
+import org.apache.cassandra.cql3.transactions.ReferenceOperation;
 import org.apache.cassandra.db.*;
 import org.apache.cassandra.db.filter.*;
+import org.apache.cassandra.db.guardrails.Guardrails;
 import org.apache.cassandra.db.marshal.BooleanType;
+import org.apache.cassandra.db.marshal.ValueAccessor;
 import org.apache.cassandra.db.partitions.*;
 import org.apache.cassandra.db.rows.RowIterator;
 import org.apache.cassandra.db.view.View;
+import org.apache.cassandra.dht.Token;
 import org.apache.cassandra.exceptions.*;
+import org.apache.cassandra.locator.Replica;
+import org.apache.cassandra.locator.ReplicaLayout;
+import org.apache.cassandra.schema.ColumnMetadata;
+import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.TableMetadata;
+import org.apache.cassandra.schema.ViewMetadata;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.service.QueryState;
 import org.apache.cassandra.service.StorageProxy;
@@ -58,6 +60,9 @@ import org.apache.cassandra.service.disk.usage.DiskUsageBroadcaster;
 import org.apache.cassandra.service.paxos.Ballot;
 import org.apache.cassandra.service.paxos.BallotGenerator;
 import org.apache.cassandra.service.paxos.Commit.Proposal;
+import org.apache.cassandra.service.accord.txn.TxnReferenceOperation;
+import org.apache.cassandra.service.accord.txn.TxnReferenceOperations;
+import org.apache.cassandra.service.accord.txn.TxnWrite;
 import org.apache.cassandra.transport.messages.ResultMessage;
 import org.apache.cassandra.triggers.TriggerExecutor;
 import org.apache.cassandra.utils.FBUtilities;
@@ -338,6 +343,11 @@ public abstract class ModificationStatement implements CQLStatement.SingleKeyspa
     public Iterable<Operation> allOperations()
     {
         return operations;
+    }
+
+    public Collection<ReferenceOperation> allReferenceOperations()
+    {
+        return operations.refs();
     }
 
     public Iterable<ColumnMetadata> getColumnsWithConditions()
@@ -733,6 +743,46 @@ public abstract class ModificationStatement implements CQLStatement.SingleKeyspa
         return collector.toMutations();
     }
 
+    @VisibleForTesting
+    public PartitionUpdate getTxnUpdate(ClientState state, QueryOptions options)
+    {
+        List<? extends IMutation> mutations = getMutations(state, options, false, 0, 0, 0);
+        if (mutations.size() != 1)
+            throw new IllegalArgumentException("When running withing a transaction, modification statements may only mutate a single partition");
+        return Iterables.getOnlyElement(mutations.get(0).getPartitionUpdates());
+    }
+
+    private List<TxnReferenceOperation> getTxnReferenceOps(List<ReferenceOperation> operations, QueryOptions options)
+    {
+        if (operations.isEmpty())
+            return Collections.emptyList();
+
+        List<TxnReferenceOperation> result = new ArrayList<>(operations.size());
+        for (ReferenceOperation operation : operations)
+            result.add(operation.bindAndGet(options));
+        return result;
+    }
+
+    public TxnReferenceOperations getTxnReferenceOps(QueryOptions options, ClientState state)
+    {
+        List<TxnReferenceOperation> regularOps = getTxnReferenceOps(operations.regularSubstitutions(), options);
+        List<TxnReferenceOperation> staticOps = getTxnReferenceOps(operations.staticSubstitutions(), options);
+        Clustering<?> clustering = !regularOps.isEmpty() ? Iterables.getOnlyElement(createClustering(options, state)) : null;
+        return new TxnReferenceOperations(metadata, clustering, regularOps, staticOps);
+    }
+
+    public TxnWrite.Fragment getTxnWriteFragment(int index, ClientState state, QueryOptions options)
+    {
+        // When an Operation requires a read, this can not be done right away and must be done by the transaction itself,
+        // so migrate those Operations to a ReferenceOperation which works properly in this case
+        //TODO - Seems that += is a ref operation regardless of rhs... is this a parser bug?  That change made this
+        // logic only defensive...
+        operations.migrateReadRequiredOperations();
+        PartitionUpdate baseUpdate = getTxnUpdate(state, options);
+        TxnReferenceOperations referenceOps = getTxnReferenceOps(options, state);
+        return new TxnWrite.Fragment(index, baseUpdate, referenceOps);
+    }
+
     final void addUpdates(UpdatesCollector collector,
                           List<ByteBuffer> keys,
                           ClientState state,
@@ -875,7 +925,6 @@ public abstract class ModificationStatement implements CQLStatement.SingleKeyspa
                               queryStartNanoTime);
 
         return new UpdateParameters(metadata(),
-                                    updatedColumns(),
                                     state,
                                     options,
                                     getTimestamp(timestamp, options),
@@ -952,7 +1001,9 @@ public abstract class ModificationStatement implements CQLStatement.SingleKeyspa
 
             Conditions preparedConditions = prepareConditions(metadata, bindVariables);
 
-            return prepareInternal(metadata, bindVariables, preparedConditions, preparedAttributes);
+            ModificationStatement statement = prepareInternal(metadata, bindVariables, preparedConditions, preparedAttributes);
+            // TODO: if this is a txn and has a read name, and updates non-static columns, confirm it selects an entire row
+            return statement;
         }
 
         /**
@@ -976,7 +1027,6 @@ public abstract class ModificationStatement implements CQLStatement.SingleKeyspa
             if (ifNotExists)
             {
                 assert conditions.isEmpty();
-                assert !ifExists;
                 return Conditions.IF_NOT_EXISTS_CONDITION;
             }
 

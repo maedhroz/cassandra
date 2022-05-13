@@ -19,17 +19,20 @@
 package org.apache.cassandra.simulator.paxos;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Spliterator;
-import java.util.Spliterators;
+import java.util.*;
 import java.util.concurrent.ExecutionException;
 import java.util.function.LongSupplier;
 import java.util.stream.StreamSupport;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterators;
+import org.apache.cassandra.cql3.QueryOptions;
+import org.apache.cassandra.cql3.QueryProcessor;
+import org.apache.cassandra.cql3.VariableSpecifications;
+import org.apache.cassandra.cql3.statements.TxnDataName;
+import org.apache.cassandra.service.accord.txn.TxnBuilder;
+import org.apache.cassandra.service.accord.txn.TxnData;
+import org.apache.cassandra.service.accord.txn.TxnReferenceOperations;
 import org.junit.Assert;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -53,8 +56,6 @@ import org.apache.cassandra.exceptions.RequestTimeoutException;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.service.accord.AccordService;
-import org.apache.cassandra.service.accord.AccordTxnBuilder;
-import org.apache.cassandra.service.accord.db.AccordData;
 import org.apache.cassandra.simulator.Debug;
 import org.apache.cassandra.simulator.RunnableActionScheduler;
 import org.apache.cassandra.simulator.cluster.ClusterActions;
@@ -111,8 +112,9 @@ public class PairOfSequencesAccordSimulation extends AbstractPairOfSequencesPaxo
     private static IIsolatedExecutor.SerializableCallable<Object[][]> read(int primaryKey)
     {
         return () -> {
-            AccordTxnBuilder builder = new AccordTxnBuilder();
-            builder.withRead(SELECT, primaryKey);
+            TxnBuilder builder = new TxnBuilder();
+            VariableSpecifications bindVariables = new VariableSpecifications(singletonList(null));
+            builder.withRead(TxnDataName.returning(), SELECT, bindVariables, primaryKey);
             // TODO (now): support complex columns
             return execute(builder.build(), "pk", "count", "seq");
         };
@@ -121,10 +123,14 @@ public class PairOfSequencesAccordSimulation extends AbstractPairOfSequencesPaxo
     private static IIsolatedExecutor.SerializableCallable<Object[][]> write(int id, int primaryKey)
     {
         return () -> {
-            AccordTxnBuilder builder = new AccordTxnBuilder();
-            builder.withRead(SELECT, primaryKey);
-            builder.withAppend(KEYSPACE, TABLE, primaryKey, "seq", id + ",");
-            builder.withIncrement(KEYSPACE, TABLE, primaryKey, "count", 1);
+            TxnBuilder builder = new TxnBuilder();
+            // TODO: temporarily disabled, need to rework this to use CQL transaction syntax
+//            VariableSpecifications bindVariables = new VariableSpecifications(ImmutableList.of(null, null, null));
+//            builder.withWrite(UPDATE, TxnReferenceOperations.empty(), bindVariables, id + ",", singletonList(id), primaryKey);
+//            AccordTxnBuilder builder = new AccordTxnBuilder();
+//            builder.withRead(SELECT, primaryKey);
+//            builder.withAppend(KEYSPACE, TABLE, primaryKey, "seq", id + ",");
+//            builder.withIncrement(KEYSPACE, TABLE, primaryKey, "count", 1);
             return execute(builder.build());
         };
     }
@@ -133,7 +139,7 @@ public class PairOfSequencesAccordSimulation extends AbstractPairOfSequencesPaxo
     {
         try
         {
-            AccordData result = (AccordData) AccordService.instance().node.coordinate(txn).get();
+            TxnData result = (TxnData) AccordService.instance().node.coordinate(txn).get();
             Assert.assertNotNull(result);
             QueryResults.Builder builder = QueryResults.builder();
             boolean addedHeader = false;

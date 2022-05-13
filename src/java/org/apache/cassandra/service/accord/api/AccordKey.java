@@ -41,6 +41,7 @@ import org.apache.cassandra.schema.Schema;
 import org.apache.cassandra.schema.TableId;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.utils.ByteBufferUtil;
+import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.ObjectSizes;
 
 public interface AccordKey extends Key
@@ -259,11 +260,21 @@ public interface AccordKey extends Key
 
     class PartitionKey extends AbstractKey<DecoratedKey>
     {
-        private static final long EMPTY_SIZE;
-        static
+
+        // avoid needing static init for tests
+        private static class EmptySize
         {
-            DecoratedKey key = DatabaseDescriptor.getPartitioner().decorateKey(ByteBufferUtil.EMPTY_BYTE_BUFFER);
-            EMPTY_SIZE = ObjectSizes.measureDeep(new PartitionKey(null, key));
+            private static final long EMPTY_SIZE;
+            static
+            {
+                DecoratedKey key = DatabaseDescriptor.getPartitioner().decorateKey(ByteBufferUtil.EMPTY_BYTE_BUFFER);
+                EMPTY_SIZE = ObjectSizes.measureDeep(new PartitionKey(null, key));
+            }
+
+            static long get()
+            {
+                return EMPTY_SIZE;
+            }
         }
 
         public PartitionKey(TableId tableId, DecoratedKey key)
@@ -288,7 +299,7 @@ public interface AccordKey extends Key
 
         public long estimatedSizeOnHeap()
         {
-            return EMPTY_SIZE + ByteBufferAccessor.instance.size(partitionKey().getKey());
+            return EmptySize.get() + ByteBufferAccessor.instance.size(partitionKey().getKey());
         }
 
         public static final Serializer serializer = new Serializer();
@@ -310,7 +321,7 @@ public interface AccordKey extends Key
                 position += key.tableId().serialize(dst, accessor, position);
                 ByteBuffer bytes = key.partitionKey().getKey();
                 int numBytes = ByteBufferAccessor.instance.size(bytes);
-                Preconditions.checkState(numBytes <= Short.MAX_VALUE);
+                Preconditions.checkState(numBytes <= FBUtilities.MAX_UNSIGNED_SHORT, "Unable to serialize key; key size %s is too large, must be <= %s", numBytes, FBUtilities.MAX_UNSIGNED_SHORT);
                 position += accessor.putShort(dst, position, (short) numBytes);
                 position += accessor.copyByteBufferTo(bytes, 0, dst, position, numBytes);
                 return position - offset;

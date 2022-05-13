@@ -56,6 +56,11 @@ public abstract class Operation
         this.t = t;
     }
 
+    public Term term()
+    {
+        return t;
+    }
+
     public void addFunctionsTo(List<Function> functions)
     {
         if (t != null)
@@ -172,7 +177,7 @@ public abstract class Operation
 
             if (receiver.type.isCollection())
             {
-                switch (((CollectionType) receiver.type).kind)
+                switch (((CollectionType<?>) receiver.type).kind)
                 {
                     case LIST:
                         return new Lists.Setter(receiver, v);
@@ -222,7 +227,7 @@ public abstract class Operation
             else if (!(receiver.type.isMultiCell()))
                 throw new InvalidRequestException(String.format("Invalid operation (%s) for frozen collection column %s", toString(receiver), receiver.name));
 
-            switch (((CollectionType)receiver.type).kind)
+            switch (((CollectionType<?>)receiver.type).kind)
             {
                 case LIST:
                     Term idx = selector.prepare(metadata.keyspace, Lists.indexSpecOf(receiver));
@@ -322,7 +327,7 @@ public abstract class Operation
             else if (!(receiver.type.isMultiCell()))
                 throw new InvalidRequestException(String.format("Invalid operation (%s) for frozen collection column %s", toString(receiver), receiver.name));
 
-            switch (((CollectionType)receiver.type).kind)
+            switch (((CollectionType<?>)receiver.type).kind)
             {
                 case LIST:
                     return new Lists.Appender(receiver, value.prepare(metadata.keyspace, receiver));
@@ -375,7 +380,7 @@ public abstract class Operation
             else if (!(receiver.type.isMultiCell()))
                 throw new InvalidRequestException(String.format("Invalid operation (%s) for frozen collection column %s", toString(receiver), receiver.name));
 
-            switch (((CollectionType)receiver.type).kind)
+            switch (((CollectionType<?>)receiver.type).kind)
             {
                 case LIST:
                     return new Lists.Discarder(receiver, value.prepare(metadata.keyspace, receiver));
@@ -386,7 +391,7 @@ public abstract class Operation
                     ColumnSpecification vr = new ColumnSpecification(receiver.ksName,
                                                                      receiver.cfName,
                                                                      receiver.name,
-                                                                     SetType.getInstance(((MapType)receiver.type).getKeysType(), false));
+                                                                     SetType.getInstance(((MapType<?, ?>) receiver.type).getKeysType(), true));
                     Term term;
                     try
                     {
@@ -488,7 +493,7 @@ public abstract class Operation
             else if (!(receiver.type.isMultiCell()))
                 throw new InvalidRequestException(String.format("Invalid deletion operation for frozen collection column %s", receiver.name));
 
-            switch (((CollectionType)receiver.type).kind)
+            switch (((CollectionType<?>)receiver.type).kind)
             {
                 case LIST:
                     Term idx = element.prepare(keyspace, Lists.indexSpecOf(receiver));

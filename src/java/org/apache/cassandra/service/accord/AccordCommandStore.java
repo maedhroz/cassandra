@@ -45,6 +45,8 @@ import org.apache.cassandra.utils.concurrent.AsyncPromise;
 import org.apache.cassandra.utils.concurrent.Future;
 import org.apache.cassandra.utils.concurrent.UncheckedInterruptedException;
 
+import static org.apache.cassandra.utils.Clock.Global.currentTimeMillis;
+
 public class AccordCommandStore extends CommandStore
 {
     public static long maxCacheSize()
