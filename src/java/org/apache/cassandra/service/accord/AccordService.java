@@ -18,21 +18,29 @@
 
 package org.apache.cassandra.service.accord;
 
+import java.util.concurrent.ExecutionException;
 import java.util.Arrays;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import com.google.common.annotations.VisibleForTesting;
 
+import accord.api.Result;
 import accord.local.Node;
 import accord.messages.Reply;
 import accord.messages.Request;
+import accord.txn.Txn;
+import org.apache.cassandra.db.ConsistencyLevel;
+import org.apache.cassandra.exceptions.ReadTimeoutException;
 import org.apache.cassandra.concurrent.Shutdownable;
 import org.apache.cassandra.net.IVerbHandler;
 import org.apache.cassandra.service.accord.api.AccordAgent;
 import org.apache.cassandra.service.accord.api.AccordScheduler;
+import org.apache.cassandra.service.accord.txn.TxnData;
 import org.apache.cassandra.utils.ExecutorUtils;
 import org.apache.cassandra.utils.FBUtilities;
+import org.apache.cassandra.utils.concurrent.Future;
+import org.apache.cassandra.utils.concurrent.UncheckedInterruptedException;
 
 public class AccordService implements Shutdownable
 {
@@ -43,7 +51,7 @@ public class AccordService implements Shutdownable
     private final AccordMessageSink messageSink;
     public final AccordConfigurationService configService;
     private final AccordScheduler scheduler;
-    private final AccordVerbHandler verbHandler;
+    private final AccordVerbHandler<? extends Request> verbHandler;
 
     public static long uniqueNow()
     {
@@ -65,10 +73,10 @@ public class AccordService implements Shutdownable
                              scheduler,
                              AccordCommandStores::new);
         this.nodeShutdown = toShutdownable(node);
-        this.verbHandler = new AccordVerbHandler(this.node);
+        this.verbHandler = new AccordVerbHandler<>(this.node);
     }
 
-    public <T extends Request> IVerbHandler<T> verbHandler()
+    public IVerbHandler<? extends Request> verbHandler()
     {
         return verbHandler;
     }
@@ -88,6 +96,29 @@ public class AccordService implements Shutdownable
     {
         return TimeUnit.MILLISECONDS.toMicros(System.currentTimeMillis());
     }
+
+    public TxnData coordinate(Txn txn)
+    {
+        try
+        {
+            Future<Result> future = node.coordinate(txn);
+            // TODO: Do we need a new, configurable timeout here?
+            Result result = future.get(30, TimeUnit.SECONDS);
+            return (TxnData) result;
+        }
+        catch (ExecutionException e)
+        {
+            throw new RuntimeException(e);
+        }
+        catch (InterruptedException e)
+        {
+            throw new UncheckedInterruptedException(e);
+        }
+        catch (TimeoutException e)
+        {
+            throw new ReadTimeoutException(ConsistencyLevel.ANY, 0, 0, false);
+        }
+    };
 
     @VisibleForTesting
     AccordMessageSink messageSink()

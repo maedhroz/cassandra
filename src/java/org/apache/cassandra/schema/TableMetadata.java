@@ -26,9 +26,6 @@ import javax.annotation.Nullable;
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.*;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import org.apache.cassandra.auth.DataResource;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.cql3.ColumnIdentifier;
@@ -53,7 +50,7 @@ import static org.apache.cassandra.schema.IndexMetadata.isNameValid;
 @Unmetered
 public class TableMetadata implements SchemaElement
 {
-    private static final Logger logger = LoggerFactory.getLogger(TableMetadata.class);
+    public static final String UNDEFINED_COLUMN_NAME_MESSAGE = "Undefined column name %s in table %s";
 
     // Please note that currently the only one truly useful flag is COUNTER, as the rest of the flags were about
     // differencing between CQL tables and the various types of COMPACT STORAGE tables (pre-4.0). As those "compact"
@@ -369,7 +366,7 @@ public class TableMetadata implements SchemaElement
     {
         ColumnMetadata def = getColumn(name);
         if (def == null)
-            throw new InvalidRequestException(format("Undefined column name %s in table %s", name.toCQLString(), this));
+            throw new InvalidRequestException(format(UNDEFINED_COLUMN_NAME_MESSAGE, name.toCQLString(), this));
         return def;
     }
     /*

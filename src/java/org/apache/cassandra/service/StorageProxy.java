@@ -45,7 +45,10 @@ import com.google.common.collect.Iterables;
 import com.google.common.primitives.Ints;
 import com.google.common.util.concurrent.Uninterruptibles;
 
+import accord.txn.Txn;
 import org.apache.cassandra.config.Config;
+import org.apache.cassandra.service.accord.AccordService;
+import org.apache.cassandra.service.accord.txn.TxnData;
 import org.apache.cassandra.service.paxos.*;
 import org.apache.cassandra.utils.concurrent.CountDownLatch;
 
@@ -2193,6 +2196,11 @@ public class StorageProxy implements StorageProxyMBean
             logger.debug("Schemas are in agreement.");
 
         return results;
+    }
+
+    public TxnData txn(Txn txn)
+    {
+        return AccordService.instance.coordinate(txn);
     }
 
     public boolean getHintedHandoffEnabled()
