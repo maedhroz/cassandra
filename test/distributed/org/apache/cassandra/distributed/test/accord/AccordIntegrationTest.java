@@ -20,12 +20,9 @@ package org.apache.cassandra.distributed.test.accord;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Iterator;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
-import java.util.Spliterator;
-import java.util.Spliterators;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -33,54 +30,48 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import com.google.common.base.Splitter;
-import com.google.common.collect.Iterators;
 import com.google.common.util.concurrent.Uninterruptibles;
+import org.assertj.core.api.Assertions;
+import org.awaitility.Awaitility;
 import org.junit.Assert;
 import org.junit.Test;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import accord.coordinate.Preempted;
 import accord.local.Status;
 import accord.messages.Commit;
 import accord.primitives.Keys;
 import accord.primitives.TxnId;
 import accord.topology.Topologies;
-import accord.txn.Txn;
-import org.apache.cassandra.cql3.statements.SelectStatement;
-import org.apache.cassandra.db.Clustering;
-import org.apache.cassandra.db.partitions.FilteredPartition;
-import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.distributed.Cluster;
 import org.apache.cassandra.distributed.api.ConsistencyLevel;
 import org.apache.cassandra.distributed.api.Feature;
 import org.apache.cassandra.distributed.api.IMessageFilters;
 import org.apache.cassandra.distributed.api.QueryResults;
+import org.apache.cassandra.distributed.shared.AssertUtils;
+import org.apache.cassandra.distributed.api.ConsistencyLevel;
 import org.apache.cassandra.distributed.api.SimpleQueryResult;
 import org.apache.cassandra.distributed.impl.Instance;
-import org.apache.cassandra.distributed.shared.AssertUtils;
 import org.apache.cassandra.distributed.test.TestBaseImpl;
 import org.apache.cassandra.distributed.util.QueryResultUtil;
 import org.apache.cassandra.net.Message;
 import org.apache.cassandra.net.Verb;
-import org.apache.cassandra.schema.ColumnMetadata;
-import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.service.accord.AccordKeyspace;
 import org.apache.cassandra.service.accord.AccordService;
-import org.apache.cassandra.service.accord.AccordTxnBuilder;
-import org.apache.cassandra.service.accord.db.AccordData;
+import org.apache.cassandra.service.accord.txn.TxnBuilder;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FailingConsumer;
-import org.assertj.core.api.Assertions;
 
-import static org.apache.cassandra.service.accord.db.AccordUpdate.UpdatePredicate.Type.EQUAL;
-import static org.apache.cassandra.service.accord.db.AccordUpdate.UpdatePredicate.Type.NOT_EXISTS;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.apache.cassandra.utils.Clock.Global.nanoTime;
 
 //TODO there are too many new clusters, this will cause Metaspace issues.  Once Schema and topology are integrated, can switch
 // to a shared cluster with isolated tables
+@SuppressWarnings("Convert2MethodRef")
 public class AccordIntegrationTest extends TestBaseImpl
 {
     private static final Logger logger = LoggerFactory.getLogger(AccordIntegrationTest.class);
@@ -89,10 +80,8 @@ public class AccordIntegrationTest extends TestBaseImpl
 
     private static void assertRow(Cluster cluster, String query, int k, int c, int v)
     {
-        SimpleQueryResult result = cluster.coordinator(1).executeWithResult(query, ConsistencyLevel.QUORUM);
-        AssertUtils.assertRows(result, QueryResults.builder()
-                                                   .row(k, c, v)
-                                                   .build());
+        Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.QUORUM);
+        Assert.assertArrayEquals(new Object[]{new Object[] {k, c, v}}, result);
     }
 
     private static void test(FailingConsumer<Cluster> fn) throws IOException
@@ -115,53 +104,26 @@ public class AccordIntegrationTest extends TestBaseImpl
     }
 
     @Test
-    public void testQuery() throws IOException
+    public void testQuery() throws Throwable
     {
         test(cluster -> {
-            cluster.get(1).runOnInstance(() -> execute(txn()
-                                                       .withRead("SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0")
-                                                       .withWrite("INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (0, 0, 1)")
-                                                       .withCondition(keyspace, "tbl", 0, 0, NOT_EXISTS)));
+            cluster.coordinator(1).execute("INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (1, 0, 3);", ConsistencyLevel.ALL);
 
-            awaitAsyncApply(cluster);
-            assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0", 0, 0, 1);
-
-            // row exists now, so tx should no-op
-            cluster.get(1).runOnInstance(() -> execute(txn()
-                                                       .withRead("SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0")
-                                                       .withWrite("INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (0, 0, 2)")
-                                                       .withCondition(keyspace, "tbl", 0, 0, NOT_EXISTS)));
-
-            awaitAsyncApply(cluster);
+            String query = "BEGIN TRANSACTION\n" +
+                           "  LET row1 = (SELECT v FROM " + keyspace + ".tbl WHERE k=0 AND c=0);\n" +
+                           "  LET row2 = (SELECT v FROM " + keyspace + ".tbl WHERE k=1 AND c=0);\n" +
+                           "  SELECT v FROM " + keyspace + ".tbl WHERE k=1 AND c=0;\n" +
+                           "  IF row1 IS NULL AND row2.v = 3 THEN\n" +
+                           "    INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (0, 0, 1);\n" +
+                           "  END IF\n" +
+                           "COMMIT TRANSACTION";
+            Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY);
+            assertEquals(3, result[0][0]);
             assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0", 0, 0, 1);
         });
     }
 
-    @Test
-    public void multiKeyMultiQuery() throws IOException
-    {
-        test(cluster -> {
-            cluster.get(1).runOnInstance(() -> execute(txn()
-                                                       .withRead("SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0")
-                                                       .withRead("SELECT * FROM " + keyspace + ".tbl WHERE k=1 AND c=0")
-                                                       .withWrite("INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (0, 0, 0)")
-                                                       .withWrite("INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (1, 0, 0)")
-                                                       .withCondition(keyspace, "tbl", 0, 0, NOT_EXISTS)));
-
-            cluster.get(1).runOnInstance(() -> execute(txn()
-                                                       .withRead("SELECT * FROM " + keyspace + ".tbl WHERE k=1 AND c=0")
-                                                       .withRead("SELECT * FROM " + keyspace + ".tbl WHERE k=2 AND c=0")
-                                                       .withWrite("INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (1, 0, 1)")
-                                                       .withWrite("INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (2, 0, 1)")
-                                                       .withCondition(keyspace, "tbl", 1, 0, "v", EQUAL, 0)));
-
-            awaitAsyncApply(cluster);
-            assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0", 0, 0, 0);
-            assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=1 AND c=0", 1, 0, 1);
-            assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=2 AND c=0", 2, 0, 1);
-        });
-    }
-
+    // TODO: This fails sporadically, sometimes w/ timeouts and sometimes w/ wrong post-recovery read results.
     @Test
     public void testRecovery() throws IOException
     {
@@ -169,32 +131,42 @@ public class AccordIntegrationTest extends TestBaseImpl
             IMessageFilters.Filter lostApply = cluster.filters().verbs(Verb.ACCORD_APPLY_REQ.id).drop();
             IMessageFilters.Filter lostCommit = cluster.filters().verbs(Verb.ACCORD_COMMIT_REQ.id).to(2).drop();
 
-            cluster.get(1).runOnInstance(() -> execute(txn()
-                                                       .withRead("SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0")
-                                                       .withWrite("INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (0, 0, 1)")
-                                                       .withCondition(keyspace, "tbl", 0, 0, NOT_EXISTS)));
+            String query = "BEGIN TRANSACTION\n" +
+                           "  LET row1 = (SELECT v FROM " + keyspace + ".tbl WHERE k=0 AND c=0);\n" +
+                           "  SELECT row1.v;\n" +
+                           "  IF row1 IS NULL THEN\n" +
+                           "    INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (0, 0, 1);\n" +
+                           "  END IF\n" +
+                           "COMMIT TRANSACTION";
+            Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY);
+            assertNull(result[0][0]); // row1.v shouldn't have existed when the txn's SELECT was executed
 
             lostApply.off();
             lostCommit.off();
 
-            // query again, this should trigger recovery
-            cluster.get(1).runOnInstance(() -> execute(txn()
-                                                       .withRead("SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0")
-                                                       .withWrite("UPDATE " + keyspace + ".tbl SET v=? WHERE k=? AND c=?", 2, 0, 0)
-                                                       .withCondition(keyspace, "tbl", 0, 0, "v", EQUAL, 1),
-                                                       true));
-
-            awaitAsyncApply(cluster);
-
-            //TODO why is this flakey?  Also why does .close hang on Accord?
+            // Querying again should trigger recovery...
+            query = "BEGIN TRANSACTION\n" +
+                    "  LET row1 = (SELECT v FROM " + keyspace + ".tbl WHERE k=0 AND c=0);\n" +
+                    "  SELECT row1.v;\n" +
+                    "  IF row1.v = 1 THEN\n" +
+                    "    UPDATE " + keyspace + ".tbl SET v=2 WHERE k = 0 AND c = 0;\n" +
+                    "  END IF\n" +
+                    "COMMIT TRANSACTION";
+            result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY);
+            assertEquals(1, result[0][0]); // The following assertion should fail if this does, but check it anyway.
+            
+            // TODO: Why does this sporadically see "1" when it should see "2"?
             assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0", 0, 0, 2);
 
-            cluster.get(1).runOnInstance(() -> execute(txn()
-                                                       .withRead("SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0")
-                                                       .withWrite("INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (0, 0, 3)")
-                                                       .withCondition(keyspace, "tbl", 0, 0, NOT_EXISTS)));
-            awaitAsyncApply(cluster);
-
+            query = "BEGIN TRANSACTION\n" +
+                    "  LET row1 = (SELECT v FROM " + keyspace + ".tbl WHERE k=0 AND c=0);\n" +
+                    "  SELECT row1.v;\n" +
+                    "  IF row1 IS NULL THEN\n" +
+                    "    INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (0, 0, 3);\n" +
+                    "  END IF\n" +
+                    "COMMIT TRANSACTION";
+            result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY);
+            assertEquals(2, result[0][0]);
             assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0", 0, 0, 2);
         });
     }
@@ -213,37 +185,50 @@ public class AccordIntegrationTest extends TestBaseImpl
             List<String> tokens = cluster.stream()
                                          .flatMap(i -> StreamSupport.stream(Splitter.on(",").split(i.config().getString("initial_token")).spliterator(), false))
                                          .collect(Collectors.toList());
-            // needs to be byte[] because ByteBuffer isn't serializable so can't pass into the coordinator ClassLoader
-            List<byte[]> keys = tokens.stream().map(t -> (Murmur3Partitioner.LongToken) Murmur3Partitioner.instance.getTokenFactory().fromString(t))
-                                      .map(Murmur3Partitioner.LongToken::keyForToken)
-                                      .map(ByteBufferUtil::getArray)
-                                      .collect(Collectors.toList());
+
+            List<ByteBuffer> keys = tokens.stream()
+                                          .map(t -> (Murmur3Partitioner.LongToken) Murmur3Partitioner.instance.getTokenFactory().fromString(t))
+                                          .map(Murmur3Partitioner.LongToken::keyForToken)
+                                          .collect(Collectors.toList());
+
+            List<String> keyStrings = keys.stream().map(bb -> "0x" + ByteBufferUtil.bytesToHex(bb)).collect(Collectors.toList());
+            StringBuilder query = new StringBuilder("BEGIN TRANSACTION\n");
+            
+            for (int i = 0; i < keys.size(); i++)
+                query.append("  LET row" + i + " = (SELECT * FROM " + keyspace + ".tbl WHERE k=" + keyStrings.get(i) + " AND c=0);\n");
+
+            query.append("  SELECT row0.v;\n")
+                 .append("  IF ");
+
+            for (int i = 0; i < keys.size(); i++)
+                query.append((i > 0 ? " AND row" : "row") + i + " IS NULL");
+
+            query.append(" THEN\n");
+
+            for (int i = 0; i < keys.size(); i++)
+                query.append("    INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (" + keyStrings.get(i) + ", 0, " + i +");\n");
+            
+            query.append("  END IF\n");
+            query.append("COMMIT TRANSACTION");
+            Object[][] txnResult = cluster.coordinator(1).execute(query.toString(), ConsistencyLevel.ANY);
+            assertNull(txnResult[0][0]); // row0.v shouldn't have existed when the txn's SELECT was executed
 
             cluster.get(1).runOnInstance(() -> {
-                AccordTxnBuilder txn = txn();
-                int i = 0;
-                for (byte[] data : keys)
-                {
-                    ByteBuffer key = ByteBuffer.wrap(data);
-                    txn = txn.withRead("SELECT * FROM " + keyspace + ".tbl WHERE k=? and c=0", key)
-                             .withWrite("INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (?, 0, ?)", key, i++)
-                             .withCondition(keyspace, "tbl", key, 0, NOT_EXISTS);
-                }
+                TxnBuilder txn = new TxnBuilder();
+
+                for (int i = 0; i < keyStrings.size(); i++)
+                    txn.withRead("row" + i, "SELECT * FROM " + keyspace + ".tbl WHERE k=" + keyStrings.get(i) + " and c=0");
+
                 Keys keySet = txn.build().keys();
                 Topologies topology = AccordService.instance.node.topology().withUnsyncedEpochs(keySet, 1);
-                // currently we don't detect out-of-bounds read/write, so need this logic to validate we reach different
-                // shards
+                // we don't detect out-of-bounds read/write yet, so use this to validate we reach different shards
                 Assertions.assertThat(topology.totalShards()).isEqualTo(2);
-                execute(txn);
             });
 
-            awaitAsyncApply(cluster);
-
             SimpleQueryResult result = cluster.coordinator(1).executeWithResult("SELECT * FROM " + keyspace + ".tbl", ConsistencyLevel.ALL);
-            QueryResults.Builder expected = QueryResults.builder()
-                                                        .columns("k", "c", "v");
+            QueryResults.Builder expected = QueryResults.builder().columns("k", "c", "v");
             for (int i = 0; i < keys.size(); i++)
-                expected.row(ByteBuffer.wrap(keys.get(i)), 0, i);
+                expected.row(keys.get(i), 0, i);
             AssertUtils.assertRows(result, expected.build());
         }
     }
@@ -252,7 +237,7 @@ public class AccordIntegrationTest extends TestBaseImpl
     public void testLostCommitReadTriggersFallbackRead() throws IOException
     {
         test(cluster -> {
-            // its expected that the required Read will happen reguardless of if this fails to return a read
+            // It's expected that the required Read will happen regardless of whether this fails to return a read
             cluster.filters().verbs(Verb.ACCORD_COMMIT_REQ.id).messagesMatching((from, to, iMessage) -> cluster.get(from).callOnInstance(() -> {
                 Message<?> msg = Instance.deserializeMessage(iMessage);
                 if (msg.payload instanceof Commit)
@@ -260,36 +245,219 @@ public class AccordIntegrationTest extends TestBaseImpl
                 return false;
             })).drop();
 
-            cluster.get(1).runOnInstance(() -> execute(txn()
-                                                       .withRead("SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0")
-                                                       .withWrite("INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (0, 0, 1)")
-                                                       .withCondition(keyspace, "tbl", 0, 0, NOT_EXISTS)));
+            String query = "BEGIN TRANSACTION\n" +
+                           "  LET row1 = (SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0);\n" +
+                           "  SELECT row1.v;\n" +
+                           "  IF row1 IS NULL THEN\n" +
+                           "    INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (0, 0, 1);\n" +
+                           "  END IF\n" +
+                           "COMMIT TRANSACTION";
+            cluster.coordinator(1).executeWithResult(query, ConsistencyLevel.ANY);
 
-            awaitAsyncApply(cluster);
-
-            // recovery happened
-            assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0", 0, 0, 1);
+            // TODO: Is 10 seconds going to be flaky here?
+            Awaitility.await("For recovery to occur")
+                      .atMost(Duration.ofSeconds(10))
+                      .pollInterval(1, TimeUnit.SECONDS)
+                      .untilAsserted(() -> assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0", 0, 0, 1));
         });
     }
 
     @Test
     public void testReadOnlyTx() throws IOException
     {
-        test(cluster -> cluster.get(1).runOnInstance(() -> execute(txn().withRead("SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0"))));
+        test(cluster -> {
+            String query = "BEGIN TRANSACTION\n" +
+                           "  SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0;\n" +
+                           "COMMIT TRANSACTION";
+            SimpleQueryResult result = cluster.coordinator(1).executeWithResult(query, ConsistencyLevel.ANY);
+            assertFalse(result.hasNext());
+        });
     }
 
     @Test
     public void testWriteOnlyTx() throws IOException
     {
         test(cluster -> {
-            cluster.get(1).runOnInstance(() -> execute(txn().withWrite("INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (0, 0, 1)")));
+            String query = "BEGIN TRANSACTION\n" +
+                           "  INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (0, 0, 1);\n" +
+                           "COMMIT TRANSACTION";
+            SimpleQueryResult result = cluster.coordinator(1).executeWithResult(query, ConsistencyLevel.ANY);
+            assertFalse(result.hasNext());
+            assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0", 0, 0, 1);
+        });
+    }
 
-            awaitAsyncApply(cluster);
+    @Test
+    public void testReturningLetReferences() throws Throwable
+    {
+        test(cluster -> {
+            cluster.coordinator(1).execute("INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (1, 0, 3);", ConsistencyLevel.ALL);
+
+            String query = "BEGIN TRANSACTION\n" +
+                    "  LET row1 = (SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0);\n" +
+                    "  LET row2 = (SELECT * FROM " + keyspace + ".tbl WHERE k=1 AND c=0);\n" +
+                    "  SELECT row2.v;\n" +
+                    "  IF row1 IS NULL AND row2.v = 3 THEN\n" +
+                    "    INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (0, 0, 1);\n" +
+                    "  END IF\n" +
+                    "COMMIT TRANSACTION";
+            Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY);
+            assertEquals(3, result[0][0]);
 
             assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0", 0, 0, 1);
         });
     }
 
+    @Test
+    public void variableSubstitution() throws Throwable
+    {
+        String keyspace = "ks" + System.currentTimeMillis();
+        try (Cluster cluster = createCluster())
+        {
+            cluster.schemaChange("CREATE KEYSPACE " + keyspace + " WITH REPLICATION={'class':'SimpleStrategy', 'replication_factor': 2}");
+            cluster.schemaChange("CREATE TABLE " + keyspace + ".tbl1 (k int, c int, v int, primary key (k, c))");
+            cluster.schemaChange("CREATE TABLE " + keyspace + ".tbl2 (k int, c int, v int, primary key (k, c))");
+            cluster.forEach(node -> node.runOnInstance(() -> AccordService.instance.createEpochFromConfigUnsafe()));
+            cluster.forEach(node -> node.runOnInstance(() -> AccordService.instance.setCacheSize(0)));
+            cluster.coordinator(1).execute("INSERT INTO " + keyspace + ".tbl1 (k, c, v) VALUES (1, 2, 3);", ConsistencyLevel.ALL);
+            cluster.coordinator(1).execute("INSERT INTO " + keyspace + ".tbl2 (k, c, v) VALUES (2, 2, 4);", ConsistencyLevel.ALL);
+
+            String query = "BEGIN TRANSACTION\n" +
+                           "  LET row1 = (SELECT * FROM " + keyspace + ".tbl1 WHERE k=1 AND c=2);\n" +
+                           "  LET row2 = (SELECT * FROM " + keyspace + ".tbl2 WHERE k=2 AND c=2);\n" +
+                           "  SELECT v FROM " + keyspace + ".tbl1 WHERE k=1 AND c=2;\n" +
+                           "  IF row1.v = 3 AND row2.v = 4 THEN\n" +
+                           "    UPDATE " + keyspace + ".tbl1 SET v=row2.v WHERE k=1 AND c=2;\n" +
+                           "  END IF\n" +
+                           "COMMIT TRANSACTION";
+            Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY);
+            assertEquals(3, result[0][0]);
+            assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl1 WHERE k=1 AND c=2", 1, 2, 4);
+        }
+    }
+
+    @Test
+    public void additionAssignment() throws Throwable
+    {
+        String keyspace = "ks" + System.currentTimeMillis();
+        try (Cluster cluster = createCluster())
+        {
+            cluster.schemaChange("CREATE KEYSPACE " + keyspace + " WITH REPLICATION={'class':'SimpleStrategy', 'replication_factor': 2}");
+            cluster.schemaChange("CREATE TABLE " + keyspace + ".tbl1 (k int, c int, v int, primary key (k, c))");
+            cluster.schemaChange("CREATE TABLE " + keyspace + ".tbl2 (k int, c int, v int, primary key (k, c))");
+            cluster.forEach(node -> node.runOnInstance(() -> AccordService.instance.createEpochFromConfigUnsafe()));
+            cluster.forEach(node -> node.runOnInstance(() -> AccordService.instance.setCacheSize(0)));
+            cluster.coordinator(1).execute("INSERT INTO " + keyspace + ".tbl1 (k, c, v) VALUES (1, 2, 3);", ConsistencyLevel.ALL);
+            cluster.coordinator(1).execute("INSERT INTO " + keyspace + ".tbl2 (k, c, v) VALUES (2, 2, 4);", ConsistencyLevel.ALL);
+
+            String query = "BEGIN TRANSACTION\n" +
+                           "  SELECT v FROM " + keyspace + ".tbl1 WHERE k=1 AND c=2;\n" +
+                           "  UPDATE " + keyspace + ".tbl1 SET v += 5 WHERE k=1 AND c=2;\n" +
+                           "  UPDATE " + keyspace + ".tbl2 SET v -= 2 WHERE k=2 AND c=2;\n" +
+                           "COMMIT TRANSACTION";
+            Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY);
+            assertEquals(3, result[0][0]);
+
+            assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl1 WHERE k=1 AND c=2", 1, 2, 8);
+            assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl2 WHERE k=2 AND c=2", 2, 2, 2);
+        }
+    }
+
+    @Test
+    public void multiKeyMultiQuery() throws Throwable
+    {
+        String keyspace = "ks" + System.currentTimeMillis();
+
+        try (Cluster cluster = createCluster())
+        {
+            cluster.schemaChange("CREATE KEYSPACE " + keyspace + " WITH REPLICATION={'class':'SimpleStrategy', 'replication_factor': 2}");
+            cluster.schemaChange("CREATE TABLE " + keyspace + ".tbl (k int, c int, v int, primary key (k, c))");
+            cluster.forEach(node -> node.runOnInstance(() -> AccordService.instance.createEpochFromConfigUnsafe()));
+            cluster.forEach(node -> node.runOnInstance(() -> AccordService.instance.setCacheSize(0)));
+
+            String query1 = "BEGIN TRANSACTION\n" +
+                            "  LET select1 = (SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0);\n" +
+                            "  LET select2 = (SELECT * FROM " + keyspace + ".tbl WHERE k=1 AND c=0);\n" +
+                            "  SELECT v FROM " + keyspace + ".tbl WHERE k=0 AND c=0;\n" +
+                            "  IF select1 IS NULL THEN\n" +
+                            "    INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (0, 0, 0);\n" +
+                            "    INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (1, 0, 0);\n" +
+                            "  END IF\n" +
+                            "COMMIT TRANSACTION";
+            Object[][] result1 = cluster.coordinator(1).execute(query1, ConsistencyLevel.ANY);
+            assertEquals(0, result1.length);
+
+            assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0", 0, 0, 0);
+            assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=1 AND c=0", 1, 0, 0);
+
+            String query2 = "BEGIN TRANSACTION\n" +
+                            "  LET select1 = (SELECT * FROM " + keyspace + ".tbl WHERE k=1 AND c=0);\n" +
+                            "  LET select2 = (SELECT * FROM " + keyspace + ".tbl WHERE k=2 AND c=0);\n" +
+                            "  SELECT v FROM " + keyspace + ".tbl WHERE k=1 AND c=0;\n" +
+                            "  IF select1.v = 0 THEN\n" +
+                            "    INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (1, 0, 1);\n" +
+                            "    INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (2, 0, 1);\n" +
+                            "  END IF\n" +
+                            "COMMIT TRANSACTION";
+            Object[][] result2 = cluster.coordinator(1).execute(query2, ConsistencyLevel.ANY);
+            assertEquals(0, result2[0][0]);
+
+            assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0", 0, 0, 0);
+            assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=1 AND c=0", 1, 0, 1);
+            assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=2 AND c=0", 2, 0, 1);
+        }
+    }
+
+    @Test
+    public void demoTest() throws Throwable
+    {
+        try (Cluster cluster = init(Cluster.build(3).withConfig(c -> c.set("write_request_timeout_in_ms", TimeUnit.SECONDS.toMillis(10))).start()))
+        {
+            cluster.schemaChange("CREATE KEYSPACE IF NOT EXISTS ks WITH REPLICATION={'class':'SimpleStrategy', 'replication_factor':3};");
+            cluster.schemaChange("CREATE TABLE IF NOT EXISTS ks.org_docs ( org_name text, doc_id int, contents_version int static, title text, permissions int, PRIMARY KEY (org_name, doc_id) );");
+            cluster.schemaChange("CREATE TABLE IF NOT EXISTS ks.org_users ( org_name text, user text, members_version int static, permissions int, PRIMARY KEY (org_name, user) );");
+            cluster.schemaChange("CREATE TABLE IF NOT EXISTS ks.user_docs ( user text, doc_id int, title text, org_name text, permissions int, PRIMARY KEY (user, doc_id) );");
+
+            cluster.forEach(node -> node.runOnInstance(() -> AccordService.instance.createEpochFromConfigUnsafe()));
+            cluster.forEach(node -> node.runOnInstance(() -> AccordService.instance.setCacheSize(0)));
+
+            cluster.coordinator(1).execute("INSERT INTO ks.org_users (org_name, user, members_version, permissions) VALUES ('demo', 'blake', 5, 777);\n", ConsistencyLevel.ALL);
+            cluster.coordinator(1).execute("INSERT INTO ks.org_users (org_name, user, members_version, permissions) VALUES ('demo', 'scott', 5, 777);\n", ConsistencyLevel.ALL);
+            cluster.coordinator(1).execute("INSERT INTO ks.org_docs (org_name, doc_id, contents_version, title, permissions) VALUES ('demo', 100, 5, 'README', 644);\n", ConsistencyLevel.ALL);
+            cluster.coordinator(1).execute("INSERT INTO ks.user_docs (user, doc_id, title, org_name, permissions) VALUES ('blake', 1, 'recipes', NULL, 777);\n", ConsistencyLevel.ALL);
+            cluster.coordinator(1).execute("INSERT INTO ks.user_docs (user, doc_id, title, org_name, permissions) VALUES ('blake', 100, 'README', 'demo', 644);\n", ConsistencyLevel.ALL);
+            cluster.coordinator(1).execute("INSERT INTO ks.user_docs (user, doc_id, title, org_name, permissions) VALUES ('scott', 2, 'to do list', NULL, 777);\n", ConsistencyLevel.ALL);
+            cluster.coordinator(1).execute("INSERT INTO ks.user_docs (user, doc_id, title, org_name, permissions) VALUES ('scott', 100, 'README', 'demo', 644);\n", ConsistencyLevel.ALL);
+
+            String addDoc =  "BEGIN TRANSACTION\n" +
+                             "  LET demo_user = (SELECT * FROM ks.org_users WHERE org_name='demo' LIMIT 1);\n" +
+                             "  LET existing = (SELECT * FROM ks.org_docs WHERE org_name='demo' AND doc_id=101);\n" +
+                             "  SELECT members_version FROM ks.org_users WHERE org_name='demo';\n" +
+                             "  IF demo_user.members_version = 5 AND existing IS NULL THEN\n" +
+                             "    UPDATE ks.org_docs SET title='slides.key', permissions=777, contents_version += 1 WHERE org_name='demo' AND doc_id=101;\n" +
+                             "    UPDATE ks.user_docs SET title='slides.key', permissions=777 WHERE user='blake' AND doc_id=101;\n" +
+                             "    UPDATE ks.user_docs SET title='slides.key', permissions=777 WHERE user='scott' AND doc_id=101;\n" +
+                             "  END IF\n" +
+                             "COMMIT TRANSACTION";
+            Object[][] result1 = cluster.coordinator(1).execute(addDoc, ConsistencyLevel.ANY);
+            assertEquals(5, result1[0][0]);
+
+            String addUser = "BEGIN TRANSACTION\n" +
+                             "  LET demo_doc = (SELECT * FROM ks.org_docs WHERE org_name='demo' LIMIT 1);\n" +
+                             "  LET existing = (SELECT * FROM ks.org_users WHERE org_name='demo' AND user='benedict');\n" +
+                             "  SELECT contents_version FROM ks.org_docs WHERE org_name='demo';\n" +
+                             "  IF demo_doc.contents_version = 6 AND existing IS NULL THEN\n" +
+                             "    UPDATE ks.org_users SET permissions=777, members_version += 1 WHERE org_name='demo' AND user='benedict';\n" +
+                             "    UPDATE ks.user_docs SET title='README', permissions=644 WHERE user='benedict' AND doc_id=100;\n" +
+                             "    UPDATE ks.user_docs SET title='slides.key', permissions=777 WHERE user='benedict' AND doc_id=101;\n" +
+                             "  END IF\n" +
+                             "COMMIT TRANSACTION";
+            Object[][] result2 = cluster.coordinator(1).execute(addUser, ConsistencyLevel.ANY);
+            assertEquals(6, result2[0][0]);
+        }
+    }
+
+    @SuppressWarnings("UnstableApiUsage")
     private static void awaitAsyncApply(Cluster cluster) throws TimeoutException
     {
         long deadlineNanos = nanoTime() + TimeUnit.SECONDS.toNanos(30);
@@ -299,8 +467,8 @@ public class AccordIntegrationTest extends TestBaseImpl
             {
                 SimpleQueryResult pending = inst.executeInternalWithResult("SELECT store_generation, store_index, txn_id, status FROM system_accord.commands WHERE status < ? ALLOW FILTERING", Status.Executed.ordinal());
                 pending = QueryResultUtil.map(pending, Map.of(
-                "txn_id", (ByteBuffer bb) -> AccordKeyspace.deserializeTimestampOrNull(bb, TxnId::new),
-                "status", (Integer ordinal) -> Status.values()[ordinal]
+                        "txn_id", (ByteBuffer bb) -> AccordKeyspace.deserializeTimestampOrNull(bb, TxnId::new),
+                        "status", (Integer ordinal) -> Status.values()[ordinal]
                 ));
                 logger.info("[node{}] Pending:\n{}", inst.config().num(), QueryResultUtil.expand(pending));
                 pending.reset();
@@ -317,101 +485,6 @@ public class AccordIntegrationTest extends TestBaseImpl
         });
         if (timeout.get() != null)
             throw timeout.get();
-    }
-
-    private static AccordTxnBuilder txn()
-    {
-        return new AccordTxnBuilder();
-    }
-
-    private static SimpleQueryResult execute(AccordTxnBuilder builder, boolean allowPreempted)
-    {
-        return execute(builder.build(), allowPreempted);
-    }
-
-    private static SimpleQueryResult execute(AccordTxnBuilder builder)
-    {
-        return execute(builder, false);
-    }
-
-    private static SimpleQueryResult execute(Txn txn)
-    {
-        return execute(txn, false);
-    }
-
-    private static SimpleQueryResult execute(Txn txn, boolean allowPreempted)
-    {
-        try
-        {
-            AccordData result = (AccordData) AccordService.instance.node.coordinate(txn).get();
-            Assert.assertNotNull(result);
-            QueryResults.Builder builder = QueryResults.builder();
-            boolean addedHeader = false;
-            for (FilteredPartition partition : result)
-            {
-                //TODO lot of this is copy/paste from SelectStatement...
-                TableMetadata metadata = partition.metadata();
-                if (!addedHeader)
-                {
-                    builder.columns(StreamSupport.stream(Spliterators.spliteratorUnknownSize(metadata.allColumnsInSelectOrder(), Spliterator.ORDERED), false)
-                                                 .map(cm -> cm.name.toString())
-                                                 .toArray(String[]::new));
-                    addedHeader = true;
-                }
-                ByteBuffer[] keyComponents = SelectStatement.getComponents(metadata, partition.partitionKey());
-                for (Row row : partition)
-                    append(metadata, keyComponents, row, builder);
-            }
-            return builder.build();
-        }
-        catch (InterruptedException e)
-        {
-            throw new AssertionError(e);
-        }
-        catch (ExecutionException e)
-        {
-            if (e.getCause() instanceof Preempted && allowPreempted)
-                return null;
-            throw new AssertionError(e);
-        }
-    }
-
-    private static void append(TableMetadata metadata, ByteBuffer[] keyComponents, Row row, QueryResults.Builder builder)
-    {
-        Object[] buffer = new Object[Iterators.size(metadata.allColumnsInSelectOrder())];
-        Clustering<?> clustering = row.clustering();
-        Iterator<ColumnMetadata> it = metadata.allColumnsInSelectOrder();
-        int idx = 0;
-        while (it.hasNext())
-        {
-            ColumnMetadata column = it.next();
-            switch (column.kind)
-            {
-                case PARTITION_KEY:
-                    buffer[idx++] = column.type.compose(keyComponents[column.position()]);
-                    break;
-                case CLUSTERING:
-                    buffer[idx++] = column.type.compose(clustering.bufferAt(column.position()));
-                    break;
-                case REGULAR:
-                {
-                    if (column.isComplex())
-                    {
-                        throw new UnsupportedOperationException("Ill implement complex later..");
-                    }
-                    else
-                    {
-                        //TODO deletes
-                        buffer[idx++] = column.type.compose(row.getCell(column).buffer());
-                    }
-                }
-                break;
-//                case STATIC:
-                default:
-                    throw new IllegalArgumentException("Unsupported kind: " + column.kind);
-            }
-        }
-        builder.row(buffer);
     }
 
 //    @Test
