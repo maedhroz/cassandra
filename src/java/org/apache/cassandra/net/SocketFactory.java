@@ -286,8 +286,10 @@ public final class SocketFactory
 
     void awaitTerminationUntil(long deadlineNanos) throws InterruptedException, TimeoutException
     {
-        List<ExecutorService> groups = ImmutableList.of(acceptGroup, defaultGroup, outboundStreamingGroup, synchronousWorkExecutor);
-        ExecutorUtils.awaitTerminationUntil(deadlineNanos, groups);
+        ExecutorUtils.awaitTerminationUntil(deadlineNanos, ImmutableList.of(acceptGroup));
+        ExecutorUtils.awaitTerminationUntil(deadlineNanos, ImmutableList.of(defaultGroup));
+        ExecutorUtils.awaitTerminationUntil(deadlineNanos, ImmutableList.of(outboundStreamingGroup));
+        ExecutorUtils.awaitTerminationUntil(deadlineNanos, ImmutableList.of(synchronousWorkExecutor));
     }
 
     static boolean isConnectionReset(Throwable t)

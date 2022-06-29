@@ -555,15 +555,22 @@ public class MessagingService extends MessagingServiceMBeanImpl
                 closing.add(pool.close(false));
 
             long deadline = nanoTime() + units.toNanos(timeout);
-            maybeFail(() -> FutureCombiner.nettySuccessListener(closing).get(timeout, units),
-                      () -> {
+            maybeFail(() -> FutureCombiner.nettySuccessListener(closing).get(timeout, units));
+            logger.info("Shut down callbacks, inbound sockets, and outbound connections.");
+            
+            maybeFail(() -> {
                           if (shutdownExecutors)
                               shutdownExecutors(deadline);
-                      },
-                      () -> ExecutorUtils.awaitTermination(timeout, units, inboundExecutors),
-                      () -> callbacks.awaitTerminationUntil(deadline),
+                      });
+            logger.info("Shut down socket factory.");
+            
+            maybeFail(() -> ExecutorUtils.awaitTermination(timeout, units, inboundExecutors));
+            logger.info("Shut down inbound executors.");
+            
+            maybeFail(() -> callbacks.awaitTerminationUntil(deadline),
                       inboundSink::clear,
                       outboundSink::clear);
+            logger.info("Non-graceful messaging service shutdown complete.");
         }
     }
 
