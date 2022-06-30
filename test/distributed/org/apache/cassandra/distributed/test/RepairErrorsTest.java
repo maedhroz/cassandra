@@ -176,8 +176,6 @@ public class RepairErrorsTest extends TestBaseImpl
             assertTrue(cluster.get(1).logs().grep("FSReadError").getResult().isEmpty());
 
             assertNoActiveRepairSessions(cluster.get(1));
-            
-            cluster.get(2).shutdown().get();
         }
     }
 

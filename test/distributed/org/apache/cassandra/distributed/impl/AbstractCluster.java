@@ -1013,7 +1013,10 @@ public abstract class AbstractCluster<I extends IInstance> implements ICluster<I
         BiPredicate<Integer, Throwable> ignore = ignoreUncaughtThrowable;
         I instance = get(cl.getInstanceId());
         if ((ignore == null || !ignore.test(cl.getInstanceId(), error)) && instance != null && !instance.isShutdown())
+        {
+            logger.info("Uncaught exception " + error + " handled from thread " + thread);
             uncaughtExceptions.add(error);
+        }
     }
 
     @Override

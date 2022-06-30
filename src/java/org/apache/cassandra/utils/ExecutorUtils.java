@@ -18,6 +18,9 @@
 
 package org.apache.cassandra.utils;
 
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
+import java.lang.management.ThreadMXBean;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.concurrent.ExecutorService;
@@ -100,6 +103,22 @@ public class ExecutorUtils
         awaitTerminationUntil(deadline, executors);
     }
 
+    public static String threadDump(boolean lockedMonitors, boolean lockedSynchronizers) {
+        StringBuilder threadDump = new StringBuilder(System.lineSeparator());
+        ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
+        for (ThreadInfo threadInfo : threadMXBean.dumpAllThreads(lockedMonitors, lockedSynchronizers)) {
+            threadDump.append(threadInfo);
+            threadDump.append("\nFull trace:");
+
+            for (StackTraceElement frame : threadInfo.getStackTrace())
+            {
+                threadDump.append("\tat " + frame.toString());
+                threadDump.append('\n');
+            }
+        }
+        return threadDump.toString();
+    }
+
     public static void awaitTerminationUntil(long deadline, Collection<?> executors) throws InterruptedException, TimeoutException
     {
         for (Object executor : executors)
@@ -108,7 +127,10 @@ public class ExecutorUtils
             if (executor instanceof ExecutorService)
             {
                 if (wait <= 0 || !((ExecutorService)executor).awaitTermination(wait, NANOSECONDS))
+                {
+                    System.err.println(threadDump(true, true));
                     throw new TimeoutException(executor + " did not terminate on time");
+                }
             }
             else if (executor instanceof Shutdownable)
             {

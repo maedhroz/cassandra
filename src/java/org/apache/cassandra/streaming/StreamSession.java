@@ -644,7 +644,7 @@ public class StreamSession implements IEndpointStateChangeSubscriber
      * after completion or because the peer was down, otherwise sends a {@link SessionFailedMessage} and closes
      * the session as {@link State#FAILED}.
      */
-    public synchronized Future<?> onError(Throwable e)
+    public Future<?> onError(Throwable e)
     {
         boolean isEofException = e instanceof EOFException || e instanceof ClosedChannelException;
         if (isEofException)
@@ -667,12 +667,19 @@ public class StreamSession implements IEndpointStateChangeSubscriber
             }
         }
 
-        logError(e);
-        // send session failure message
-        if (channel.connected())
-            channel.sendControlMessage(new SessionFailedMessage()).syncUninterruptibly();
-        // fail session
-        return closeSession(State.FAILED);
+        // Synchronize just over this block to ensure we can see channel closures.
+        synchronized (this)
+        {
+            logError(e);
+
+            if (channel.connected())
+            {
+                state(State.FAILED); // make sure subsequent error handling sees the session in a final state 
+                channel.sendControlMessage(new SessionFailedMessage()).syncUninterruptibly();
+            }
+
+            return closeSession(State.FAILED);
+        }
     }
 
     private void logError(Throwable e)
