@@ -666,20 +666,16 @@ public class StreamSession implements IEndpointStateChangeSubscriber
                 return closeSession(State.FAILED);
             }
         }
+        
+        logError(e);
 
-        // Synchronize just over this block to ensure we can see channel closures.
-        synchronized (this)
+        if (channel.connected())
         {
-            logError(e);
-
-            if (channel.connected())
-            {
-                state(State.FAILED); // make sure subsequent error handling sees the session in a final state 
-                channel.sendControlMessage(new SessionFailedMessage()).syncUninterruptibly();
-            }
-
-            return closeSession(State.FAILED);
+            state(State.FAILED); // make sure subsequent error handling sees the session in a final state 
+            channel.sendControlMessage(new SessionFailedMessage()).awaitUninterruptibly();
         }
+
+        return closeSession(State.FAILED);
     }
 
     private void logError(Throwable e)
