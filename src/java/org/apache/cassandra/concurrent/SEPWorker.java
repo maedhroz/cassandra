@@ -101,7 +101,7 @@ final class SEPWorker extends AtomicReference<SEPWorker.Work> implements Runnabl
                 if (assigned == null)
                     continue;
                 if (SET_THREAD_NAME)
-                    Thread.currentThread().setName(assigned.name + "-" + workerId);
+                    Thread.currentThread().setName(NamedThreadFactory.globalPrefix() + assigned.name + "-" + workerId);
                 task = assigned.tasks.poll();
 
                 // if we do have tasks assigned, nobody will change our state so we can simply set it to WORKING
