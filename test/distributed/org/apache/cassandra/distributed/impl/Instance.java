@@ -44,6 +44,9 @@ import javax.management.NotificationListener;
 
 import com.google.common.annotations.VisibleForTesting;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import io.netty.util.concurrent.GlobalEventExecutor;
 import org.apache.cassandra.auth.AuthCache;
 import org.apache.cassandra.batchlog.Batch;
@@ -116,6 +119,7 @@ import org.apache.cassandra.service.PendingRangeCalculatorService;
 import org.apache.cassandra.service.QueryState;
 import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.service.StorageServiceMBean;
+import org.apache.cassandra.service.accord.AccordService;
 import org.apache.cassandra.service.reads.trackwarnings.CoordinatorWarnings;
 import org.apache.cassandra.service.snapshot.SnapshotManager;
 import org.apache.cassandra.streaming.StreamReceiveTask;
@@ -157,6 +161,7 @@ public class Instance extends IsolatedExecutor implements IInvokableInstance
     public final IInstanceConfig config;
     private volatile boolean initialized = false;
     private final long startedAt;
+    private final Logger logger;
 
     @Deprecated
     Instance(IInstanceConfig config, ClassLoader classLoader)
@@ -168,6 +173,7 @@ public class Instance extends IsolatedExecutor implements IInvokableInstance
     {
         super("node" + config.num(), classLoader, executorFactory().pooled("isolatedExecutor", Integer.MAX_VALUE));
         this.config = config;
+        this.logger = LoggerFactory.getLogger(Instance.class.getCanonicalName() + "$node" + config.num());
         if (fileSystem != null)
             File.unsafeSetFilesystem(fileSystem);
         Object clusterId = Objects.requireNonNull(config.get(Constants.KEY_DTEST_API_CLUSTER_ID), "cluster_id is not defined");
@@ -330,7 +336,10 @@ public class Instance extends IsolatedExecutor implements IInvokableInstance
                 return false;
             int fromNum = from.config().num();
             int toNum = config.num(); // since this instance is reciving the message, to will always be this instance
-            return cluster.filters().permitInbound(fromNum, toNum, serialized);
+            boolean permit = cluster.filters().permitInbound(fromNum, toNum, serialized);
+            if (!permit)
+                logger.info("Dropping inbound message {}", message);
+            return permit;
         });
     }
 
@@ -345,7 +354,10 @@ public class Instance extends IsolatedExecutor implements IInvokableInstance
             if (toInstance == null)
                 return false;
             int toNum = toInstance.config().num();
-            return cluster.filters().permitOutbound(fromNum, toNum, serialzied);
+            boolean permit = cluster.filters().permitOutbound(fromNum, toNum, serialzied);
+            if (!permit)
+                logger.info("Dropping outbound message {}", message);
+            return permit;
         });
     }
 
@@ -743,7 +755,8 @@ public class Instance extends IsolatedExecutor implements IInvokableInstance
                                 () -> SSTableReader.shutdownBlocking(1L, MINUTES),
                                 () -> shutdownAndWait(Collections.singletonList(ActiveRepairService.repairCommandExecutor())),
                                 () -> ScheduledExecutors.shutdownNowAndWait(1L, MINUTES),
-                                () -> SnapshotManager.shutdownAndWait(1L, MINUTES)
+                                () -> SnapshotManager.shutdownAndWait(1L, MINUTES),
+                                () -> AccordService.instance.shutdownAndWait(1l, MINUTES)
             );
 
             error = parallelRun(error, executor,

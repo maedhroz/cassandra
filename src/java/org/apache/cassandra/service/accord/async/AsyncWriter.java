@@ -31,6 +31,7 @@ import java.util.function.Function;
 import com.google.common.base.Preconditions;
 
 import accord.api.Key;
+import accord.local.Status;
 import accord.txn.TxnId;
 import org.apache.cassandra.concurrent.Stage;
 import org.apache.cassandra.db.Mutation;
@@ -211,7 +212,8 @@ public class AsyncWriter
         }
 
         Map<PartitionKey, AccordCommandsForKey> addCfkToCtx = new HashMap<>();
-        if (CommandSummaries.commandsPerKey.needsUpdate(command))
+        // There won't be a txn to denormalize against until the command has been preaccepted
+        if (command.status().hasBeen(Status.PreAccepted) && CommandSummaries.commandsPerKey.needsUpdate(command))
         {
             for (Key key : command.txn().keys())
             {
@@ -227,7 +229,8 @@ public class AsyncWriter
 
     private void denormalize(AsyncContext context)
     {
-        context.commands.items.values().forEach(command -> denormalize(command, context));
+        // need to clone "values" as denormalize will mutate it
+        new ArrayList<>(context.commands.items.values()).forEach(command -> denormalize(command, context));
     }
 
     private static void confirmNoSummaryChanges(AsyncContext context)
