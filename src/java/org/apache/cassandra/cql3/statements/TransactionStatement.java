@@ -218,6 +218,7 @@ public class TransactionStatement implements CQLStatement
                 columns.add(reference.column);
             }
 
+            // TODO: Is the column metadata correct here?
             ResultSetBuilder result = new ResultSetBuilder(new ResultSet.ResultMetadata(names), Selection.noopSelector(), null);
             result.newRow(options.getProtocolVersion(), null, null, columns);
             

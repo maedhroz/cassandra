@@ -18,15 +18,20 @@
 
 package org.apache.cassandra.service.accord.txn;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Objects;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-import accord.primitives.Keys;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterators;
 
-import accord.api.Key;
+import accord.primitives.Keys;
+
 import org.apache.cassandra.service.accord.api.AccordKey;
 import org.apache.cassandra.service.accord.api.AccordKey.PartitionKey;
 
@@ -36,6 +41,8 @@ import org.apache.cassandra.service.accord.api.AccordKey.PartitionKey;
  */
 public abstract class AbstractKeySorted<T> implements Iterable<T>
 {
+    public static final String ITEMS_OUT_OF_ORDER_MESSAGE = "Items are out of order ([%s] %s >= [%s] %s)";
+
     final T[] items;
 
     // items are expected to be sorted
@@ -110,7 +117,7 @@ public abstract class AbstractKeySorted<T> implements Iterable<T>
             T prev = items[i-1];
             T next = items[i];
             if (getKey(prev).compareTo(getKey(next)) > 0)
-                throw new IllegalStateException(String.format("Items are out of order ([%s] %s >= [%s] %s)", i-1, prev, i, next));
+                throw new IllegalStateException(String.format(ITEMS_OUT_OF_ORDER_MESSAGE, i-1, prev, i, next));
             if (compare(prev, next) >= 0)
                 throw new IllegalStateException(String.format("Items are out of order ([%s] %s >= [%s] %s)", i-1, prev, i, next));
         }

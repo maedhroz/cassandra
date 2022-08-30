@@ -180,8 +180,8 @@ public class AccordTestUtils
     {
         StringBuilder sb = new StringBuilder("BEGIN TRANSACTION\n");
         sb.append(format("LET row1 = (SELECT * FROM ks.tbl WHERE k=%s AND c=0);\n", readKey));
-        sb.append("SELECT row1.v\n");
-        sb.append("IF row1 NOT EXISTS THEN\n");
+        sb.append("SELECT row1.v;\n");
+        sb.append("IF row1 IS NULL THEN\n");
         for (int key : writeKeys)
             sb.append(format("INSERT INTO ks.tbl (k, c, v) VALUES (%s, 0, 1);\n", key));
         sb.append("END IF\n");
