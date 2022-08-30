@@ -64,6 +64,7 @@ import org.apache.cassandra.service.accord.txn.TxnBuilder;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FailingConsumer;
 
+import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -81,7 +82,7 @@ public class AccordIntegrationTest extends TestBaseImpl
     private static void assertRow(Cluster cluster, String query, int k, int c, int v)
     {
         Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.QUORUM);
-        Assert.assertArrayEquals(new Object[]{new Object[] {k, c, v}}, result);
+        assertArrayEquals(new Object[]{new Object[] {k, c, v}}, result);
     }
 
     private static void test(FailingConsumer<Cluster> fn) throws IOException
@@ -119,7 +120,13 @@ public class AccordIntegrationTest extends TestBaseImpl
                            "COMMIT TRANSACTION";
             Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY);
             assertEquals(3, result[0][0]);
-            assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0", 0, 0, 1);
+
+            // TODO: Why isn't the read seeing the write apply?
+            String check = "BEGIN TRANSACTION\n" +
+                           "  SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0;\n" +
+                           "COMMIT TRANSACTION";
+            Object[][] checkResult = cluster.coordinator(1).execute(check, ConsistencyLevel.ANY);
+            assertArrayEquals(new Object[]{new Object[] {0, 0, 1}}, checkResult);
         });
     }
 
