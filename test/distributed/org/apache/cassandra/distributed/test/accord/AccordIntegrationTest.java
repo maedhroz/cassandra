@@ -33,7 +33,6 @@ import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.Uninterruptibles;
 import org.assertj.core.api.Assertions;
 import org.awaitility.Awaitility;
-import org.junit.Assert;
 import org.junit.Test;
 
 import org.slf4j.Logger;
@@ -120,8 +119,10 @@ public class AccordIntegrationTest extends TestBaseImpl
                            "COMMIT TRANSACTION";
             Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY);
             assertEquals(3, result[0][0]);
+            
+            awaitAsyncApply(cluster);
 
-            // TODO: Why isn't the read seeing the write apply?
+            // TODO: Why isn't the read seeing the write apply if we don't wait for APPLY on the write?
             String check = "BEGIN TRANSACTION\n" +
                            "  SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0;\n" +
                            "COMMIT TRANSACTION";
@@ -130,7 +131,7 @@ public class AccordIntegrationTest extends TestBaseImpl
         });
     }
 
-    // TODO: This fails sporadically, sometimes w/ timeouts and sometimes w/ wrong post-recovery read results.
+    // TODO: This fails sporadically, sometimes w/ timeouts and sometimes w/ Preempted issues.
     @Test
     public void testRecovery() throws IOException
     {
@@ -151,6 +152,9 @@ public class AccordIntegrationTest extends TestBaseImpl
             lostApply.off();
             lostCommit.off();
 
+            awaitAsyncApply(cluster);
+
+            // TODO: We should be able to just perform this txn without waiting for APPLY explicitly.
             // Querying again should trigger recovery...
             query = "BEGIN TRANSACTION\n" +
                     "  LET row1 = (SELECT v FROM " + keyspace + ".tbl WHERE k=0 AND c=0);\n" +
@@ -161,8 +165,10 @@ public class AccordIntegrationTest extends TestBaseImpl
                     "COMMIT TRANSACTION";
             result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY);
             assertEquals(1, result[0][0]); // The following assertion should fail if this does, but check it anyway.
-            
-            // TODO: Why does this sporadically see "1" when it should see "2"?
+
+            // TODO: This shouldn't be necessary if a read-only transaction follows...
+            awaitAsyncApply(cluster);
+
             assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0", 0, 0, 2);
 
             query = "BEGIN TRANSACTION\n" +
@@ -232,6 +238,9 @@ public class AccordIntegrationTest extends TestBaseImpl
                 Assertions.assertThat(topology.totalShards()).isEqualTo(2);
             });
 
+            awaitAsyncApply(cluster);
+
+            // TODO: We should be able to just perform a read-only txn without waiting for APPLY explicitly.
             SimpleQueryResult result = cluster.coordinator(1).executeWithResult("SELECT * FROM " + keyspace + ".tbl", ConsistencyLevel.ALL);
             QueryResults.Builder expected = QueryResults.builder().columns("k", "c", "v");
             for (int i = 0; i < keys.size(); i++)
@@ -290,6 +299,10 @@ public class AccordIntegrationTest extends TestBaseImpl
                            "COMMIT TRANSACTION";
             SimpleQueryResult result = cluster.coordinator(1).executeWithResult(query, ConsistencyLevel.ANY);
             assertFalse(result.hasNext());
+            
+            awaitAsyncApply(cluster);
+
+            // TODO: We should be able to just perform a read-only txn without waiting for APPLY explicitly.
             assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0", 0, 0, 1);
         });
     }
@@ -311,6 +324,9 @@ public class AccordIntegrationTest extends TestBaseImpl
             Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY);
             assertEquals(3, result[0][0]);
 
+            awaitAsyncApply(cluster);
+
+            // TODO: We should be able to just perform a read-only txn without waiting for APPLY explicitly.
             assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0", 0, 0, 1);
         });
     }
@@ -339,6 +355,10 @@ public class AccordIntegrationTest extends TestBaseImpl
                            "COMMIT TRANSACTION";
             Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY);
             assertEquals(3, result[0][0]);
+
+            awaitAsyncApply(cluster);
+
+            // TODO: We should be able to just perform a read-only txn without waiting for APPLY explicitly.
             assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl1 WHERE k=1 AND c=2", 1, 2, 4);
         }
     }
@@ -365,6 +385,9 @@ public class AccordIntegrationTest extends TestBaseImpl
             Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY);
             assertEquals(3, result[0][0]);
 
+            awaitAsyncApply(cluster);
+
+            // TODO: We should be able to just perform a read-only txn without waiting for APPLY explicitly.
             assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl1 WHERE k=1 AND c=2", 1, 2, 8);
             assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl2 WHERE k=2 AND c=2", 2, 2, 2);
         }
@@ -394,6 +417,9 @@ public class AccordIntegrationTest extends TestBaseImpl
             Object[][] result1 = cluster.coordinator(1).execute(query1, ConsistencyLevel.ANY);
             assertEquals(0, result1.length);
 
+            awaitAsyncApply(cluster);
+
+            // TODO: We should be able to just perform a read-only txn without waiting for APPLY explicitly.
             assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0", 0, 0, 0);
             assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=1 AND c=0", 1, 0, 0);
 
@@ -409,6 +435,9 @@ public class AccordIntegrationTest extends TestBaseImpl
             Object[][] result2 = cluster.coordinator(1).execute(query2, ConsistencyLevel.ANY);
             assertEquals(0, result2[0][0]);
 
+            awaitAsyncApply(cluster);
+
+            // TODO: We should be able to just perform a read-only txn without waiting for APPLY explicitly.
             assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0", 0, 0, 0);
             assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=1 AND c=0", 1, 0, 1);
             assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=2 AND c=0", 2, 0, 1);
@@ -449,6 +478,9 @@ public class AccordIntegrationTest extends TestBaseImpl
             Object[][] result1 = cluster.coordinator(1).execute(addDoc, ConsistencyLevel.ANY);
             assertEquals(5, result1[0][0]);
 
+            awaitAsyncApply(cluster);
+
+            // TODO: We should be able to just perform this txn without waiting for APPLY explicitly.
             String addUser = "BEGIN TRANSACTION\n" +
                              "  LET demo_doc = (SELECT * FROM ks.org_docs WHERE org_name='demo' LIMIT 1);\n" +
                              "  LET existing = (SELECT * FROM ks.org_users WHERE org_name='demo' AND user='benedict');\n" +
