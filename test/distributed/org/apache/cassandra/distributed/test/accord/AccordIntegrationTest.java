@@ -31,6 +31,8 @@ import java.util.stream.StreamSupport;
 
 import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.Uninterruptibles;
+
+import org.apache.cassandra.distributed.api.Feature;
 import org.assertj.core.api.Assertions;
 import org.awaitility.Awaitility;
 import org.junit.Test;

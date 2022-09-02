@@ -95,7 +95,12 @@ public final class CassandraGenerators
 
 
     private static final Gen<TableMetadata.Kind> TABLE_KIND_GEN = SourceDSL.arbitrary().pick(TableMetadata.Kind.REGULAR, TableMetadata.Kind.INDEX, TableMetadata.Kind.VIRTUAL);
-    public static final Gen<TableMetadata> TABLE_METADATA_GEN = gen(rnd -> createTableMetadata(IDENTIFIER_GEN.generate(rnd), rnd)).describedAs(CassandraGenerators::toStringRecursive);
+    public static final Gen<TableMetadata> TABLE_METADATA_GEN = tableMetadataGen(IDENTIFIER_GEN, AbstractTypeGenerators.typeGen(), IDENTIFIER_GEN);
+
+    public static Gen<TableMetadata> tableMetadataGen(Gen<String> identifierGen, Gen<AbstractType<?>> typeGen, Gen<String> keyspaceGen)
+    {
+        return gen(rnd -> createTableMetadata(identifierGen, typeGen, keyspaceGen.generate(rnd), rnd)).describedAs(CassandraGenerators::toStringRecursive);
+    }
 
     private static final Gen<SinglePartitionReadCommand> SINGLE_PARTITION_READ_COMMAND_GEN = gen(rnd -> {
         TableMetadata metadata = TABLE_METADATA_GEN.generate(rnd);
@@ -146,9 +151,9 @@ public final class CassandraGenerators
 
     }
 
-    private static TableMetadata createTableMetadata(String ks, RandomnessSource rnd)
+    public static TableMetadata createTableMetadata(Gen<String> identifierGen, Gen<AbstractType<?>> typeGen, String ks, RandomnessSource rnd)
     {
-        String tableName = IDENTIFIER_GEN.generate(rnd);
+        String tableName = identifierGen.generate(rnd);
         TableMetadata.Builder builder = TableMetadata.builder(ks, tableName, TableId.fromUUID(Generators.UUID_RANDOM_GEN.generate(rnd)))
                                                      .partitioner(PARTITIONER_GEN.generate(rnd))
                                                      .kind(TABLE_KIND_GEN.generate(rnd))
@@ -164,23 +169,24 @@ public final class CassandraGenerators
 
         Set<String> createdColumnNames = new HashSet<>();
         for (int i = 0; i < numPartitionColumns; i++)
-            builder.addColumn(createColumnDefinition(ks, tableName, ColumnMetadata.Kind.PARTITION_KEY, createdColumnNames, rnd));
+            builder.addColumn(createColumnDefinition(ks, tableName, ColumnMetadata.Kind.PARTITION_KEY, identifierGen, typeGen, createdColumnNames, rnd));
         for (int i = 0; i < numClusteringColumns; i++)
-            builder.addColumn(createColumnDefinition(ks, tableName, ColumnMetadata.Kind.CLUSTERING, createdColumnNames, rnd));
+            builder.addColumn(createColumnDefinition(ks, tableName, ColumnMetadata.Kind.CLUSTERING, identifierGen, typeGen, createdColumnNames, rnd));
         for (int i = 0; i < numStaticColumns; i++)
-            builder.addColumn(createColumnDefinition(ks, tableName, ColumnMetadata.Kind.STATIC, createdColumnNames, rnd));
+            builder.addColumn(createColumnDefinition(ks, tableName, ColumnMetadata.Kind.STATIC, identifierGen, typeGen, createdColumnNames, rnd));
         for (int i = 0; i < numRegularColumns; i++)
-            builder.addColumn(createColumnDefinition(ks, tableName, ColumnMetadata.Kind.REGULAR, createdColumnNames, rnd));
+            builder.addColumn(createColumnDefinition(ks, tableName, ColumnMetadata.Kind.REGULAR, identifierGen, typeGen, createdColumnNames, rnd));
 
         return builder.build();
     }
 
     private static ColumnMetadata createColumnDefinition(String ks, String table,
                                                          ColumnMetadata.Kind kind,
+                                                         Gen<String> identifierGen,
+                                                         Gen<AbstractType<?>> typeGen,
                                                          Set<String> createdColumnNames, /* This is mutated to check for collisions, so has a side effect outside of normal random generation */
                                                          RandomnessSource rnd)
     {
-        Gen<AbstractType<?>> typeGen = AbstractTypeGenerators.typeGen();
         switch (kind)
         {
             // partition and clustering keys require frozen types, so make sure all types generated will be frozen
@@ -197,7 +203,7 @@ public final class CassandraGenerators
         }
         // filter for unique names
         String str;
-        while (!createdColumnNames.add(str = IDENTIFIER_GEN.generate(rnd)))
+        while (!createdColumnNames.add(str = identifierGen.generate(rnd)))
         {
         }
         ColumnIdentifier name = new ColumnIdentifier(str, true);
@@ -205,12 +211,12 @@ public final class CassandraGenerators
         return new ColumnMetadata(ks, table, name, typeGen.generate(rnd), position, kind);
     }
 
-    public static Gen<ByteBuffer> partitionKeyDataGen(TableMetadata metadata)
+    public static Gen<ByteBuffer[]> partitionKeyArrayDataGen(TableMetadata metadata)
     {
         ImmutableList<ColumnMetadata> columns = metadata.partitionKeyColumns();
         assert !columns.isEmpty() : "Unable to find partition key columns";
         if (columns.size() == 1)
-            return getTypeSupport(columns.get(0).type).bytesGen();
+            return getTypeSupport(columns.get(0).type).bytesGen().map(b -> new ByteBuffer[]{ b });
         List<Gen<ByteBuffer>> columnGens = new ArrayList<>(columns.size());
         for (ColumnMetadata cm : columns)
             columnGens.add(getTypeSupport(cm.type).bytesGen());
@@ -218,8 +224,17 @@ public final class CassandraGenerators
             ByteBuffer[] buffers = new ByteBuffer[columnGens.size()];
             for (int i = 0; i < columnGens.size(); i++)
                 buffers[i] = columnGens.get(i).generate(rnd);
-            return CompositeType.build(ByteBufferAccessor.instance, buffers);
+            return buffers;
         };
+    }
+
+    public static Gen<ByteBuffer> partitionKeyDataGen(TableMetadata metadata)
+    {
+        return partitionKeyArrayDataGen(metadata).map(buffers -> {
+            if (buffers.length == 1)
+                return buffers[0];
+            return CompositeType.build(ByteBufferAccessor.instance, buffers);
+        });
     }
 
     /**

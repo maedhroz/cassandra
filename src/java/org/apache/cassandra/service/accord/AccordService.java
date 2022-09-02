@@ -32,8 +32,10 @@ import accord.local.Node;
 import accord.messages.Request;
 import accord.txn.Txn;
 import org.apache.cassandra.db.ConsistencyLevel;
+import org.apache.cassandra.db.WriteType;
 import org.apache.cassandra.exceptions.ReadTimeoutException;
 import org.apache.cassandra.concurrent.Shutdownable;
+import org.apache.cassandra.exceptions.WriteTimeoutException;
 import org.apache.cassandra.net.IVerbHandler;
 import org.apache.cassandra.service.accord.api.AccordAgent;
 import org.apache.cassandra.service.accord.api.AccordScheduler;
@@ -90,6 +92,12 @@ public class AccordService implements Shutdownable
         configService.createEpochFromConfig();
     }
 
+    @VisibleForTesting
+    public void unsafeReloadEpochFromConfig()
+    {
+        configService.unsafeReloadEpochFromConfig();
+    }
+
     public static long nowInMicros()
     {
         return TimeUnit.MILLISECONDS.toMicros(System.currentTimeMillis());
@@ -114,7 +122,9 @@ public class AccordService implements Shutdownable
         }
         catch (TimeoutException e)
         {
-            throw new ReadTimeoutException(ConsistencyLevel.ANY, 0, 0, false);
+            if (!txn.isWrite())
+                throw new ReadTimeoutException(ConsistencyLevel.ANY, 0, 0, false);
+            throw new WriteTimeoutException(WriteType.ACCORD, ConsistencyLevel.ANY, 0, 0);
         }
     };
 

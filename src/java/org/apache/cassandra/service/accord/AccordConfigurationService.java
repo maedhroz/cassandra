@@ -20,11 +20,17 @@ package org.apache.cassandra.service.accord;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+
+import org.slf4j.LoggerFactory;
 
 import accord.api.ConfigurationService;
 import accord.local.Node;
+import accord.topology.Shard;
 import accord.topology.Topology;
-import org.apache.cassandra.utils.concurrent.Future;
+import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.TableMetadata;
+import org.apache.cassandra.service.accord.api.AccordKey;
 
 /**
  * Currently a stubbed out config service meant to be triggered from a dtest
@@ -33,7 +39,7 @@ public class AccordConfigurationService implements ConfigurationService
 {
     private final Node.Id localId;
     private final List<Listener> listeners = new ArrayList<>();
-    private final List<Topology> epochs = new ArrayList<>();
+    private final List<Topology> epochs = new CopyOnWriteArrayList<>();
 
     public AccordConfigurationService(Node.Id localId)
     {
@@ -84,5 +90,21 @@ public class AccordConfigurationService implements ConfigurationService
         epochs.add(topology);
         for (Listener listener : listeners)
             listener.onTopologyUpdate(topology);
+    }
+
+    public void unsafeReloadEpochFromConfig()
+    {
+        epochs.clear();
+        epochs.add(Topology.EMPTY);
+        createEpochFromConfig();
+        Topology current = currentTopology();
+        StringBuilder sb = new StringBuilder();
+        sb.append("Current topology:\n");
+        for (Shard shard : current)
+        {
+            TableMetadata metadata = Schema.instance.getTableMetadata(((AccordKey) shard.range.start()).tableId());
+            sb.append('\t').append(metadata).append('\t').append(metadata.id).append('\t').append(shard.range).append('\n');
+        }
+        LoggerFactory.getLogger(AccordConfigurationService.class).info(sb.toString());
     }
 }

@@ -214,6 +214,7 @@ public class TransactionStatement implements CQLStatement
             
             for (ColumnReference reference : returningReferences)
             {
+                Objects.requireNonNull(reference.column, "Invalid column ref: " + reference);
                 names.add(reference.column);
                 columns.add(reference.column);
             }
