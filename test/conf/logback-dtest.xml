@@ -52,6 +52,14 @@
 
   <logger name="org.apache.hadoop" level="WARN"/>
 
+  <logger name="accord" level="TRACE">
+    <appender-ref ref="INSTANCEFILE"/>
+  </logger>
+
+  <logger name="org.apache.cassandra.service.accord" level="TRACE">
+    <appender-ref ref="INSTANCEFILE"/>
+  </logger>
+
   <root level="DEBUG">
     <appender-ref ref="INSTANCEFILE" /> <!-- use blocking to avoid race conditions with appending and searching -->
     <appender-ref ref="INSTANCESTDERR" />
