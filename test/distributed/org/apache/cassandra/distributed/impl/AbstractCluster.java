@@ -48,6 +48,7 @@ import java.util.function.BiPredicate;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -97,7 +98,6 @@ import org.apache.cassandra.utils.Shared.Recursive;
 import org.apache.cassandra.utils.concurrent.Condition;
 import org.reflections.Reflections;
 import org.reflections.scanners.Scanners;
-import org.reflections.scanners.TypeAnnotationsScanner;
 import org.reflections.util.ConfigurationBuilder;
 import org.reflections.util.NameHelper;
 
@@ -1027,11 +1027,32 @@ public abstract class AbstractCluster<I extends IInstance> implements ICluster<I
     @Override
     public void close()
     {
-        FBUtilities.waitOnFutures(instances.stream()
-                                           .filter(i -> !i.isShutdown())
-                                           .map(IInstance::shutdown)
-                                           .collect(Collectors.toList()),
-                                  1L, TimeUnit.MINUTES);
+        try
+        {
+            FBUtilities.waitOnFutures(instances.stream()
+                                               .filter(i -> !i.isShutdown())
+                                               .map(IInstance::shutdown)
+                                               .collect(Collectors.toList()),
+                                      1L, TimeUnit.MINUTES);
+        }
+        catch (Exception e)
+        {
+            Map<Thread, StackTraceElement[]> dump = Thread.getAllStackTraces();
+            StringBuilder sb = new StringBuilder();
+            sb.append("Threads:\n");
+            Set<Pattern> ignore = Stream.concat(Stream.of(Pattern.compile("logback.*")),
+                                                Stream.of("Finalizer", "Signal Dispatcher", "Reference Handler", "Attach Listener", "Common-Cleaner", "Monitor Ctrl-Break").map(Pattern::compile)) // java threads
+                                        .collect(Collectors.toSet());
+            for (Map.Entry<Thread, StackTraceElement[]> en : dump.entrySet())
+            {
+                String threadName = en.getKey().getName();
+                if (ignore.stream().anyMatch(p -> p.matcher(threadName).matches()))
+                    continue;
+                sb.append(threadName).append('\n');
+                Stream.of(en.getValue()).forEach(se -> sb.append('\t').append(se.getClassName()).append('#').append(se.getMethodName()).append(": ").append(se.getLineNumber()).append('\n'));
+            }
+            throw new RuntimeException("Failure to shutdown on time; " + sb, e);
+        }
 
         instances.clear();
         instanceMap.clear();
