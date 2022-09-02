@@ -51,7 +51,6 @@ public class HintedHandoffAddRemoveNodesTest extends TestBaseImpl
      * Ignored for now as there is some in-jvm bug which needs to be fixed, otherwise the test is flaky
      * For more information see CASSANDRA-16679
      */
-    @Ignore
     @Test
     public void shouldStreamHintsDuringDecommission() throws Exception
     {
@@ -90,7 +89,6 @@ public class HintedHandoffAddRemoveNodesTest extends TestBaseImpl
         }
     }
 
-    @Ignore
     @Test
     public void shouldBootstrapWithHintsOutstanding() throws Exception
     {
