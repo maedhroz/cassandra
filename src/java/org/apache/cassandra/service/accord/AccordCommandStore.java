@@ -20,6 +20,7 @@ package org.apache.cassandra.service.accord;
 
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -274,7 +275,14 @@ public class AccordCommandStore extends CommandStore
     public Future<Void> process(TxnOperation scope, Consumer<? super CommandStore> consumer)
     {
         AsyncOperation<Void> operation = AsyncOperation.create(this, scope, consumer);
-        executor.execute(operation);
+        try
+        {
+            executor.execute(operation);
+        }
+        catch (RejectedExecutionException e)
+        {
+            operation.tryFailure(e);
+        }
         return operation;
     }
 
