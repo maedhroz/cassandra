@@ -6885,4 +6885,10 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
     {
         AccordService.instance.createEpochFromConfigUnsafe();
     }
+
+    @Override
+    public void unsafeReloadEpochFromConfig()
+    {
+        AccordService.instance.unsafeReloadEpochFromConfig();
+    }
 }

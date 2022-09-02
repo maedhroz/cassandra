@@ -105,6 +105,17 @@ public class ColumnReference implements Term
         return new ValueReference(selectName, bindRowIndex(options), column, bindCellPath(options));
     }
 
+    @Override
+    public String toString()
+    {
+        return "ColumnReference{" +
+               "selectName='" + selectName + '\'' +
+               ", rowIndex=" + rowIndex +
+               ", column=" + column +
+               ", cellPath=" + cellPath +
+               '}';
+    }
+
     public static class Raw extends Term.Raw
     {
         private static final ColumnSpecification TEXT_TERM = new ColumnSpecification(null, null, null, UTF8Type.instance);

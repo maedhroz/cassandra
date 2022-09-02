@@ -33,6 +33,7 @@ import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.Uninterruptibles;
 
 import accord.coordinate.Preempted;
+import org.apache.cassandra.distributed.api.Feature;
 import org.assertj.core.api.Assertions;
 import org.assertj.core.util.Throwables;
 import org.awaitility.Awaitility;

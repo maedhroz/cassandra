@@ -1078,4 +1078,5 @@ public interface StorageServiceMBean extends NotificationEmitter
     public void setMinTrackedPartitionTombstoneCount(long value);
 
     public void createEpochUnsafe();
+    public void unsafeReloadEpochFromConfig();
 }
