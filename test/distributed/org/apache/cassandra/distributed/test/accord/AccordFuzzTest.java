@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.Ignore;
 import org.junit.Test;
@@ -38,6 +39,7 @@ import org.apache.cassandra.utils.AbstractTypeGenerators;
 import org.apache.cassandra.utils.AccordGenerators;
 import org.apache.cassandra.utils.AccordGenerators.Txn;
 import org.apache.cassandra.utils.CassandraGenerators;
+import org.apache.cassandra.utils.FailingConsumer;
 import org.apache.cassandra.utils.Generators;
 import org.quicktheories.core.Gen;
 import org.quicktheories.generators.Generate;
@@ -93,7 +95,7 @@ public class AccordFuzzTest extends TestBaseImpl
         {
             cluster.schemaChange(createStatement);
             ClusterUtils.awaitGossipSchemaMatch(cluster);
-            cluster.forEach(node -> node.runOnInstance(() -> AccordService.instance.unsafeReloadEpochFromConfig()));
+            cluster.forEach(node -> node.runOnInstance(() -> AccordService.instance.createEpochFromConfigUnsafe()));
 
             cluster.coordinator(1).execute(cql, ConsistencyLevel.ANY);
         }
@@ -111,6 +113,21 @@ public class AccordFuzzTest extends TestBaseImpl
                 this.metadata = metadata;
                 this.transactions = selects;
             }
+
+            @Override
+            public String toString()
+            {
+                StringBuilder sb = new StringBuilder();
+                sb.append("Table:\n").append(metadata.toCqlString(false, false));
+                sb.append("Transactions:\n");
+                for (int i = 0; i < transactions.size(); i++)
+                {
+                    Txn t = transactions.get(i);
+                    sb.append("Txn@").append(i).append("\n");
+                    sb.append(t.toCQL()).append('\n');
+                }
+                return sb.toString();
+            }
         }
         Gen<TableMetadata> metadataGen = CassandraGenerators.tableMetadataGen(nameGen, AbstractTypeGenerators.numericTypeGen(), Generate.constant(KEYSPACE));
         Set<String> tables = new HashSet<>();
@@ -123,25 +140,28 @@ public class AccordFuzzTest extends TestBaseImpl
         };
         try (Cluster cluster = createCluster())
         {
-            qt().withFixedSeed(800226806560166L).withExamples(10).withShrinkCycles(0).forAll(gen).checkAssert(c -> {
+            qt().withFixedSeed(800226806560166L).withExamples(10).withShrinkCycles(0).forAll(gen).checkAssert(FailingConsumer.orFail(c -> {
                 String createStatement = c.metadata.toCqlString(false, false);
                 LoggerFactory.getLogger(AccordFuzzTest.class).info("Creating table\n{}", createStatement);
                 cluster.schemaChange(createStatement);
                 ClusterUtils.awaitGossipSchemaMatch(cluster);
-                cluster.forEach(node -> node.runOnInstance(() -> AccordService.instance.unsafeReloadEpochFromConfig()));
+                cluster.forEach(node -> node.runOnInstance(() -> AccordService.instance.createEpochFromConfigUnsafe()));
+                TimeUnit.SECONDS.sleep(10);
 
                 for (Txn t : c.transactions)
                 {
                     try
                     {
-                        cluster.coordinator(1).execute(t.toCQL(), ConsistencyLevel.ANY, t.binds);
+                        cluster.coordinator(1).execute(t.toCQL(), ConsistencyLevel.ANY, t.boundValues);
                     }
                     catch (Exception e)
                     {
                         throw new RuntimeException("Table:\n" + createStatement + "\nCQL:\n" + t.toCQL(), e);
                     }
                 }
-            });
+
+                AccordIntegrationTest.awaitAsyncApply(cluster);
+            }));
         }
     }
 
