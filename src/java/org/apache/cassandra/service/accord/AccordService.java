@@ -92,12 +92,6 @@ public class AccordService implements Shutdownable
         configService.createEpochFromConfig();
     }
 
-    @VisibleForTesting
-    public void unsafeReloadEpochFromConfig()
-    {
-        configService.unsafeReloadEpochFromConfig();
-    }
-
     public static long nowInMicros()
     {
         return TimeUnit.MILLISECONDS.toMicros(System.currentTimeMillis());
@@ -150,13 +144,13 @@ public class AccordService implements Shutdownable
     @Override
     public void shutdown()
     {
-        ExecutorUtils.shutdown(Arrays.asList(scheduler, nodeShutdown));
+        ExecutorUtils.shutdown(Arrays.asList(nodeShutdown, scheduler));
     }
 
     @Override
     public Object shutdownNow()
     {
-        ExecutorUtils.shutdownNow(Arrays.asList(scheduler, nodeShutdown));
+        ExecutorUtils.shutdownNow(Arrays.asList(nodeShutdown, scheduler));
         return null;
     }
 
@@ -165,7 +159,7 @@ public class AccordService implements Shutdownable
     {
         try
         {
-            ExecutorUtils.awaitTermination(timeout, units, Arrays.asList(scheduler, nodeShutdown));
+            ExecutorUtils.awaitTermination(timeout, units, Arrays.asList(nodeShutdown, scheduler));
             return true;
         }
         catch (TimeoutException e)

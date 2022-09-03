@@ -21,6 +21,7 @@ package org.apache.cassandra.service.accord;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.stream.Stream;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
@@ -108,6 +109,11 @@ public class EndpointMapping
     private static volatile Mapping mapping = Mapping.EMPTY;
 
     private EndpointMapping() {}
+
+    public static Stream<Node.Id> knownIds()
+    {
+        return mapping.idToEndpoint.keySet().stream();
+    }
 
     public static Node.Id getId(InetAddressAndPort endpoint)
     {

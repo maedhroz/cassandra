@@ -18,25 +18,33 @@
 
 package org.apache.cassandra.service.accord;
 
+import java.lang.reflect.Array;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
+import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import accord.api.ConfigurationService;
 import accord.local.Node;
 import accord.topology.Shard;
 import accord.topology.Topology;
+import accord.topology.TopologyManager;
 import org.apache.cassandra.schema.Schema;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.service.accord.api.AccordKey;
+import org.apache.cassandra.tools.nodetool.formatter.TableBuilder;
 
 /**
  * Currently a stubbed out config service meant to be triggered from a dtest
  */
 public class AccordConfigurationService implements ConfigurationService
 {
+    private static final Logger logger = LoggerFactory.getLogger(AccordConfigurationService.class);
+
     private final Node.Id localId;
     private final List<Listener> listeners = new ArrayList<>();
     private final List<Topology> epochs = new CopyOnWriteArrayList<>();
@@ -90,21 +98,23 @@ public class AccordConfigurationService implements ConfigurationService
         epochs.add(topology);
         for (Listener listener : listeners)
             listener.onTopologyUpdate(topology);
-    }
+        // since we don't have a dist sys that sets this up, we have to just lie...
+        EndpointMapping.knownIds().forEach(id -> {
+            for (Listener listener : listeners)
+                listener.onEpochSyncComplete(id, topology.epoch());
+        });
 
-    public void unsafeReloadEpochFromConfig()
-    {
-        epochs.clear();
-        epochs.add(Topology.EMPTY);
-        createEpochFromConfig();
         Topology current = currentTopology();
         StringBuilder sb = new StringBuilder();
         sb.append("Current topology:\n");
+        TableBuilder builder = new TableBuilder(" | ");
+        builder.add("Table", "Table ID", "Range");
         for (Shard shard : current)
         {
             TableMetadata metadata = Schema.instance.getTableMetadata(((AccordKey) shard.range.start()).tableId());
-            sb.append('\t').append(metadata).append('\t').append(metadata.id).append('\t').append(shard.range).append('\n');
+            builder.add(metadata.toString(), metadata.id.toString(), shard.range.toString());
         }
-        LoggerFactory.getLogger(AccordConfigurationService.class).info(sb.toString());
+        sb.append(builder);
+        logger.info(sb.toString());
     }
 }

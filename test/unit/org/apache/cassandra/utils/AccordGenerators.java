@@ -182,7 +182,7 @@ public class AccordGenerators
         // return
         public final Optional<Select> output;
         //TODO when bind support is done, move away from literals
-        public final Object[] binds = new Object[0];
+        public final Object[] boundValues = new Object[0];
 
         public Txn(List<TxnLet> lets, Optional<Select> output)
         {
@@ -236,7 +236,8 @@ public class AccordGenerators
             if (lets.containsKey(name))
                 throw new IllegalArgumentException("Let name " + name + " already exists");
             lets.put(name, select);
-            allowedReferences.add(new Reference(Arrays.asList(name)));
+            //TODO add support for touple
+//            allowedReferences.add(new Reference(Arrays.asList(name)));
             for (Expression e : select.selections)
                 //TODO remove " due to current limitation... revert once fixed!
                 allowedReferences.add(new Reference(Arrays.asList(name, e.name().replace("\"", ""))));
