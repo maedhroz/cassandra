@@ -50,7 +50,6 @@ import org.apache.cassandra.distributed.api.Feature;
 import org.apache.cassandra.distributed.api.IMessageFilters;
 import org.apache.cassandra.distributed.api.QueryResults;
 import org.apache.cassandra.distributed.shared.AssertUtils;
-import org.apache.cassandra.distributed.api.ConsistencyLevel;
 import org.apache.cassandra.distributed.api.SimpleQueryResult;
 import org.apache.cassandra.distributed.impl.Instance;
 import org.apache.cassandra.distributed.test.TestBaseImpl;
@@ -84,7 +83,7 @@ public class AccordIntegrationTest extends TestBaseImpl
         assertArrayEquals(new Object[]{new Object[] {k, c, v}}, result);
     }
 
-    private static void test(FailingConsumer<Cluster> fn) throws IOException
+    private static void test(FailingConsumer<Cluster> fn) throws Exception
     {
         try (Cluster cluster = createCluster())
         {
@@ -94,6 +93,9 @@ public class AccordIntegrationTest extends TestBaseImpl
             cluster.forEach(node -> node.runOnInstance(() -> AccordService.instance.setCacheSize(0)));
 
             fn.accept(cluster);
+
+            // Make sure transaction state settles.
+            awaitAsyncApply(cluster);
         }
     }
 
@@ -119,8 +121,6 @@ public class AccordIntegrationTest extends TestBaseImpl
                            "COMMIT TRANSACTION";
             Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY);
             assertEquals(3, result[0][0]);
-            
-            awaitAsyncApply(cluster);
 
             // TODO: Why isn't the read seeing the write apply if we don't wait for APPLY on the write?
             String check = "BEGIN TRANSACTION\n" +
@@ -133,7 +133,7 @@ public class AccordIntegrationTest extends TestBaseImpl
 
     // TODO: This fails sporadically, sometimes w/ timeouts and sometimes w/ Preempted issues.
     @Test
-    public void testRecovery() throws IOException
+    public void testRecovery() throws Exception
     {
         test(cluster -> {
             IMessageFilters.Filter lostApply = cluster.filters().verbs(Verb.ACCORD_APPLY_REQ.id).drop();
@@ -250,7 +250,7 @@ public class AccordIntegrationTest extends TestBaseImpl
     }
 
     @Test
-    public void testLostCommitReadTriggersFallbackRead() throws IOException
+    public void testLostCommitReadTriggersFallbackRead() throws Exception
     {
         test(cluster -> {
             // It's expected that the required Read will happen regardless of whether this fails to return a read
@@ -279,7 +279,7 @@ public class AccordIntegrationTest extends TestBaseImpl
     }
 
     @Test
-    public void testReadOnlyTx() throws IOException
+    public void testReadOnlyTx() throws Exception
     {
         test(cluster -> {
             String query = "BEGIN TRANSACTION\n" +
@@ -291,7 +291,7 @@ public class AccordIntegrationTest extends TestBaseImpl
     }
 
     @Test
-    public void testWriteOnlyTx() throws IOException
+    public void testWriteOnlyTx() throws Exception
     {
         test(cluster -> {
             String query = "BEGIN TRANSACTION\n" +
