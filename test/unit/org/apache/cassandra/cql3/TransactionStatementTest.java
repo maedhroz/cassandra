@@ -128,11 +128,26 @@ public class TransactionStatementTest
     }
 
     @Test
+    public void shouldRejectLetOnlyStatement()
+    {
+        String query = "BEGIN TRANSACTION\n" +
+                       "  LET row1 = (SELECT * FROM ks.tbl1 WHERE k=1 AND c=2);\n" +
+                       "COMMIT TRANSACTION";
+
+        TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(query);
+
+        Assertions.assertThatThrownBy(() -> parsed.prepare(ClientState.forInternalCalls()))
+                  .isInstanceOf(InvalidRequestException.class)
+                  .hasMessage(EMPTY_TRANSACTION_MESSAGE);
+    }
+
+    @Test
     public void shouldRejectDuplicateTupleName()
     {
         String query = "BEGIN TRANSACTION\n" +
                        "  LET row1 = (SELECT * FROM ks.tbl1 WHERE k=1 AND c=2);\n" +
                        "  LET row1 = (SELECT * FROM ks.tbl2 WHERE k=2 AND c=2);\n" +
+                       "  SELECT row1.v;\n" +
                        "COMMIT TRANSACTION";
 
         TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(query);

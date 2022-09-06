@@ -58,6 +58,7 @@ public class TransactionStatement implements CQLStatement
     public static final String INVALID_LIMIT_MESSAGE = "LIMIT must be 1 for SELECTs in LET assignments.";
     public static final String NO_CONDITIONS_IN_UPDATES_MESSAGE = "Updates within transactions may not specify their own conditions.";
     public static final String NO_TIMESTAMPS_IN_UPDATES_MESSAGE = "Updates within transactions may not specify custom timestamps.";
+    public static final String EMPTY_TRANSACTION_MESSAGE = "Transaction contains no reads or writes";
 
     static class NamedSelect
     {
@@ -323,7 +324,7 @@ public class TransactionStatement implements CQLStatement
         public CQLStatement prepare(ClientState state)
         {
             checkTrue(bindVariables.isEmpty(), "TODO: support bound variables");
-            checkFalse(assignments.isEmpty() && updates.isEmpty() && returning == null && select == null, "Transaction is empty");
+            checkFalse(updates.isEmpty() && returning == null && select == null, EMPTY_TRANSACTION_MESSAGE);
 
             if (select != null || returning != null)
                 checkTrue(select != null ^ returning != null, "Cannot specify both a full SELECT and a SELECT w/ LET references.");
