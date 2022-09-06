@@ -31,7 +31,10 @@ import java.util.stream.StreamSupport;
 
 import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.Uninterruptibles;
+
+import accord.coordinate.Preempted;
 import org.assertj.core.api.Assertions;
+import org.assertj.core.util.Throwables;
 import org.awaitility.Awaitility;
 import org.junit.Test;
 
@@ -90,6 +93,8 @@ public class AccordIntegrationTest extends TestBaseImpl
             cluster.schemaChange("CREATE KEYSPACE " + keyspace + " WITH REPLICATION={'class':'SimpleStrategy', 'replication_factor': 2}");
             cluster.schemaChange("CREATE TABLE " + keyspace + ".tbl (k int, c int, v int, primary key (k, c))");
             cluster.forEach(node -> node.runOnInstance(() -> AccordService.instance.createEpochFromConfigUnsafe()));
+            
+            // Evict commands from the cache immediately to expose problems loading from disk.
             cluster.forEach(node -> node.runOnInstance(() -> AccordService.instance.setCacheSize(0)));
 
             fn.accept(cluster);
@@ -122,12 +127,12 @@ public class AccordIntegrationTest extends TestBaseImpl
             Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY);
             assertEquals(3, result[0][0]);
 
-            // TODO: Why isn't the read seeing the write apply if we don't wait for APPLY on the write?
             String check = "BEGIN TRANSACTION\n" +
                            "  SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0;\n" +
                            "COMMIT TRANSACTION";
-            Object[][] checkResult = cluster.coordinator(1).execute(check, ConsistencyLevel.ANY);
-            assertArrayEquals(new Object[]{new Object[] {0, 0, 1}}, checkResult);
+
+            // TODO: Retry on preemption may become unnecessary after the Unified Log is integrated.
+            assertRowEqualsWithPreemptedRetry(cluster, check, new Object[] { 0, 0, 1 });
         });
     }
 
@@ -299,11 +304,13 @@ public class AccordIntegrationTest extends TestBaseImpl
                            "COMMIT TRANSACTION";
             SimpleQueryResult result = cluster.coordinator(1).executeWithResult(query, ConsistencyLevel.ANY);
             assertFalse(result.hasNext());
-            
-            awaitAsyncApply(cluster);
 
-            // TODO: We should be able to just perform a read-only txn without waiting for APPLY explicitly.
-            assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0", 0, 0, 1);
+            String check = "BEGIN TRANSACTION\n" +
+                           "  SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0;\n" +
+                           "COMMIT TRANSACTION";
+
+            // TODO: Retry on preemption may become unnecessary after the Unified Log is integrated.
+            assertRowEqualsWithPreemptedRetry(cluster, check, new Object[] {0, 0, 1});
         });
     }
 
@@ -493,6 +500,27 @@ public class AccordIntegrationTest extends TestBaseImpl
                              "COMMIT TRANSACTION";
             Object[][] result2 = cluster.coordinator(1).execute(addUser, ConsistencyLevel.ANY);
             assertEquals(6, result2[0][0]);
+        }
+    }
+
+    private static void assertRowEqualsWithPreemptedRetry(Cluster cluster, String check, Object[] row)
+    {
+        try
+        {
+            Object[][] checkResult = cluster.coordinator(1).execute(check, ConsistencyLevel.ANY);
+            assertArrayEquals(new Object[]{ row }, checkResult);
+        }
+        catch (Throwable t)
+        {
+            if (Throwables.getRootCause(t).toString().contains(Preempted.class.getName()))
+            {
+                Object[][] checkResult = cluster.coordinator(1).execute(check, ConsistencyLevel.ANY);
+                assertArrayEquals(new Object[]{ row }, checkResult);
+            }
+            else
+            {
+                throw t;
+            }
         }
     }
 
