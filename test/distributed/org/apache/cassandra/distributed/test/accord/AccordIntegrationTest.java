@@ -34,24 +34,14 @@ import java.util.stream.StreamSupport;
 
 import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.Uninterruptibles;
-
-import org.apache.commons.lang3.ClassLoaderUtils;
-
-import accord.coordinate.Preempted;
-import org.apache.cassandra.distributed.api.IInstance;
-import org.assertj.core.api.Assertions;
-import org.assertj.core.util.Throwables;
-import org.awaitility.Awaitility;
-
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
-import org.junit.Ignore;
 import org.junit.Test;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import accord.coordinate.Preempted;
 import accord.local.Status;
 import accord.messages.Commit;
 import accord.primitives.Keys;
@@ -61,11 +51,12 @@ import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.distributed.Cluster;
 import org.apache.cassandra.distributed.api.ConsistencyLevel;
 import org.apache.cassandra.distributed.api.Feature;
+import org.apache.cassandra.distributed.api.IInstance;
 import org.apache.cassandra.distributed.api.IMessageFilters;
 import org.apache.cassandra.distributed.api.QueryResults;
-import org.apache.cassandra.distributed.shared.AssertUtils;
 import org.apache.cassandra.distributed.api.SimpleQueryResult;
 import org.apache.cassandra.distributed.impl.Instance;
+import org.apache.cassandra.distributed.shared.AssertUtils;
 import org.apache.cassandra.distributed.test.TestBaseImpl;
 import org.apache.cassandra.distributed.util.QueryResultUtil;
 import org.apache.cassandra.net.Message;
@@ -74,12 +65,15 @@ import org.apache.cassandra.service.accord.AccordKeyspace;
 import org.apache.cassandra.service.accord.AccordService;
 import org.apache.cassandra.service.accord.txn.TxnBuilder;
 import org.apache.cassandra.utils.ByteBufferUtil;
+import org.assertj.core.api.Assertions;
+import org.assertj.core.util.Throwables;
+import org.awaitility.Awaitility;
 
+import static org.apache.cassandra.utils.Clock.Global.nanoTime;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
-import static org.apache.cassandra.utils.Clock.Global.nanoTime;
 
 @SuppressWarnings("Convert2MethodRef")
 public class AccordIntegrationTest extends TestBaseImpl
