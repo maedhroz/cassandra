@@ -132,7 +132,7 @@ public class QueryResultUtil
         int rowNum = 1;
         while (qr.hasNext())
         {
-            sb.append("@ Row ").append(rowNum).append('\n');
+            sb.append("@ Row ").append(rowNum++).append('\n');
             TableBuilder table = new TableBuilder('|');
             Row next = qr.next();
             for (String column : qr.names())

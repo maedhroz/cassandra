@@ -94,7 +94,7 @@ public class AccordIntegrationTest extends TestBaseImpl
     {
         if (cluster != null)
         {
-            cluster.forEach(i -> logger.info("[node{}] Pending Commands:\n", i.config().num(), findPendingTxns(i)));
+            cluster.forEach(i -> logger.info("[node{}] Pending Commands:\n{}", i.config().num(), QueryResultUtil.expand(findPendingTxns(i))));
             cluster.close();
         }
     }
