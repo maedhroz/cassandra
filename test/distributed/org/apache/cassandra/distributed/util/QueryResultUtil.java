@@ -25,6 +25,8 @@ import java.util.Objects;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
+import org.apache.commons.lang3.ArrayUtils;
+
 import org.apache.cassandra.distributed.api.Row;
 import org.apache.cassandra.distributed.api.SimpleQueryResult;
 import org.apache.cassandra.tools.nodetool.formatter.TableBuilder;
@@ -76,6 +78,36 @@ public class QueryResultUtil
         }
 
         return new SimpleQueryResult(input.names().toArray(new String[0]), filtered.toArray(new Object[0][]), input.warnings());
+    }
+
+    public static SimpleQueryResult addColumns(SimpleQueryResult qr, Map<String, Function<Row, Object>> fns)
+    {
+        if (fns.isEmpty())
+            return qr;
+        fns.keySet().forEach(name -> {
+            if (qr.names().contains(name))
+                throw new IllegalArgumentException("Column " + name + " already exists: " + qr.next());
+        });
+        List<String> names = new ArrayList<>(qr.names());
+        List<String> subNames = new ArrayList<>(fns.keySet());
+        names.addAll(subNames);
+        Object[][] rows = new Object[qr.toObjectArrays().length][];
+        int i = 0;
+        while (qr.hasNext())
+        {
+            Row next = qr.next();
+            Object[] row = next.toObjectArray();
+            for (String name : subNames)
+            {
+                Function<Row, Object> fn = fns.get(name);
+                Object value = fn.apply(next);
+                row = ArrayUtils.add(row, value);
+            }
+            rows[i++] = row;
+        }
+        if (i < rows.length)
+            rows = Arrays.copyOfRange(rows, 0, i);
+        return new SimpleQueryResult(names.toArray(new String[0]), rows, qr.warnings());
     }
 
     public static boolean contains(SimpleQueryResult qr, Object... values)
