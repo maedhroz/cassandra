@@ -63,6 +63,21 @@ public class QueryResultUtil
         return new SimpleQueryResult(input.names().toArray(String[]::new), rows, input.warnings());
     }
 
+    public static <T> SimpleQueryResult filter(SimpleQueryResult input, String column, Predicate<T> fn)
+    {
+        if (!input.names().contains(column))
+            throw new IllegalArgumentException("Column " + column + " is not present: " + input.names());
+        List<Object[]> filtered = new ArrayList<>(input.toObjectArrays().length);
+        while (input.hasNext())
+        {
+            Row next = input.next();
+            if (fn.test(next.get(column)))
+                filtered.add(next.toObjectArray());
+        }
+
+        return new SimpleQueryResult(input.names().toArray(new String[0]), filtered.toArray(new Object[0][]), input.warnings());
+    }
+
     public static boolean contains(SimpleQueryResult qr, Object... values)
     {
         return contains(qr, a -> equals(a, values));

@@ -21,8 +21,10 @@ package org.apache.cassandra.distributed.test.accord;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -32,17 +34,10 @@ import java.util.stream.StreamSupport;
 
 import com.google.common.base.Splitter;
 import com.google.common.util.concurrent.Uninterruptibles;
-
-import org.apache.cassandra.distributed.api.Feature;
-import org.apache.cassandra.distributed.api.IInstance;
-import org.assertj.core.api.Assertions;
-import org.awaitility.Awaitility;
-
 import org.junit.AfterClass;
 import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,11 +49,13 @@ import accord.topology.Topologies;
 import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.distributed.Cluster;
 import org.apache.cassandra.distributed.api.ConsistencyLevel;
+import org.apache.cassandra.distributed.api.Feature;
+import org.apache.cassandra.distributed.api.IInstance;
 import org.apache.cassandra.distributed.api.IMessageFilters;
 import org.apache.cassandra.distributed.api.QueryResults;
-import org.apache.cassandra.distributed.shared.AssertUtils;
 import org.apache.cassandra.distributed.api.SimpleQueryResult;
 import org.apache.cassandra.distributed.impl.Instance;
+import org.apache.cassandra.distributed.shared.AssertUtils;
 import org.apache.cassandra.distributed.test.TestBaseImpl;
 import org.apache.cassandra.distributed.util.QueryResultUtil;
 import org.apache.cassandra.net.Message;
@@ -67,12 +64,14 @@ import org.apache.cassandra.service.accord.AccordKeyspace;
 import org.apache.cassandra.service.accord.AccordService;
 import org.apache.cassandra.service.accord.txn.TxnBuilder;
 import org.apache.cassandra.utils.ByteBufferUtil;
+import org.assertj.core.api.Assertions;
+import org.awaitility.Awaitility;
 
+import static org.apache.cassandra.utils.Clock.Global.nanoTime;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
-import static org.apache.cassandra.utils.Clock.Global.nanoTime;
 
 @SuppressWarnings("Convert2MethodRef")
 public class AccordIntegrationTest extends TestBaseImpl
@@ -108,9 +107,7 @@ public class AccordIntegrationTest extends TestBaseImpl
         }
         catch (TimeoutException e)
         {
-            // accord can't make progress without a new tx to push things along... so... push one along!
-            logger.info("Gave up waiting for tx to complete, injecting new one to trigger recovery");
-            CLUSTER.coordinator(1).execute("BEGIN TRANSACTION SELECT * FROM " + currentTable() + " WHERE k=1 AND c=0; COMMIT TRANSACTION", ConsistencyLevel.ANY);
+            logger.warn("Gave up waiting for tx to complete");
         }
     }
 
@@ -147,7 +144,7 @@ public class AccordIntegrationTest extends TestBaseImpl
     private static Cluster createCluster() throws IOException
     {
         // need to up the timeout else tests get flaky
-        return init(Cluster.build(2).withConfig(c -> c.with(Feature.NETWORK).set("write_request_timeout_in_ms", TimeUnit.SECONDS.toMillis(10))).start());
+        return init(Cluster.build(2).withConfig(c -> c.with(Feature.NETWORK).set("write_request_timeout_in_ms", TimeUnit.SECONDS.toMillis(20))).start());
     }
 
     @Test
@@ -471,30 +468,31 @@ public class AccordIntegrationTest extends TestBaseImpl
     @Test
     public void demoTest() throws Throwable
     {
-        CLUSTER.schemaChange("CREATE KEYSPACE IF NOT EXISTS ks WITH REPLICATION={'class':'SimpleStrategy', 'replication_factor':3};");
-        CLUSTER.schemaChange("CREATE TABLE IF NOT EXISTS ks.org_docs ( org_name text, doc_id int, contents_version int static, title text, permissions int, PRIMARY KEY (org_name, doc_id) );");
-        CLUSTER.schemaChange("CREATE TABLE IF NOT EXISTS ks.org_users ( org_name text, user text, members_version int static, permissions int, PRIMARY KEY (org_name, user) );");
-        CLUSTER.schemaChange("CREATE TABLE IF NOT EXISTS ks.user_docs ( user text, doc_id int, title text, org_name text, permissions int, PRIMARY KEY (user, doc_id) );");
+        String ks = "ks" + COUNTER.getAndIncrement();
+        CLUSTER.schemaChange("CREATE KEYSPACE IF NOT EXISTS " + ks + " WITH REPLICATION={'class':'SimpleStrategy', 'replication_factor':2};");
+        CLUSTER.schemaChange("CREATE TABLE IF NOT EXISTS "+ks+".org_docs ( org_name text, doc_id int, contents_version int static, title text, permissions int, PRIMARY KEY (org_name, doc_id) );");
+        CLUSTER.schemaChange("CREATE TABLE IF NOT EXISTS "+ks+".org_users ( org_name text, user text, members_version int static, permissions int, PRIMARY KEY (org_name, user) );");
+        CLUSTER.schemaChange("CREATE TABLE IF NOT EXISTS "+ks+".user_docs ( user text, doc_id int, title text, org_name text, permissions int, PRIMARY KEY (user, doc_id) );");
 
         CLUSTER.forEach(node -> node.runOnInstance(() -> AccordService.instance.createEpochFromConfigUnsafe()));
         CLUSTER.forEach(node -> node.runOnInstance(() -> AccordService.instance.setCacheSize(0)));
 
-        CLUSTER.coordinator(1).execute("INSERT INTO ks.org_users (org_name, user, members_version, permissions) VALUES ('demo', 'blake', 5, 777);\n", ConsistencyLevel.ALL);
-        CLUSTER.coordinator(1).execute("INSERT INTO ks.org_users (org_name, user, members_version, permissions) VALUES ('demo', 'scott', 5, 777);\n", ConsistencyLevel.ALL);
-        CLUSTER.coordinator(1).execute("INSERT INTO ks.org_docs (org_name, doc_id, contents_version, title, permissions) VALUES ('demo', 100, 5, 'README', 644);\n", ConsistencyLevel.ALL);
-        CLUSTER.coordinator(1).execute("INSERT INTO ks.user_docs (user, doc_id, title, org_name, permissions) VALUES ('blake', 1, 'recipes', NULL, 777);\n", ConsistencyLevel.ALL);
-        CLUSTER.coordinator(1).execute("INSERT INTO ks.user_docs (user, doc_id, title, org_name, permissions) VALUES ('blake', 100, 'README', 'demo', 644);\n", ConsistencyLevel.ALL);
-        CLUSTER.coordinator(1).execute("INSERT INTO ks.user_docs (user, doc_id, title, org_name, permissions) VALUES ('scott', 2, 'to do list', NULL, 777);\n", ConsistencyLevel.ALL);
-        CLUSTER.coordinator(1).execute("INSERT INTO ks.user_docs (user, doc_id, title, org_name, permissions) VALUES ('scott', 100, 'README', 'demo', 644);\n", ConsistencyLevel.ALL);
+        CLUSTER.coordinator(1).execute("INSERT INTO "+ks+".org_users (org_name, user, members_version, permissions) VALUES ('demo', 'blake', 5, 777);\n", ConsistencyLevel.ALL);
+        CLUSTER.coordinator(1).execute("INSERT INTO "+ks+".org_users (org_name, user, members_version, permissions) VALUES ('demo', 'scott', 5, 777);\n", ConsistencyLevel.ALL);
+        CLUSTER.coordinator(1).execute("INSERT INTO "+ks+".org_docs (org_name, doc_id, contents_version, title, permissions) VALUES ('demo', 100, 5, 'README', 644);\n", ConsistencyLevel.ALL);
+        CLUSTER.coordinator(1).execute("INSERT INTO "+ks+".user_docs (user, doc_id, title, org_name, permissions) VALUES ('blake', 1, 'recipes', NULL, 777);\n", ConsistencyLevel.ALL);
+        CLUSTER.coordinator(1).execute("INSERT INTO "+ks+".user_docs (user, doc_id, title, org_name, permissions) VALUES ('blake', 100, 'README', 'demo', 644);\n", ConsistencyLevel.ALL);
+        CLUSTER.coordinator(1).execute("INSERT INTO "+ks+".user_docs (user, doc_id, title, org_name, permissions) VALUES ('scott', 2, 'to do list', NULL, 777);\n", ConsistencyLevel.ALL);
+        CLUSTER.coordinator(1).execute("INSERT INTO "+ks+".user_docs (user, doc_id, title, org_name, permissions) VALUES ('scott', 100, 'README', 'demo', 644);\n", ConsistencyLevel.ALL);
 
         String addDoc =  "BEGIN TRANSACTION\n" +
-                         "  LET demo_user = (SELECT * FROM ks.org_users WHERE org_name='demo' LIMIT 1);\n" +
-                         "  LET existing = (SELECT * FROM ks.org_docs WHERE org_name='demo' AND doc_id=101);\n" +
-                         "  SELECT members_version FROM ks.org_users WHERE org_name='demo';\n" +
+                         "  LET demo_user = (SELECT * FROM "+ks+".org_users WHERE org_name='demo' LIMIT 1);\n" +
+                         "  LET existing = (SELECT * FROM "+ks+".org_docs WHERE org_name='demo' AND doc_id=101);\n" +
+                         "  SELECT members_version FROM "+ks+".org_users WHERE org_name='demo';\n" +
                          "  IF demo_user.members_version = 5 AND existing IS NULL THEN\n" +
-                         "    UPDATE ks.org_docs SET title='slides.key', permissions=777, contents_version += 1 WHERE org_name='demo' AND doc_id=101;\n" +
-                         "    UPDATE ks.user_docs SET title='slides.key', permissions=777 WHERE user='blake' AND doc_id=101;\n" +
-                         "    UPDATE ks.user_docs SET title='slides.key', permissions=777 WHERE user='scott' AND doc_id=101;\n" +
+                         "    UPDATE "+ks+".org_docs SET title='slides.key', permissions=777, contents_version += 1 WHERE org_name='demo' AND doc_id=101;\n" +
+                         "    UPDATE "+ks+".user_docs SET title='slides.key', permissions=777 WHERE user='blake' AND doc_id=101;\n" +
+                         "    UPDATE "+ks+".user_docs SET title='slides.key', permissions=777 WHERE user='scott' AND doc_id=101;\n" +
                          "  END IF\n" +
                          "COMMIT TRANSACTION";
         Object[][] result1 = CLUSTER.coordinator(1).execute(addDoc, ConsistencyLevel.ANY);
@@ -504,13 +502,13 @@ public class AccordIntegrationTest extends TestBaseImpl
 
         // TODO: We should be able to just perform this txn without waiting for APPLY explicitly.
         String addUser = "BEGIN TRANSACTION\n" +
-                         "  LET demo_doc = (SELECT * FROM ks.org_docs WHERE org_name='demo' LIMIT 1);\n" +
-                         "  LET existing = (SELECT * FROM ks.org_users WHERE org_name='demo' AND user='benedict');\n" +
-                         "  SELECT contents_version FROM ks.org_docs WHERE org_name='demo';\n" +
+                         "  LET demo_doc = (SELECT * FROM "+ks+".org_docs WHERE org_name='demo' LIMIT 1);\n" +
+                         "  LET existing = (SELECT * FROM "+ks+".org_users WHERE org_name='demo' AND user='benedict');\n" +
+                         "  SELECT contents_version FROM "+ks+".org_docs WHERE org_name='demo';\n" +
                          "  IF demo_doc.contents_version = 6 AND existing IS NULL THEN\n" +
-                         "    UPDATE ks.org_users SET permissions=777, members_version += 1 WHERE org_name='demo' AND user='benedict';\n" +
-                         "    UPDATE ks.user_docs SET title='README', permissions=644 WHERE user='benedict' AND doc_id=100;\n" +
-                         "    UPDATE ks.user_docs SET title='slides.key', permissions=777 WHERE user='benedict' AND doc_id=101;\n" +
+                         "    UPDATE "+ks+".org_users SET permissions=777, members_version += 1 WHERE org_name='demo' AND user='benedict';\n" +
+                         "    UPDATE "+ks+".user_docs SET title='README', permissions=644 WHERE user='benedict' AND doc_id=100;\n" +
+                         "    UPDATE "+ks+".user_docs SET title='slides.key', permissions=777 WHERE user='benedict' AND doc_id=101;\n" +
                          "  END IF\n" +
                          "COMMIT TRANSACTION";
         Object[][] result2 = CLUSTER.coordinator(1).execute(addUser, ConsistencyLevel.ANY);
@@ -522,6 +520,8 @@ public class AccordIntegrationTest extends TestBaseImpl
         awaitAsyncApply(cluster, Duration.ofSeconds(30));
     }
 
+    private static final Set<TxnId> IGNORE_AWAIT = new HashSet<>();
+
     @SuppressWarnings("UnstableApiUsage")
     public static void awaitAsyncApply(Cluster cluster, Duration deadline) throws TimeoutException
     {
@@ -532,12 +532,15 @@ public class AccordIntegrationTest extends TestBaseImpl
             {
                 SimpleQueryResult pending = inst.executeInternalWithResult("SELECT store_generation, store_index, txn_id, status FROM system_accord.commands WHERE status < ? ALLOW FILTERING", Status.Executed.ordinal());
                 pending = normalizeCommandsTable(pending);
+                if (!IGNORE_AWAIT.isEmpty())
+                    pending = ignoreAwait(pending);
                 logger.info("[node{}] Pending:\n{}", inst.config().num(), QueryResultUtil.expand(pending));
                 pending.reset();
                 if (!pending.hasNext())
                     break;
                 if (nanoTime() > deadlineNanos)
                 {
+                    IGNORE_AWAIT.add(pending.next().get("txn_id"));
                     pending.reset();
                     timeout.set(new TimeoutException("Timeout waiting on Accord Txn to complete; node" + inst.config().num() + " Pending:\n" + QueryResultUtil.expand(pending)));
                     break;
@@ -547,6 +550,11 @@ public class AccordIntegrationTest extends TestBaseImpl
         });
         if (timeout.get() != null)
             throw timeout.get();
+    }
+
+    private static SimpleQueryResult ignoreAwait(SimpleQueryResult pending)
+    {
+        return QueryResultUtil.filter(pending, "txn_id", (TxnId id) -> !IGNORE_AWAIT.contains(id));
     }
 
     private static SimpleQueryResult normalizeCommandsTable(SimpleQueryResult qr)
