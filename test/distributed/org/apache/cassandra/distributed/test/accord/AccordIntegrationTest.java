@@ -52,6 +52,7 @@ import org.apache.cassandra.distributed.Cluster;
 import org.apache.cassandra.distributed.api.ConsistencyLevel;
 import org.apache.cassandra.distributed.api.Feature;
 import org.apache.cassandra.distributed.api.IInstance;
+import org.apache.cassandra.distributed.api.IInvokableInstance;
 import org.apache.cassandra.distributed.api.IMessageFilters;
 import org.apache.cassandra.distributed.api.QueryResults;
 import org.apache.cassandra.distributed.api.SimpleQueryResult;
@@ -93,7 +94,7 @@ public class AccordIntegrationTest extends TestBaseImpl
     {
         if (cluster != null)
         {
-            cluster.forEach(i -> logger.info("[node{}] Commands:\n", i.config().num(), normalizeCommandsTable(i.executeInternalWithResult("SELECT * FROM system_accord.commands"))));
+            cluster.forEach(i -> logger.info("[node{}] Pending Commands:\n", i.config().num(), findPendingTxns(i)));
             cluster.close();
         }
     }
@@ -103,6 +104,7 @@ public class AccordIntegrationTest extends TestBaseImpl
     {
         cluster.filters().reset();
         cluster.stream().filter(IInstance::isShutdown).forEach(i -> i.startup(cluster));
+        logger.info("Checking to see if any pending txn exists");
         try
         {
             awaitAsyncApply(cluster, Duration.ofSeconds(10));
@@ -541,8 +543,7 @@ public class AccordIntegrationTest extends TestBaseImpl
         cluster.stream().filter(i -> !i.isShutdown()).forEach(inst -> {
             while (timeout.get() == null)
             {
-                SimpleQueryResult pending = inst.executeInternalWithResult("SELECT store_generation, store_index, txn_id, status FROM system_accord.commands WHERE status < ? ALLOW FILTERING", Status.Executed.ordinal());
-                pending = normalizeCommandsTable(pending);
+                SimpleQueryResult pending = findPendingTxns(inst);
                 if (!IGNORE_AWAIT.isEmpty())
                     pending = ignoreAwait(pending);
                 logger.info("[node{}] Pending:\n{}", inst.config().num(), QueryResultUtil.expand(pending));
@@ -561,6 +562,13 @@ public class AccordIntegrationTest extends TestBaseImpl
         });
         if (timeout.get() != null)
             throw timeout.get();
+    }
+
+    private static SimpleQueryResult findPendingTxns(IInvokableInstance inst)
+    {
+        SimpleQueryResult pending = inst.executeInternalWithResult("SELECT store_generation, store_index, txn_id, status FROM system_accord.commands WHERE status < ? ALLOW FILTERING", Status.Executed.ordinal());
+        pending = normalizeCommandsTable(pending);
+        return pending;
     }
 
     private static SimpleQueryResult ignoreAwait(SimpleQueryResult pending)
