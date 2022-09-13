@@ -91,7 +91,7 @@ public class TxnReferenceOperations
         return regulars.isEmpty() && statics.isEmpty();
     }
 
-    public static final IVersionedSerializer<TxnReferenceOperations> serializer = new IVersionedSerializer<>()
+    public static final IVersionedSerializer<TxnReferenceOperations> serializer = new IVersionedSerializer<TxnReferenceOperations>()
     {
         @Override
         public void serialize(TxnReferenceOperations operations, DataOutputPlus out, int version) throws IOException

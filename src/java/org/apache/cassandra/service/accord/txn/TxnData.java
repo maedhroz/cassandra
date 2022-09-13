@@ -73,7 +73,7 @@ public class TxnData implements Data, Result
         return 0;
     }
 
-    public static final IVersionedSerializer<TxnData> serializer = new IVersionedSerializer<>()
+    public static final IVersionedSerializer<TxnData> serializer = new IVersionedSerializer<TxnData>()
     {
         @Override
         public void serialize(TxnData data, DataOutputPlus out, int version) throws IOException

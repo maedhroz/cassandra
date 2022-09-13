@@ -121,7 +121,7 @@ public class CommandSerializers
         }
     }
 
-    public static final IVersionedSerializer<Txn> testTxn = new IVersionedSerializer<>()
+    public static final IVersionedSerializer<Txn> testTxn = new IVersionedSerializer<Txn>()
     {
         @Override
         public void serialize(Txn txn, DataOutputPlus out, int version) throws IOException
@@ -160,7 +160,7 @@ public class CommandSerializers
         }
     };
 
-    public static final IVersionedSerializer<Txn> cqlTxn = new IVersionedSerializer<>()
+    public static final IVersionedSerializer<Txn> cqlTxn = new IVersionedSerializer<Txn>()
     {
         @Override
         public void serialize(Txn txn, DataOutputPlus out, int version) throws IOException
@@ -201,7 +201,7 @@ public class CommandSerializers
 
     public static final IVersionedSerializer<Txn> txn = cqlTxn;
 
-    public static final IVersionedSerializer<Status> status = new IVersionedSerializer<>()
+    public static final IVersionedSerializer<Status> status = new IVersionedSerializer<Status>()
     {
         @Override
         public void serialize(Status status, DataOutputPlus out, int version) throws IOException

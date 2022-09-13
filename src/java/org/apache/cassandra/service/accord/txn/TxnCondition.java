@@ -123,7 +123,7 @@ public abstract class TxnCondition
             return true;
         }
 
-        private static final ConditionSerializer<None> serializer = new ConditionSerializer<>()
+        private static final ConditionSerializer<None> serializer = new ConditionSerializer<None>()
         {
             @Override
             public void serialize(None condition, DataOutputPlus out, int version) throws IOException {}
@@ -204,7 +204,7 @@ public abstract class TxnCondition
             }
         }
 
-        private static final ConditionSerializer<Exists> serializer = new ConditionSerializer<>()
+        private static final ConditionSerializer<Exists> serializer = new ConditionSerializer<Exists>()
         {
             @Override
             public void serialize(Exists condition, DataOutputPlus out, int version) throws IOException
@@ -299,7 +299,7 @@ public abstract class TxnCondition
             }
         }
 
-        private static final ConditionSerializer<Value> serializer = new ConditionSerializer<>()
+        private static final ConditionSerializer<Value> serializer = new ConditionSerializer<Value>()
         {
             @Override
             public void serialize(Value condition, DataOutputPlus out, int version) throws IOException
@@ -376,7 +376,7 @@ public abstract class TxnCondition
             }
         }
 
-        private static final ConditionSerializer<BooleanGroup> serializer = new ConditionSerializer<>()
+        private static final ConditionSerializer<BooleanGroup> serializer = new ConditionSerializer<BooleanGroup>()
         {
             @Override
             public void serialize(BooleanGroup condition, DataOutputPlus out, int version) throws IOException
@@ -398,7 +398,7 @@ public abstract class TxnCondition
         };
     }
 
-    public static final IVersionedSerializer<TxnCondition> serializer = new IVersionedSerializer<>()
+    public static final IVersionedSerializer<TxnCondition> serializer = new IVersionedSerializer<TxnCondition>()
     {
         private ConditionSerializer serializerFor(Kind kind)
         {

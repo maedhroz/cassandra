@@ -144,7 +144,7 @@ public class TxnRead extends AbstractKeySorted<TxnNamedRead> implements Read
         }
     }
 
-    public static final IVersionedSerializer<TxnRead> serializer = new IVersionedSerializer<>()
+    public static final IVersionedSerializer<TxnRead> serializer = new IVersionedSerializer<TxnRead>()
     {
         @Override
         public void serialize(TxnRead read, DataOutputPlus out, int version) throws IOException

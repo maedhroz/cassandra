@@ -43,6 +43,8 @@ import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.concurrent.Future;
 import org.apache.cassandra.utils.concurrent.UncheckedInterruptedException;
 
+import static org.apache.cassandra.utils.Clock.Global.currentTimeMillis;
+
 public class AccordService implements Shutdownable
 {
     public static final AccordService instance = new AccordService();
@@ -56,7 +58,7 @@ public class AccordService implements Shutdownable
 
     public static long uniqueNow()
     {
-        return TimeUnit.MILLISECONDS.toMicros(System.currentTimeMillis());
+        return TimeUnit.MILLISECONDS.toMicros(currentTimeMillis());
     }
 
     private AccordService()
@@ -92,7 +94,7 @@ public class AccordService implements Shutdownable
 
     public static long nowInMicros()
     {
-        return TimeUnit.MILLISECONDS.toMicros(System.currentTimeMillis());
+        return TimeUnit.MILLISECONDS.toMicros(currentTimeMillis());
     }
 
     public TxnData coordinate(Txn txn)

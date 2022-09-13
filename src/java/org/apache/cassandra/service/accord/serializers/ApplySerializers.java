@@ -29,7 +29,7 @@ import org.apache.cassandra.service.accord.txn.TxnData;
 
 public class ApplySerializers
 {
-    public static final IVersionedSerializer<Apply> request = new TxnRequestSerializer<>()
+    public static final IVersionedSerializer<Apply> request = new TxnRequestSerializer<Apply>()
     {
         @Override
         public void serializeBody(Apply apply, DataOutputPlus out, int version) throws IOException
@@ -69,7 +69,7 @@ public class ApplySerializers
         }
     };
 
-    public static final IVersionedSerializer<Apply.ApplyOk> reply = new IVersionedSerializer<>()
+    public static final IVersionedSerializer<Apply.ApplyOk> reply = new IVersionedSerializer<Apply.ApplyOk>()
     {
         @Override
         public void serialize(Apply.ApplyOk t, DataOutputPlus out, int version) throws IOException

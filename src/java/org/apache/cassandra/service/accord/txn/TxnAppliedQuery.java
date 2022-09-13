@@ -59,7 +59,7 @@ public class TxnAppliedQuery implements Query
             return SIZE;
         }
 
-        public static final IVersionedSerializer<Applied> serializer = new IVersionedSerializer<>()
+        public static final IVersionedSerializer<Applied> serializer = new IVersionedSerializer<Applied>()
         {
             @Override
             public void serialize(Applied applied, DataOutputPlus out, int version) throws IOException
@@ -127,7 +127,7 @@ public class TxnAppliedQuery implements Query
         return condition.applies((TxnData) data) ? Applied.TRUE : Applied.FALSE;
     }
 
-    public static final IVersionedSerializer<TxnAppliedQuery> serializer = new IVersionedSerializer<>()
+    public static final IVersionedSerializer<TxnAppliedQuery> serializer = new IVersionedSerializer<TxnAppliedQuery>()
     {
         @Override
         public void serialize(TxnAppliedQuery query, DataOutputPlus out, int version) throws IOException
