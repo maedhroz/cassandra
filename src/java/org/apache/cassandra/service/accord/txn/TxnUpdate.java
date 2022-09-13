@@ -124,7 +124,7 @@ public class TxnUpdate implements Update
         return new TxnWrite(updates);
     }
 
-    public static final IVersionedSerializer<TxnUpdate> serializer = new IVersionedSerializer<>()
+    public static final IVersionedSerializer<TxnUpdate> serializer = new IVersionedSerializer<TxnUpdate>()
     {
         @Override
         public void serialize(TxnUpdate update, DataOutputPlus out, int version) throws IOException

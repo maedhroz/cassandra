@@ -66,7 +66,7 @@ public abstract class TxnQuery implements Query
         return SIZE;
     }
 
-    public static final IVersionedSerializer<TxnQuery> serializer = new IVersionedSerializer<>()
+    public static final IVersionedSerializer<TxnQuery> serializer = new IVersionedSerializer<TxnQuery>()
     {
         @Override
         public void serialize(TxnQuery query, DataOutputPlus out, int version) throws IOException

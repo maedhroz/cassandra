@@ -163,7 +163,7 @@ public class SerializationUtils
         }
     };
 
-    public static final IVersionedSerializer<SinglePartitionReadCommand> singlePartitionReadCommandSerializer = new IVersionedSerializer<>()
+    public static final IVersionedSerializer<SinglePartitionReadCommand> singlePartitionReadCommandSerializer = new IVersionedSerializer<SinglePartitionReadCommand>()
     {
         @Override
         public void serialize(SinglePartitionReadCommand command, DataOutputPlus out, int version) throws IOException
@@ -184,7 +184,7 @@ public class SerializationUtils
         }
     };
 
-    public static final IVersionedSerializer<FilteredPartition> filteredPartitionSerializer = new IVersionedSerializer<>()
+    public static final IVersionedSerializer<FilteredPartition> filteredPartitionSerializer = new IVersionedSerializer<FilteredPartition>()
     {
         @Override
         public void serialize(FilteredPartition partition, DataOutputPlus out, int version) throws IOException

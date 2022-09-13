@@ -143,7 +143,7 @@ public class ValueReference
         return row != null ? getCell(row) : null;
     }
 
-    public static final IVersionedSerializer<ValueReference> serializer = new IVersionedSerializer<>()
+    public static final IVersionedSerializer<ValueReference> serializer = new IVersionedSerializer<ValueReference>()
     {
         @Override
         public void serialize(ValueReference reference, DataOutputPlus out, int version) throws IOException

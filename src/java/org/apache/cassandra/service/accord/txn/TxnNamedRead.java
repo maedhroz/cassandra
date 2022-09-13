@@ -138,7 +138,7 @@ public class TxnNamedRead extends AbstractSerialized<SinglePartitionReadCommand>
         return future;
     }
 
-    public static final IVersionedSerializer<TxnNamedRead> serializer = new IVersionedSerializer<>()
+    public static final IVersionedSerializer<TxnNamedRead> serializer = new IVersionedSerializer<TxnNamedRead>()
     {
         @Override
         public void serialize(TxnNamedRead read, DataOutputPlus out, int version) throws IOException

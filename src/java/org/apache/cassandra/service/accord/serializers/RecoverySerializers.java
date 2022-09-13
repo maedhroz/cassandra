@@ -40,7 +40,7 @@ import org.apache.cassandra.service.accord.txn.TxnData;
 
 public class RecoverySerializers
 {
-    public static final IVersionedSerializer<BeginRecovery> request = new TxnRequestSerializer<>()
+    public static final IVersionedSerializer<BeginRecovery> request = new TxnRequestSerializer<BeginRecovery>()
     {
         @Override
         public void serializeBody(BeginRecovery recover, DataOutputPlus out, int version) throws IOException

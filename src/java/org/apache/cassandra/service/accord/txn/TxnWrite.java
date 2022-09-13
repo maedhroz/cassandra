@@ -134,7 +134,7 @@ public class TxnWrite extends AbstractKeySorted<TxnWrite.Update> implements Writ
             return partitionUpdateSerializer;
         }
 
-        public static final IVersionedSerializer<Update> serializer = new IVersionedSerializer<>()
+        public static final IVersionedSerializer<Update> serializer = new IVersionedSerializer<Update>()
         {
             @Override
             public void serialize(Update write, DataOutputPlus out, int version) throws IOException
@@ -283,7 +283,7 @@ public class TxnWrite extends AbstractKeySorted<TxnWrite.Update> implements Writ
             return new Update(key, index, updateBuilder.build());
         }
 
-        public static final IVersionedSerializer<Fragment> serializer = new IVersionedSerializer<>()
+        public static final IVersionedSerializer<Fragment> serializer = new IVersionedSerializer<Fragment>()
         {
             @Override
             public void serialize(Fragment fragment, DataOutputPlus out, int version) throws IOException
@@ -373,7 +373,7 @@ public class TxnWrite extends AbstractKeySorted<TxnWrite.Update> implements Writ
         return size;
     }
 
-    public static final IVersionedSerializer<TxnWrite> serializer = new IVersionedSerializer<>()
+    public static final IVersionedSerializer<TxnWrite> serializer = new IVersionedSerializer<TxnWrite>()
     {
         @Override
         public void serialize(TxnWrite write, DataOutputPlus out, int version) throws IOException

@@ -173,7 +173,7 @@ public abstract class TxnReferenceValue
             return reference.getCell(data).buffer();
         }
 
-        static final Serializer<Substitution> serializer = new Serializer<>()
+        static final Serializer<Substitution> serializer = new Serializer<Substitution>()
         {
             @Override
             public void serialize(Substitution substitution, DataOutputPlus out, int version) throws IOException
@@ -325,7 +325,7 @@ public abstract class TxnReferenceValue
         public static final Serializer<Subtraction> serializer = new BiValueSerializer<>(Subtraction::new);
     }
 
-    public static final IVersionedSerializer<TxnReferenceValue> serializer = new IVersionedSerializer<>()
+    public static final IVersionedSerializer<TxnReferenceValue> serializer = new IVersionedSerializer<TxnReferenceValue>()
     {
         @Override
         public void serialize(TxnReferenceValue value, DataOutputPlus out, int version) throws IOException

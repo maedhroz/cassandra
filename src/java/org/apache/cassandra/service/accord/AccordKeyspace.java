@@ -108,6 +108,7 @@ import static org.apache.cassandra.db.rows.BufferCell.*;
 import static org.apache.cassandra.schema.SchemaConstants.ACCORD_KEYSPACE_NAME;
 import static org.apache.cassandra.utils.ByteBufferUtil.EMPTY_BYTE_BUFFER;
 import static org.apache.cassandra.utils.ByteBufferUtil.bytes;
+import static org.apache.cassandra.utils.Clock.Global.currentTimeMillis;
 
 public class AccordKeyspace
 {
@@ -765,7 +766,7 @@ public class AccordKeyspace
     {
         Preconditions.checkArgument(!cfk.isLoaded());
         ((AccordCommandStore) cfk.commandStore()).checkNotInStoreThread();
-        long timestampMicros = TimeUnit.MILLISECONDS.toMicros(System.currentTimeMillis());
+        long timestampMicros = TimeUnit.MILLISECONDS.toMicros(currentTimeMillis());
         int nowInSeconds = (int) TimeUnit.MICROSECONDS.toSeconds(timestampMicros);
 
         SinglePartitionReadCommand command = getCommandsForKeyRead(cfk.commandStore(), cfk.key(), nowInSeconds);
