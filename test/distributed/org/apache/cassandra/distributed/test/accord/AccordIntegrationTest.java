@@ -29,18 +29,17 @@ import java.util.stream.Collectors;
 import java.util.stream.StreamSupport;
 
 import com.google.common.base.Splitter;
+import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.Uninterruptibles;
 
-import accord.coordinate.Preempted;
 import org.assertj.core.api.Assertions;
-import org.assertj.core.util.Throwables;
 import org.awaitility.Awaitility;
 import org.junit.Test;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import accord.coordinate.Preempted;
 import accord.local.Status;
 import accord.messages.Commit;
 import accord.primitives.Keys;
@@ -69,6 +68,7 @@ import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
+
 import static org.apache.cassandra.utils.Clock.Global.nanoTime;
 
 //TODO there are too many new clusters, this will cause Metaspace issues.  Once Schema and topology are integrated, can switch
@@ -331,10 +331,12 @@ public class AccordIntegrationTest extends TestBaseImpl
             Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY);
             assertEquals(3, result[0][0]);
 
-            awaitAsyncApply(cluster);
+            String check = "BEGIN TRANSACTION\n" +
+                           "  SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0;\n" +
+                           "COMMIT TRANSACTION";
 
-            // TODO: We should be able to just perform a read-only txn without waiting for APPLY explicitly.
-            assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0", 0, 0, 1);
+            // TODO: Retry on preemption may become unnecessary after the Unified Log is integrated.
+            assertRowEqualsWithPreemptedRetry(cluster, check, new Object[] {0, 0, 1});
         });
     }
 
@@ -363,10 +365,12 @@ public class AccordIntegrationTest extends TestBaseImpl
             Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY);
             assertEquals(3, result[0][0]);
 
-            awaitAsyncApply(cluster);
+            String check = "BEGIN TRANSACTION\n" +
+                           "  SELECT * FROM " + keyspace + ".tbl1 WHERE k=1 AND c=2;\n" +
+                           "COMMIT TRANSACTION";
 
-            // TODO: We should be able to just perform a read-only txn without waiting for APPLY explicitly.
-            assertRow(cluster, "SELECT * FROM " + keyspace + ".tbl1 WHERE k=1 AND c=2", 1, 2, 4);
+            // TODO: Retry on preemption may become unnecessary after the Unified Log is integrated.
+            assertRowEqualsWithPreemptedRetry(cluster, check, new Object[] {1, 2, 4});
         }
     }
 
