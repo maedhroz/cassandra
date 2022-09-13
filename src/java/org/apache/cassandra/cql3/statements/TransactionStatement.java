@@ -54,8 +54,8 @@ import static org.apache.cassandra.cql3.statements.RequestValidations.*;
 public class TransactionStatement implements CQLStatement
 {
     public static final String DUPLICATE_TUPLE_NAME_MESSAGE = "The name '%s' has already been used by a LET assignment.";
-    public static final String INCOMPLETE_PRIMARY_KEY_MESSAGE = "SELECTs in LET assignments without a LIMIT must specify all primary key elements.";
-    public static final String INVALID_LIMIT_MESSAGE = "LIMIT must be 1 for SELECTs in LET assignments.";
+    public static final String INCOMPLETE_PRIMARY_KEY_LET_MESSAGE = "SELECT in LET assignment without LIMIT 1 must specify all primary key elements.";
+    public static final String INCOMPLETE_PRIMARY_KEY_SELECT_MESSAGE = "Normal SELECT without LIMIT 1 must specify all primary key elements.";
     public static final String NO_CONDITIONS_IN_UPDATES_MESSAGE = "Updates within transactions may not specify their own conditions.";
     public static final String NO_TIMESTAMPS_IN_UPDATES_MESSAGE = "Updates within transactions may not specify custom timestamps.";
     public static final String EMPTY_TRANSACTION_MESSAGE = "Transaction contains no reads or writes";
@@ -114,7 +114,11 @@ public class TransactionStatement implements CQLStatement
     {
         SelectStatement select = namedSelect.select;
         ReadQuery readQuery = select.getQuery(options, 0);
+
+        // We reject reads from both LET and SELECT that do not specify a single row.
+        @SuppressWarnings("unchecked") 
         SinglePartitionReadQuery.Group<SinglePartitionReadCommand> selectQuery = (SinglePartitionReadQuery.Group<SinglePartitionReadCommand>) readQuery;
+
         return new TxnNamedRead(namedSelect.name, Iterables.getOnlyElement(selectQuery.queries));
     }
 
@@ -340,18 +344,12 @@ public class TransactionStatement implements CQLStatement
                 checkTrue(selectNames.add(name), DUPLICATE_TUPLE_NAME_MESSAGE, name);
                 checkFalse(name.equals("returning"), "Assignments may not use the name \"returning\"");
 
-                SelectStatement preparedSelect = select.prepare(bindVariables);
+                SelectStatement prepared = select.prepare(bindVariables);
+                checkAtMostOneRowSpecified(prepared, INCOMPLETE_PRIMARY_KEY_LET_MESSAGE);
 
-                int limit = preparedSelect.getLimit(QueryOptions.DEFAULT);
-
-                if (limit == DataLimits.NO_LIMIT)
-                    checkTrue(preparedSelect.getRestrictions().hasAllPKColumnsRestrictedByEqualities(), INCOMPLETE_PRIMARY_KEY_MESSAGE);
-                else
-                    checkTrue(limit == 1, INVALID_LIMIT_MESSAGE);
-
-                NamedSelect namedSelect = new NamedSelect(name, preparedSelect);
+                NamedSelect namedSelect = new NamedSelect(name, prepared);
                 preparedAssignments.add(namedSelect);
-                refSources.put(name, new SelectReferenceSource(preparedSelect));
+                refSources.put(name, new SelectReferenceSource(prepared));
             }
 
             if (columnReferences != null)
@@ -361,9 +359,13 @@ public class TransactionStatement implements CQLStatement
             }
 
             NamedSelect returningSelect = null;
-
             if (select != null)
-                returningSelect = new NamedSelect("returning", select.prepare(bindVariables));
+            {
+                SelectStatement prepared = select.prepare(bindVariables);
+                // TODO: Accord saves the result of this read, so limit to a single row until that is no longer true. 
+                checkAtMostOneRowSpecified(prepared, INCOMPLETE_PRIMARY_KEY_SELECT_MESSAGE);
+                returningSelect = new NamedSelect("returning", prepared);
+            }
 
             List<ColumnReference> returningReferences = null;
             if (returning != null)
@@ -402,6 +404,16 @@ public class TransactionStatement implements CQLStatement
                 preparedConditions.add(condition.prepare("[txn]", bindVariables));
 
             return new TransactionStatement(preparedAssignments, returningSelect, returningReferences, preparedUpdates, preparedConditions);
+        }
+
+        private void checkAtMostOneRowSpecified(SelectStatement prepared, String failureMessage)
+        {
+            int limit = prepared.getLimit(QueryOptions.DEFAULT);
+
+            if (limit == DataLimits.NO_LIMIT)
+                checkTrue(prepared.getRestrictions().hasAllPKColumnsRestrictedByEqualities(), failureMessage);
+            else
+                checkTrue(limit == 1, failureMessage);
         }
     }
 }

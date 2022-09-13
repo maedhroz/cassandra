@@ -158,7 +158,7 @@ public class TransactionStatementTest
     }
 
     @Test
-    public void shouldRejectIllegalLimit()
+    public void shouldRejectIllegalLimitInLet()
     {
         String query = "BEGIN TRANSACTION\n" +
                        "  LET row1 = (SELECT * FROM ks.tbl1 WHERE k=1 LIMIT 2);\n" +
@@ -169,11 +169,11 @@ public class TransactionStatementTest
 
         Assertions.assertThatThrownBy(() -> parsed.prepare(ClientState.forInternalCalls()))
                   .isInstanceOf(InvalidRequestException.class)
-                  .hasMessageContaining(INVALID_LIMIT_MESSAGE);
+                  .hasMessageContaining(INCOMPLETE_PRIMARY_KEY_LET_MESSAGE);
     }
 
     @Test
-    public void shouldRejectIncompletePrimaryKey()
+    public void shouldRejectIncompletePrimaryKeyInLet()
     {
         String query = "BEGIN TRANSACTION\n" +
                        "  LET row1 = (SELECT * FROM ks.tbl1 WHERE k=1);\n" +
@@ -184,7 +184,35 @@ public class TransactionStatementTest
 
         Assertions.assertThatThrownBy(() -> parsed.prepare(ClientState.forInternalCalls()))
                   .isInstanceOf(InvalidRequestException.class)
-                  .hasMessageContaining(INCOMPLETE_PRIMARY_KEY_MESSAGE);
+                  .hasMessageContaining(INCOMPLETE_PRIMARY_KEY_LET_MESSAGE);
+    }
+
+    @Test
+    public void shouldRejectIllegalLimitInSelect()
+    {
+        String query = "BEGIN TRANSACTION\n" +
+                       "  SELECT * FROM ks.tbl1 WHERE k=1 LIMIT 2;\n" +
+                       "COMMIT TRANSACTION";
+
+        TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(query);
+
+        Assertions.assertThatThrownBy(() -> parsed.prepare(ClientState.forInternalCalls()))
+                  .isInstanceOf(InvalidRequestException.class)
+                  .hasMessageContaining(INCOMPLETE_PRIMARY_KEY_SELECT_MESSAGE);
+    }
+
+    @Test
+    public void shouldRejectIncompletePrimaryKeyInSelect()
+    {
+        String query = "BEGIN TRANSACTION\n" +
+                       "  SELECT * FROM ks.tbl1 WHERE k=1;\n" +
+                       "COMMIT TRANSACTION";
+
+        TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(query);
+
+        Assertions.assertThatThrownBy(() -> parsed.prepare(ClientState.forInternalCalls()))
+                  .isInstanceOf(InvalidRequestException.class)
+                  .hasMessageContaining(INCOMPLETE_PRIMARY_KEY_SELECT_MESSAGE);
     }
 
     @Test
