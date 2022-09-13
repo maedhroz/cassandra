@@ -78,17 +78,27 @@ public class TransactionStatement implements CQLStatement
     private final List<ModificationStatement> updates;
     private final List<ConditionStatement> conditions;
 
+    private final VariableSpecifications bindVariables;
+
     public TransactionStatement(List<NamedSelect> assignments,
                                 NamedSelect returningSelect,
                                 List<ColumnReference> returningReferences,
                                 List<ModificationStatement> updates,
-                                List<ConditionStatement> conditions)
+                                List<ConditionStatement> conditions,
+                                VariableSpecifications bindVariables)
     {
         this.assignments = assignments;
         this.returningSelect = returningSelect;
         this.returningReferences = returningReferences;
         this.updates = updates;
         this.conditions = conditions;
+        this.bindVariables = bindVariables;
+    }
+
+    @Override
+    public List<ColumnSpecification> getBindVariables()
+    {
+        return bindVariables.getBindVariables();
     }
 
     @Override
@@ -327,7 +337,6 @@ public class TransactionStatement implements CQLStatement
         @Override
         public CQLStatement prepare(ClientState state)
         {
-            checkTrue(bindVariables.isEmpty(), "TODO: support bound variables");
             checkFalse(updates.isEmpty() && returning == null && select == null, EMPTY_TRANSACTION_MESSAGE);
 
             if (select != null || returning != null)
@@ -401,9 +410,10 @@ public class TransactionStatement implements CQLStatement
 
             List<ConditionStatement> preparedConditions = new ArrayList<>(conditions.size());
             for (ConditionStatement.Raw condition : conditions)
-                preparedConditions.add(condition.prepare("[txn]", bindVariables));
+                // TODO: Bind variable support for IF statements
+                preparedConditions.add(condition.prepare("[txn]", VariableSpecifications.empty()));
 
-            return new TransactionStatement(preparedAssignments, returningSelect, returningReferences, preparedUpdates, preparedConditions);
+            return new TransactionStatement(preparedAssignments, returningSelect, returningReferences, preparedUpdates, preparedConditions, bindVariables);
         }
 
         private void checkAtMostOneRowSpecified(SelectStatement prepared, String failureMessage)

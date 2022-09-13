@@ -117,14 +117,14 @@ public class AccordIntegrationTest extends TestBaseImpl
             cluster.coordinator(1).execute("INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (1, 0, 3);", ConsistencyLevel.ALL);
 
             String query = "BEGIN TRANSACTION\n" +
-                           "  LET row1 = (SELECT v FROM " + keyspace + ".tbl WHERE k=0 AND c=0);\n" +
-                           "  LET row2 = (SELECT v FROM " + keyspace + ".tbl WHERE k=1 AND c=0);\n" +
-                           "  SELECT v FROM " + keyspace + ".tbl WHERE k=1 AND c=0;\n" +
+                           "  LET row1 = (SELECT v FROM " + keyspace + ".tbl WHERE k=? AND c=?);\n" +
+                           "  LET row2 = (SELECT v FROM " + keyspace + ".tbl WHERE k=? AND c=?);\n" +
+                           "  SELECT v FROM " + keyspace + ".tbl WHERE k=? AND c=?;\n" +
                            "  IF row1 IS NULL AND row2.v = 3 THEN\n" +
-                           "    INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (0, 0, 1);\n" +
+                           "    INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (?, ?, ?);\n" +
                            "  END IF\n" +
                            "COMMIT TRANSACTION";
-            Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY);
+            Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY, 0, 0, 1, 0, 1, 0, 0, 0, 1);
             assertEquals(3, result[0][0]);
 
             String check = "BEGIN TRANSACTION\n" +
@@ -132,7 +132,7 @@ public class AccordIntegrationTest extends TestBaseImpl
                            "COMMIT TRANSACTION";
 
             // TODO: Retry on preemption may become unnecessary after the Unified Log is integrated.
-            assertRowEqualsWithPreemptedRetry(cluster, check, new Object[] { 0, 0, 1 });
+            assertRowEqualsWithPreemptedRetry(cluster, new Object[] { 0, 0, 1 }, check);
         });
     }
 
@@ -300,17 +300,17 @@ public class AccordIntegrationTest extends TestBaseImpl
     {
         test(cluster -> {
             String query = "BEGIN TRANSACTION\n" +
-                           "  INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (0, 0, 1);\n" +
+                           "  INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (?, ?, ?);\n" +
                            "COMMIT TRANSACTION";
-            SimpleQueryResult result = cluster.coordinator(1).executeWithResult(query, ConsistencyLevel.ANY);
+            SimpleQueryResult result = cluster.coordinator(1).executeWithResult(query, ConsistencyLevel.ANY, 0, 0, 1);
             assertFalse(result.hasNext());
 
             String check = "BEGIN TRANSACTION\n" +
-                           "  SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0;\n" +
+                           "  SELECT * FROM " + keyspace + ".tbl WHERE k=? AND c=?;\n" +
                            "COMMIT TRANSACTION";
 
             // TODO: Retry on preemption may become unnecessary after the Unified Log is integrated.
-            assertRowEqualsWithPreemptedRetry(cluster, check, new Object[] {0, 0, 1});
+            assertRowEqualsWithPreemptedRetry(cluster, new Object[] {0, 0, 1}, check, 0, 0);
         });
     }
 
@@ -336,7 +336,7 @@ public class AccordIntegrationTest extends TestBaseImpl
                            "COMMIT TRANSACTION";
 
             // TODO: Retry on preemption may become unnecessary after the Unified Log is integrated.
-            assertRowEqualsWithPreemptedRetry(cluster, check, new Object[] {0, 0, 1});
+            assertRowEqualsWithPreemptedRetry(cluster, new Object[] {0, 0, 1}, check);
         });
     }
 
@@ -370,7 +370,7 @@ public class AccordIntegrationTest extends TestBaseImpl
                            "COMMIT TRANSACTION";
 
             // TODO: Retry on preemption may become unnecessary after the Unified Log is integrated.
-            assertRowEqualsWithPreemptedRetry(cluster, check, new Object[] {1, 2, 4});
+            assertRowEqualsWithPreemptedRetry(cluster, new Object[] {1, 2, 4}, check);
         }
     }
 
@@ -389,11 +389,11 @@ public class AccordIntegrationTest extends TestBaseImpl
             cluster.coordinator(1).execute("INSERT INTO " + keyspace + ".tbl2 (k, c, v) VALUES (2, 2, 4);", ConsistencyLevel.ALL);
 
             String query = "BEGIN TRANSACTION\n" +
-                           "  SELECT v FROM " + keyspace + ".tbl1 WHERE k=1 AND c=2;\n" +
-                           "  UPDATE " + keyspace + ".tbl1 SET v += 5 WHERE k=1 AND c=2;\n" +
-                           "  UPDATE " + keyspace + ".tbl2 SET v -= 2 WHERE k=2 AND c=2;\n" +
+                           "  SELECT v FROM " + keyspace + ".tbl1 WHERE k=? AND c=?;\n" +
+                           "  UPDATE " + keyspace + ".tbl1 SET v += 5 WHERE k=? AND c=?;\n" +
+                           "  UPDATE " + keyspace + ".tbl2 SET v -= 2 WHERE k=? AND c=?;\n" +
                            "COMMIT TRANSACTION";
-            Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY);
+            Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY, 1, 2, 1, 2, 2, 2);
             assertEquals(3, result[0][0]);
 
             awaitAsyncApply(cluster);
@@ -507,18 +507,18 @@ public class AccordIntegrationTest extends TestBaseImpl
         }
     }
 
-    private static void assertRowEqualsWithPreemptedRetry(Cluster cluster, String check, Object[] row)
+    private static void assertRowEqualsWithPreemptedRetry(Cluster cluster, Object[] row, String check, Object... boundValues)
     {
         try
         {
-            Object[][] checkResult = cluster.coordinator(1).execute(check, ConsistencyLevel.ANY);
+            Object[][] checkResult = cluster.coordinator(1).execute(check, ConsistencyLevel.ANY, boundValues);
             assertArrayEquals(new Object[]{ row }, checkResult);
         }
         catch (Throwable t)
         {
             if (Throwables.getRootCause(t).toString().contains(Preempted.class.getName()))
             {
-                Object[][] checkResult = cluster.coordinator(1).execute(check, ConsistencyLevel.ANY);
+                Object[][] checkResult = cluster.coordinator(1).execute(check, ConsistencyLevel.ANY, boundValues);
                 assertArrayEquals(new Object[]{ row }, checkResult);
             }
             else
