@@ -331,7 +331,7 @@ public class TransactionStatementTest
                                  .withRead("row2", "SELECT * FROM ks.tbl2 WHERE k=2 AND c=2")
                                  .withRead("returning", "SELECT v FROM ks.tbl1 WHERE k=2 AND c=2")
                                  .withWrite("UPDATE ks.tbl1 SET v=1 WHERE k=1 AND c=2")
-                                 .withExistsCondition("row1", 0, null)
+                                 .withIsNotNullCondition("row1", 0, null)
                                  .withEqualsCondition("row1", 0, "ks.tbl1.v", bytes(3))
                                  .withEqualsCondition("row2", 0, "ks.tbl2.v", bytes(4))
                                  .build();
@@ -360,7 +360,7 @@ public class TransactionStatementTest
                                  .withRead("row1", "SELECT * FROM ks.tbl1 WHERE k=1 AND c=2")
                                  .withRead("row2", "SELECT * FROM ks.tbl2 WHERE k=2 AND c=2")
                                  .withWrite("UPDATE ks.tbl1 SET v=1 WHERE k=1 AND c=2")
-                                 .withExistsCondition("row1", 0, null)
+                                 .withIsNotNullCondition("row1", 0, null)
                                  .withEqualsCondition("row1", 0, "ks.tbl1.v", bytes(3))
                                  .withEqualsCondition("row2", 0, "ks.tbl2.v", bytes(4))
                                  .build();

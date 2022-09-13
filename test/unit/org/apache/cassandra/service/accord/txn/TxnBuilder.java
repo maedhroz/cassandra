@@ -123,19 +123,19 @@ public class TxnBuilder
         return withValueCondition(name, index, column, TxnCondition.Kind.EQUAL, value);
     }
 
-    private TxnBuilder withExistsCondition(String name, int index, String column, TxnCondition.Kind kind)
+    private TxnBuilder withExistenceCondition(String name, int index, String column, TxnCondition.Kind kind)
     {
         return withCondition(new TxnCondition.Exists(reference(name, index, column), kind));
     }
 
-    public TxnBuilder withExistsCondition(String name, int index, String column)
+    public TxnBuilder withIsNotNullCondition(String name, int index, String column)
     {
-        return withExistsCondition(name, index, column, TxnCondition.Kind.IS_NOT_NULL);
+        return withExistenceCondition(name, index, column, TxnCondition.Kind.IS_NOT_NULL);
     }
 
-    public TxnBuilder withNotExistsCondition(String name, int index, String column)
+    public TxnBuilder withIsNullCondition(String name, int index, String column)
     {
-        return withExistsCondition(name, index, column, TxnCondition.Kind.IS_NULL);
+        return withExistenceCondition(name, index, column, TxnCondition.Kind.IS_NULL);
     }
 
     Keys toKeys(SortedSet<Key> keySet)
