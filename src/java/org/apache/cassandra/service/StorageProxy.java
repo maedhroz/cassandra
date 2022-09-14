@@ -46,7 +46,6 @@ import com.google.common.util.concurrent.Uninterruptibles;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import accord.txn.Txn;
 import org.apache.cassandra.batchlog.Batch;
 import org.apache.cassandra.batchlog.BatchlogManager;
 import org.apache.cassandra.concurrent.DebuggableTask.RunnableDebuggableTask;
@@ -2313,11 +2312,6 @@ public class StorageProxy implements StorageProxyMBean
             logger.debug("Schemas are in agreement.");
 
         return results;
-    }
-
-    public TxnData txn(Txn txn)
-    {
-        return AccordService.instance.coordinate(txn);
     }
 
     public boolean getHintedHandoffEnabled()

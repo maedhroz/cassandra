@@ -17,17 +17,24 @@
  */
 package org.apache.cassandra.cql3;
 
+import java.util.Collections;
+
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import org.apache.cassandra.SchemaLoader;
 import org.apache.cassandra.config.CassandraRelevantProperties;
+import org.apache.cassandra.locator.TokenMetadata;
+import org.apache.cassandra.service.StorageService;
+import org.apache.cassandra.service.accord.AccordService;
+
+import static org.junit.Assert.assertEquals;
 
 import static org.apache.cassandra.db.ConsistencyLevel.NODE_LOCAL;
 import static org.apache.cassandra.metrics.ClientRequestsMetricsHolder.readMetrics;
 import static org.apache.cassandra.metrics.ClientRequestsMetricsHolder.readMetricsForLevel;
 import static org.apache.cassandra.metrics.ClientRequestsMetricsHolder.writeMetrics;
 import static org.apache.cassandra.metrics.ClientRequestsMetricsHolder.writeMetricsForLevel;
-import static org.junit.Assert.assertEquals;
 
 public class NodeLocalConsistencyTest extends CQLTester
 {
@@ -35,6 +42,11 @@ public class NodeLocalConsistencyTest extends CQLTester
     public static void setUp() throws Exception
     {
         CassandraRelevantProperties.ENABLE_NODELOCAL_QUERIES.setBoolean(true);
+
+        SchemaLoader.startGossiper();
+        TokenMetadata tmd = StorageService.instance.getTokenMetadata();
+        tmd.clearUnsafe();
+        StorageService.instance.setTokens(Collections.singleton(tmd.partitioner.getRandomToken()));
     }
 
     @Test
@@ -86,5 +98,21 @@ public class NodeLocalConsistencyTest extends CQLTester
 
         assertEquals(1, afterLevel - beforeLevel);
         assertEquals(1, afterGlobal - beforeGlobal);
+    }
+
+    @Test
+    public void testTransaction()
+    {
+        createTable("CREATE TABLE %s (key text, val int, PRIMARY KEY(key))");
+        QueryProcessor.process(formatQuery("INSERT INTO %s (key, val) VALUES ('foo', 0)"), NODE_LOCAL);
+
+        AccordService.instance.createEpochFromConfigUnsafe();
+
+        String query = "BEGIN TRANSACTION\n" +
+                       "  SELECT * FROM %s WHERE key = 'foo';\n" +
+                       "COMMIT TRANSACTION";
+
+        UntypedResultSet rows = QueryProcessor.process(formatQuery(query), NODE_LOCAL);
+        assertEquals(1, rows.size());
     }
 }
