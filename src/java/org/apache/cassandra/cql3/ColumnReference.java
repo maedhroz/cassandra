@@ -105,6 +105,11 @@ public class ColumnReference implements Term
         return new ValueReference(selectName, bindRowIndex(options), column, bindCellPath(options));
     }
 
+    public ColumnIdentifier getFullyQualifiedName()
+    {
+        return new ColumnIdentifier(selectName + '.' + column.name.toString(), true);
+    }
+
     public static class Raw extends Term.Raw
     {
         private static final ColumnSpecification TEXT_TERM = new ColumnSpecification(null, null, null, UTF8Type.instance);

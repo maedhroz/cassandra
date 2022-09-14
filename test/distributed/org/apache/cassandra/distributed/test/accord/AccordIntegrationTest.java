@@ -30,6 +30,7 @@ import java.util.stream.StreamSupport;
 
 import com.google.common.base.Splitter;
 import com.google.common.base.Throwables;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.Uninterruptibles;
 
@@ -51,8 +52,8 @@ import org.apache.cassandra.distributed.api.ConsistencyLevel;
 import org.apache.cassandra.distributed.api.Feature;
 import org.apache.cassandra.distributed.api.IMessageFilters;
 import org.apache.cassandra.distributed.api.QueryResults;
-import org.apache.cassandra.distributed.shared.AssertUtils;
 import org.apache.cassandra.distributed.api.SimpleQueryResult;
+import org.apache.cassandra.distributed.shared.AssertUtils;
 import org.apache.cassandra.distributed.impl.Instance;
 import org.apache.cassandra.distributed.test.TestBaseImpl;
 import org.apache.cassandra.distributed.util.QueryResultUtil;
@@ -69,6 +70,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 
+import static org.apache.cassandra.distributed.util.QueryResultUtil.assertThat;
 import static org.apache.cassandra.utils.Clock.Global.nanoTime;
 
 //TODO there are too many new clusters, this will cause Metaspace issues.  Once Schema and topology are integrated, can switch
@@ -321,15 +323,16 @@ public class AccordIntegrationTest extends TestBaseImpl
             cluster.coordinator(1).execute("INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (1, 0, 3);", ConsistencyLevel.ALL);
 
             String query = "BEGIN TRANSACTION\n" +
-                    "  LET row1 = (SELECT * FROM " + keyspace + ".tbl WHERE k = ? AND c = ?);\n" +
-                    "  LET row2 = (SELECT * FROM " + keyspace + ".tbl WHERE k = ? AND c = ?);\n" +
-                    "  SELECT row2.v;\n" +
-                    "  IF row1 IS NULL AND row2.v = ? THEN\n" +
-                    "    INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (?, ?, ?);\n" +
-                    "  END IF\n" +
-                    "COMMIT TRANSACTION";
-            Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY, 0, 0, 1, 0, 3, 0, 0, 1);
-            assertEquals(3, result[0][0]);
+                           "  LET row1 = (SELECT * FROM " + keyspace + ".tbl WHERE k = ? AND c = ?);\n" +
+                           "  LET row2 = (SELECT * FROM " + keyspace + ".tbl WHERE k = ? AND c = ?);\n" +
+                           "  SELECT row1.v, row2.v;\n" +
+                           "  IF row1 IS NULL AND row2.v = ? THEN\n" +
+                           "    INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (?, ?, ?);\n" +
+                           "  END IF\n" +
+                           "COMMIT TRANSACTION";
+            SimpleQueryResult result = cluster.coordinator(1).executeWithResult(query, ConsistencyLevel.ANY, 0, 0, 1, 0, 3, 0, 0, 1);
+            assertEquals(ImmutableList.of("row1.v", "row2.v"), result.names());
+            assertThat(result).hasSize(1).contains(null, 3);
 
             String check = "BEGIN TRANSACTION\n" +
                            "  SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0;\n" +

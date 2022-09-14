@@ -59,14 +59,21 @@ import org.apache.cassandra.service.accord.txn.TxnReferenceValue.Subtraction;
 import org.apache.cassandra.service.accord.txn.ValueReference;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
+import static org.junit.Assert.assertEquals;
+
 import static org.apache.cassandra.cql3.ColumnReference.CANNOT_FIND_TUPLE_MESSAGE;
 import static org.apache.cassandra.cql3.ColumnReference.COLUMN_NOT_IN_TUPLE_MESSAGE;
-import static org.apache.cassandra.cql3.statements.TransactionStatement.*;
+import static org.apache.cassandra.cql3.statements.TransactionStatement.DUPLICATE_TUPLE_NAME_MESSAGE;
+import static org.apache.cassandra.cql3.statements.TransactionStatement.EMPTY_TRANSACTION_MESSAGE;
+import static org.apache.cassandra.cql3.statements.TransactionStatement.INCOMPLETE_PRIMARY_KEY_LET_MESSAGE;
+import static org.apache.cassandra.cql3.statements.TransactionStatement.INCOMPLETE_PRIMARY_KEY_SELECT_MESSAGE;
+import static org.apache.cassandra.cql3.statements.TransactionStatement.NO_CONDITIONS_IN_UPDATES_MESSAGE;
+import static org.apache.cassandra.cql3.statements.TransactionStatement.NO_TIMESTAMPS_IN_UPDATES_MESSAGE;
+import static org.apache.cassandra.cql3.statements.TransactionStatement.SELECT_REFS_NEED_COLUMN_MESSAGE;
 import static org.apache.cassandra.cql3.statements.UpdateStatement.UPDATING_PRIMARY_KEY_MESSAGE;
 import static org.apache.cassandra.cql3.statements.schema.CreateTableStatement.parse;
 import static org.apache.cassandra.schema.TableMetadata.UNDEFINED_COLUMN_NAME_MESSAGE;
 import static org.apache.cassandra.utils.ByteBufferUtil.bytes;
-import static org.junit.Assert.assertEquals;
 
 public class TransactionStatementTest
 {
@@ -141,6 +148,20 @@ public class TransactionStatementTest
         Assertions.assertThatThrownBy(() -> parsed.prepare(ClientState.forInternalCalls()))
                   .isInstanceOf(InvalidRequestException.class)
                   .hasMessage(EMPTY_TRANSACTION_MESSAGE);
+    }
+
+    @Test
+    public void shouldRejectEntireTupleSelect()
+    {
+        String query = "BEGIN TRANSACTION\n" +
+                       "  LET row1 = (SELECT * FROM ks.tbl1 WHERE k=1 AND c=2);\n" +
+                       "  SELECT row1;\n" +
+                       "COMMIT TRANSACTION";
+
+        TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(query);
+        Assertions.assertThatThrownBy(() -> parsed.prepare(ClientState.forInternalCalls()))
+                  .isInstanceOf(InvalidRequestException.class)
+                  .hasMessage(SELECT_REFS_NEED_COLUMN_MESSAGE);
     }
 
     @Test

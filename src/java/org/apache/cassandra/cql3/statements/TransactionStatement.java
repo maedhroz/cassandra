@@ -59,6 +59,7 @@ public class TransactionStatement implements CQLStatement
     public static final String NO_CONDITIONS_IN_UPDATES_MESSAGE = "Updates within transactions may not specify their own conditions.";
     public static final String NO_TIMESTAMPS_IN_UPDATES_MESSAGE = "Updates within transactions may not specify custom timestamps.";
     public static final String EMPTY_TRANSACTION_MESSAGE = "Transaction contains no reads or writes";
+    public static final String SELECT_REFS_NEED_COLUMN_MESSAGE = "SELECT references must specify a column.";
 
     static class NamedSelect
     {
@@ -226,14 +227,15 @@ public class TransactionStatement implements CQLStatement
             // TODO: If the ResultMetadata ctor didn't require ColumnSpecification, we wouldn't need both of these.
             List<ColumnSpecification> names = new ArrayList<>(returningReferences.size());
             List<ColumnMetadata> columns = new ArrayList<>(returningReferences.size());
-            
+
+            // TODO: If we support selecting entire LET rows, this will have to pull column names from Row.
             for (ColumnReference reference : returningReferences)
             {
-                names.add(reference.column);
+                ColumnIdentifier fullName = reference.getFullyQualifiedName();
+                names.add(reference.column.withNewName(fullName));
                 columns.add(reference.column);
             }
 
-            // TODO: Is the column metadata correct here?
             ResultSetBuilder result = new ResultSetBuilder(new ResultSet.ResultMetadata(names), Selection.noopSelector(), null);
             result.newRow(options.getProtocolVersion(), null, null, columns);
             
@@ -378,7 +380,12 @@ public class TransactionStatement implements CQLStatement
 
             List<ColumnReference> returningReferences = null;
             if (returning != null)
-                returningReferences = returning.stream().map(ColumnReference.Raw::prepareAsReceiver).collect(Collectors.toList());
+            {
+                // TODO: Eliminate/modify this check if we allow full tuple selections.
+                returningReferences = returning.stream().peek(raw -> checkTrue(raw.column() != null, SELECT_REFS_NEED_COLUMN_MESSAGE))
+                                                        .map(ColumnReference.Raw::prepareAsReceiver)
+                                                        .collect(Collectors.toList());
+            }
 
             List<ModificationStatement> preparedUpdates = new ArrayList<>(updates.size());
             
