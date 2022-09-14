@@ -120,11 +120,11 @@ public class AccordIntegrationTest extends TestBaseImpl
                            "  LET row1 = (SELECT v FROM " + keyspace + ".tbl WHERE k=? AND c=?);\n" +
                            "  LET row2 = (SELECT v FROM " + keyspace + ".tbl WHERE k=? AND c=?);\n" +
                            "  SELECT v FROM " + keyspace + ".tbl WHERE k=? AND c=?;\n" +
-                           "  IF row1 IS NULL AND row2.v = 3 THEN\n" +
+                           "  IF row1 IS NULL AND row2.v = ? THEN\n" +
                            "    INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (?, ?, ?);\n" +
                            "  END IF\n" +
                            "COMMIT TRANSACTION";
-            Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY, 0, 0, 1, 0, 1, 0, 0, 0, 1);
+            Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY, 0, 0, 1, 0, 1, 0, 3, 0, 0, 1);
             assertEquals(3, result[0][0]);
 
             String check = "BEGIN TRANSACTION\n" +
@@ -321,14 +321,14 @@ public class AccordIntegrationTest extends TestBaseImpl
             cluster.coordinator(1).execute("INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (1, 0, 3);", ConsistencyLevel.ALL);
 
             String query = "BEGIN TRANSACTION\n" +
-                    "  LET row1 = (SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0);\n" +
-                    "  LET row2 = (SELECT * FROM " + keyspace + ".tbl WHERE k=1 AND c=0);\n" +
+                    "  LET row1 = (SELECT * FROM " + keyspace + ".tbl WHERE k = ? AND c = ?);\n" +
+                    "  LET row2 = (SELECT * FROM " + keyspace + ".tbl WHERE k = ? AND c = ?);\n" +
                     "  SELECT row2.v;\n" +
-                    "  IF row1 IS NULL AND row2.v = 3 THEN\n" +
-                    "    INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (0, 0, 1);\n" +
+                    "  IF row1 IS NULL AND row2.v = ? THEN\n" +
+                    "    INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (?, ?, ?);\n" +
                     "  END IF\n" +
                     "COMMIT TRANSACTION";
-            Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY);
+            Object[][] result = cluster.coordinator(1).execute(query, ConsistencyLevel.ANY, 0, 0, 1, 0, 3, 0, 0, 1);
             assertEquals(3, result[0][0]);
 
             String check = "BEGIN TRANSACTION\n" +
@@ -438,12 +438,12 @@ public class AccordIntegrationTest extends TestBaseImpl
                             "  LET select1 = (SELECT * FROM " + keyspace + ".tbl WHERE k=1 AND c=0);\n" +
                             "  LET select2 = (SELECT * FROM " + keyspace + ".tbl WHERE k=2 AND c=0);\n" +
                             "  SELECT v FROM " + keyspace + ".tbl WHERE k=1 AND c=0;\n" +
-                            "  IF select1.v = 0 THEN\n" +
+                            "  IF select1.v = ? THEN\n" +
                             "    INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (1, 0, 1);\n" +
                             "    INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (2, 0, 1);\n" +
                             "  END IF\n" +
                             "COMMIT TRANSACTION";
-            Object[][] result2 = cluster.coordinator(1).execute(query2, ConsistencyLevel.ANY);
+            Object[][] result2 = cluster.coordinator(1).execute(query2, ConsistencyLevel.ANY, 0);
             assertEquals(0, result2[0][0]);
 
             awaitAsyncApply(cluster);

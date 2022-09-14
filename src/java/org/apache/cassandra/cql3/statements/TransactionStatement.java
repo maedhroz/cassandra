@@ -410,8 +410,7 @@ public class TransactionStatement implements CQLStatement
 
             List<ConditionStatement> preparedConditions = new ArrayList<>(conditions.size());
             for (ConditionStatement.Raw condition : conditions)
-                // TODO: Bind variable support for IF statements
-                preparedConditions.add(condition.prepare("[txn]", VariableSpecifications.empty()));
+                preparedConditions.add(condition.prepare("[txn]", bindVariables));
 
             return new TransactionStatement(preparedAssignments, returningSelect, returningReferences, preparedUpdates, preparedConditions, bindVariables);
         }

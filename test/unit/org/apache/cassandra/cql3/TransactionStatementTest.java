@@ -18,11 +18,12 @@
 
 package org.apache.cassandra.cql3;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.apache.cassandra.exceptions.InvalidRequestException;
+import com.google.common.collect.ImmutableList;
 import org.assertj.core.api.Assertions;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -40,6 +41,7 @@ import org.apache.cassandra.db.RegularAndStaticColumns;
 import org.apache.cassandra.db.partitions.PartitionUpdate;
 import org.apache.cassandra.db.rows.BTreeRow;
 import org.apache.cassandra.db.rows.Row;
+import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.exceptions.SyntaxException;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.schema.KeyspaceParams;
@@ -346,11 +348,11 @@ public class TransactionStatementTest
     public void simpleQueryTest()
     {
         String query = "BEGIN TRANSACTION\n" +
-                       "  LET row1 = (SELECT * FROM ks.tbl1 WHERE k=1 AND c=2);\n" +
+                       "  LET row1 = (SELECT * FROM ks.tbl1 WHERE k=1 AND c=?);\n" +
                        "  LET row2 = (SELECT * FROM ks.tbl2 WHERE k=2 AND c=2);\n" +
-                       "  SELECT v FROM ks.tbl1 WHERE k=2 AND c=2;\n" +
-                       "  IF row1 IS NOT NULL AND row1.v = 3 AND row2.v=4 THEN\n" +
-                       "    UPDATE ks.tbl1 SET v=1 WHERE k=1 AND c=2;\n" +
+                       "  SELECT v FROM ks.tbl1 WHERE k=2 AND c=?;\n" +
+                       "  IF row1 IS NOT NULL AND row1.v = 3 AND row2.v=? THEN\n" +
+                       "    UPDATE ks.tbl1 SET v=? WHERE k=1 AND c=2;\n" +
                        "  END IF\n" +
                        "COMMIT TRANSACTION";
 
@@ -367,7 +369,8 @@ public class TransactionStatementTest
         TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(query);
         Assert.assertNotNull(parsed);
         TransactionStatement statement = (TransactionStatement) parsed.prepare(ClientState.forInternalCalls());
-        Txn actual = statement.createTxn(ClientState.forInternalCalls(), QueryOptions.DEFAULT);
+        List<ByteBuffer> values = ImmutableList.of(bytes(2), bytes(2), bytes(4), bytes(1));
+        Txn actual = statement.createTxn(ClientState.forInternalCalls(), QueryOptions.forInternalCalls(values));
 
         assertEquals(expected, actual);
     }
