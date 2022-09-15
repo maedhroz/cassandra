@@ -25,7 +25,6 @@ import java.util.List;
 
 import com.google.common.collect.ImmutableList;
 import org.assertj.core.api.Assertions;
-import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -79,9 +78,11 @@ public class TransactionStatementTest
 {
     private static final TableId TABLE1_ID = TableId.fromString("00000000-0000-0000-0000-000000000001");
     private static final TableId TABLE2_ID = TableId.fromString("00000000-0000-0000-0000-000000000002");
+    private static final TableId TABLE3_ID = TableId.fromString("00000000-0000-0000-0000-000000000003");
 
     private static TableMetadata TABLE1;
     private static TableMetadata TABLE2;
+    private static TableMetadata TABLE3;
 
     @BeforeClass
     public static void beforeClass() throws Exception
@@ -89,9 +90,12 @@ public class TransactionStatementTest
         SchemaLoader.prepareServer();
         SchemaLoader.createKeyspace("ks", KeyspaceParams.simple(1),
                                     parse("CREATE TABLE tbl1 (k int, c int, v int, primary key (k, c))", "ks").id(TABLE1_ID),
-                                    parse("CREATE TABLE tbl2 (k int, c int, v int, primary key (k, c))", "ks").id(TABLE2_ID));
+                                    parse("CREATE TABLE tbl2 (k int, c int, v int, primary key (k, c))", "ks").id(TABLE2_ID),
+                                    parse("CREATE TABLE tbl3 (k int PRIMARY KEY, \"with spaces\" int, \"with\"\"quote\" int, \"MiXeD_CaSe\" int)", "ks").id(TABLE3_ID));
+
         TABLE1 = Schema.instance.getTableMetadata("ks", "tbl1");
         TABLE2 = Schema.instance.getTableMetadata("ks", "tbl2");
+        TABLE3 = Schema.instance.getTableMetadata("ks", "tbl3");
     }
 
     @Test
@@ -388,7 +392,6 @@ public class TransactionStatementTest
                                  .build();
 
         TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(query);
-        Assert.assertNotNull(parsed);
         TransactionStatement statement = (TransactionStatement) parsed.prepare(ClientState.forInternalCalls());
         List<ByteBuffer> values = ImmutableList.of(bytes(2), bytes(2), bytes(4), bytes(1));
         Txn actual = statement.createTxn(ClientState.forInternalCalls(), QueryOptions.forInternalCalls(values));
@@ -418,12 +421,39 @@ public class TransactionStatementTest
                                  .build();
 
         TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(query);
-        Assert.assertNotNull(parsed);
         TransactionStatement statement = (TransactionStatement) parsed.prepare(ClientState.forInternalCalls());
         Txn actual = statement.createTxn(ClientState.forInternalCalls(), QueryOptions.DEFAULT);
 
         assertEquals(expected, actual);
         assertEquals(2, statement.getReturningReferences().size());
+    }
+
+    @Test
+    public void testQuotedColumnNames()
+    {
+        String query = "BEGIN TRANSACTION\n" +
+                       "  LET row1 = (SELECT * FROM ks.tbl3 WHERE k=1);\n" +
+                       "  SELECT row1.\"with spaces\", row1.\"with\"\"quote\", row1.\"MiXeD_CaSe\";\n" +
+                       "  IF row1.\"with spaces\" IS NULL THEN\n" +
+                       "    INSERT INTO ks.tbl3 (k, \"with spaces\") VALUES (1, 2);\n" +
+                       "  END IF\n" +
+                       "COMMIT TRANSACTION";
+
+        Txn expected = TxnBuilder.builder()
+                                 .withRead("row1", "SELECT * FROM ks.tbl3 WHERE k=1")
+                                 .withWrite("INSERT INTO ks.tbl3 (k, \"with spaces\") VALUES (1, 2)")
+                                 .withIsNullCondition("row1", 0, "ks.tbl3.with spaces")
+                                 .build();
+
+        TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(query);
+        TransactionStatement statement = (TransactionStatement) parsed.prepare(ClientState.forInternalCalls());
+        Txn actual = statement.createTxn(ClientState.forInternalCalls(), QueryOptions.DEFAULT);
+
+        assertEquals(expected, actual);
+        assertEquals(3, statement.getReturningReferences().size());
+        assertEquals("with spaces", statement.getReturningReferences().get(0).column.name.toString());
+        assertEquals("with\"quote", statement.getReturningReferences().get(1).column.name.toString());
+        assertEquals("MiXeD_CaSe", statement.getReturningReferences().get(2).column.name.toString());
     }
 
     @Test
@@ -452,7 +482,6 @@ public class TransactionStatementTest
                                  .build();
 
         TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(query);
-        Assert.assertNotNull(parsed);
         TransactionStatement statement = (TransactionStatement) parsed.prepare(ClientState.forInternalCalls());
         Txn actual = statement.createTxn(ClientState.forInternalCalls(), QueryOptions.DEFAULT);
         assertEquals(expected, actual);
@@ -484,7 +513,6 @@ public class TransactionStatementTest
                                  .build();
 
         TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(query);
-        Assert.assertNotNull(parsed);
         TransactionStatement statement = (TransactionStatement) parsed.prepare(ClientState.forInternalCalls());
         Txn actual = statement.createTxn(ClientState.forInternalCalls(), QueryOptions.DEFAULT);
         assertEquals(expected, actual);
@@ -514,7 +542,6 @@ public class TransactionStatementTest
                                  .withEqualsCondition("row2", 0, "ks.tbl2.v", bytes(4))
                                  .build();
         TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(query);
-        Assert.assertNotNull(parsed);
         TransactionStatement statement = (TransactionStatement) parsed.prepare(ClientState.forInternalCalls());
         Txn actual = statement.createTxn(ClientState.forInternalCalls(), QueryOptions.DEFAULT);
         assertEquals(expected, actual);
@@ -544,7 +571,6 @@ public class TransactionStatementTest
                                  .withEqualsCondition("row2", 0, "ks.tbl2.v", bytes(4))
                                  .build();
         TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(query);
-        Assert.assertNotNull(parsed);
         TransactionStatement statement = (TransactionStatement) parsed.prepare(ClientState.forInternalCalls());
         Txn actual = statement.createTxn(ClientState.forInternalCalls(), QueryOptions.DEFAULT);
         assertEquals(expected, actual);
@@ -580,7 +606,6 @@ public class TransactionStatementTest
                                  .build();
 
         TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(query);
-        Assert.assertNotNull(parsed);
         TransactionStatement statement = (TransactionStatement) parsed.prepare(ClientState.forInternalCalls());
         Txn actual = statement.createTxn(ClientState.forInternalCalls(), QueryOptions.DEFAULT);
         assertEquals(expected, actual);

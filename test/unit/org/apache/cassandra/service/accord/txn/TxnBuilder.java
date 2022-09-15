@@ -83,7 +83,7 @@ public class TxnBuilder
         VariableSpecifications bindVariables = VariableSpecifications.empty();
         ModificationStatement prepared = parsed.prepare(bindVariables);
 
-        // TODO: If forInternalCalls() correct here?
+        // TODO: Is forInternalCalls() correct here?
         return withWrite(prepared.getTxnUpdate(ClientState.forInternalCalls(), QueryOptions.DEFAULT), referenceOps);
     }
 

@@ -1742,8 +1742,8 @@ columnReference returns [ColumnReference.Raw vterm]
     @init { List<Term.Raw> terms = new ArrayList<>(2); }
     @after { $vterm = newColumnReference(terms); }
     : {isParsingTxn}?
-      (v1=IDENT { terms.add(Constants.Literal.string($v1.text)); }
-      ('.' v2=IDENT { terms.add(Constants.Literal.string($v2.text)); } )*)
+      ( v1=IDENT { terms.add(Constants.Literal.string($v1.text)); }
+      ('.' v2=IDENT { terms.add(Constants.Literal.string($v2.text)); } | ('.' v2=QUOTED_NAME { terms.add(Constants.Literal.string($v2.text)); }))? )
     ;
 
 termOrColumnRef returns [Term.Raw term]
