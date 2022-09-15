@@ -288,14 +288,7 @@ public class TransactionStatement implements CQLStatement
         return null;
     }
 
-    // TODO: move to ColumnReference
-    public interface ReferenceSource
-    {
-        boolean isPointSelect();
-        ColumnMetadata getColumn(String name);
-    }
-
-    private static class SelectReferenceSource implements ReferenceSource
+    private static class SelectReferenceSource implements ColumnReference.ReferenceSource
     {
         private final SelectStatement statement;
         private final Set<ColumnMetadata> selectedColumns;
@@ -367,7 +360,7 @@ public class TransactionStatement implements CQLStatement
                 checkTrue(select != null ^ returning != null, "Cannot specify both a full SELECT and a SELECT w/ LET references.");
 
             List<NamedSelect> preparedAssignments = new ArrayList<>(assignments.size());
-            Map<String, ReferenceSource> refSources = new HashMap<>();
+            Map<String, ColumnReference.ReferenceSource> refSources = new HashMap<>();
             Set<String> selectNames = new HashSet<>();
 
             for (SelectStatement.RawStatement select : assignments)

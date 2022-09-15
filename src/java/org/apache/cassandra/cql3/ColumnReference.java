@@ -26,7 +26,6 @@ import java.util.Map;
 import com.google.common.base.Preconditions;
 
 import org.apache.cassandra.cql3.functions.Function;
-import org.apache.cassandra.cql3.statements.TransactionStatement;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.marshal.Int32Type;
 import org.apache.cassandra.db.marshal.UTF8Type;
@@ -140,7 +139,7 @@ public class ColumnReference implements Term
                 rowIndex = ROW_IDX_ZERO;
         }
 
-        public void resolveReference(Map<String, TransactionStatement.ReferenceSource> sources)
+        public void resolveReference(Map<String, ReferenceSource> sources)
         {
             if (isResolved)
                 return;
@@ -150,7 +149,7 @@ public class ColumnReference implements Term
             // root level name
             Constants.Literal literal = (Constants.Literal) termIterator.next();
             tupleName = literal.getRawText();
-            TransactionStatement.ReferenceSource source = sources.get(tupleName);
+            ReferenceSource source = sources.get(tupleName);
             checkNotNull(source, CANNOT_FIND_TUPLE_MESSAGE, tupleName);
 
             if (!termIterator.hasNext())
@@ -258,5 +257,11 @@ public class ColumnReference implements Term
         {
             return column;
         }
+    }
+
+    public interface ReferenceSource
+    {
+        boolean isPointSelect();
+        ColumnMetadata getColumn(String name);
     }
 }
