@@ -25,8 +25,8 @@ import com.google.common.base.Preconditions;
 
 import org.apache.cassandra.db.TypeSizes;
 import org.apache.cassandra.db.partitions.FilteredPartition;
-import org.apache.cassandra.db.rows.Cell;
 import org.apache.cassandra.db.rows.CellPath;
+import org.apache.cassandra.db.rows.ColumnData;
 import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.io.IVersionedSerializer;
 import org.apache.cassandra.io.util.DataInputPlus;
@@ -126,21 +126,18 @@ public class ValueReference
         return partition.getAtIdx(rowIdx);
     }
 
-    public Cell<?> getCell(Row row)
+    public ColumnData getColumnData(Row row)
     {
+        if (column.isComplex() && path == null)
+            return row.getComplexColumnData(column);
+
         return path != null ? row.getCell(column, path) : row.getCell(column);
     }
 
-    public Cell<?> getCell(FilteredPartition partition)
-    {
-        Row row = getRow(partition);
-        return row != null ? getCell(row) : null;
-    }
-
-    public Cell<?> getCell(TxnData data)
+    public ColumnData getColumnData(TxnData data)
     {
         Row row = getRow(data);
-        return row != null ? getCell(row) : null;
+        return row != null ? getColumnData(row) : null;
     }
 
     public static final IVersionedSerializer<ValueReference> serializer = new IVersionedSerializer<ValueReference>()

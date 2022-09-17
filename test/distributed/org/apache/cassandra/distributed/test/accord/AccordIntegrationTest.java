@@ -21,6 +21,7 @@ package org.apache.cassandra.distributed.test.accord;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -46,6 +47,8 @@ import accord.messages.Commit;
 import accord.primitives.Keys;
 import accord.primitives.TxnId;
 import accord.topology.Topologies;
+import org.apache.cassandra.db.marshal.Int32Type;
+import org.apache.cassandra.db.marshal.ListType;
 import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.distributed.Cluster;
 import org.apache.cassandra.distributed.api.ConsistencyLevel;
@@ -88,12 +91,12 @@ public class AccordIntegrationTest extends TestBaseImpl
         assertArrayEquals(new Object[]{new Object[] {k, c, v}}, result);
     }
 
-    private static void test(FailingConsumer<Cluster> fn) throws Exception
+    private static void test(String tableDDL, FailingConsumer<Cluster> fn) throws Exception
     {
         try (Cluster cluster = createCluster())
         {
             cluster.schemaChange("CREATE KEYSPACE " + keyspace + " WITH REPLICATION={'class':'SimpleStrategy', 'replication_factor': 2}");
-            cluster.schemaChange("CREATE TABLE " + keyspace + ".tbl (k int, c int, v int, primary key (k, c))");
+            cluster.schemaChange(tableDDL);
             cluster.forEach(node -> node.runOnInstance(() -> AccordService.instance.createEpochFromConfigUnsafe()));
             
             // Evict commands from the cache immediately to expose problems loading from disk.
@@ -104,6 +107,11 @@ public class AccordIntegrationTest extends TestBaseImpl
             // Make sure transaction state settles.
             awaitAsyncApply(cluster);
         }
+    }
+
+    private static void test(FailingConsumer<Cluster> fn) throws Exception
+    {
+        test("CREATE TABLE " + keyspace + ".tbl (k int, c int, v int, primary key (k, c))", fn);
     }
 
     private static Cluster createCluster() throws IOException
@@ -341,6 +349,46 @@ public class AccordIntegrationTest extends TestBaseImpl
             // TODO: Retry on preemption may become unnecessary after the Unified Log is integrated.
             assertRowEqualsWithPreemptedRetry(cluster, new Object[] {0, 0, 1}, check);
         });
+    }
+
+    @Test
+    public void testListReferences() throws Exception
+    {
+        test("CREATE TABLE " + keyspace + ".tbl (k int PRIMARY KEY, int_list list<int>)",
+             cluster ->
+             {
+                 ListType<Integer> listType = ListType.getInstance(Int32Type.instance, true);
+                 List<Integer> initialList = Arrays.asList(1, 2);
+                 ByteBuffer initialListBytes = listType.serializer.serialize(initialList);
+
+                 String query = "BEGIN TRANSACTION\n" +
+                                "  INSERT INTO " + keyspace + ".tbl (k, int_list) VALUES (?, ?);\n" +
+                                "COMMIT TRANSACTION";
+                 SimpleQueryResult result = cluster.coordinator(1).executeWithResult(query, ConsistencyLevel.ANY, 0, initialListBytes);
+                 assertFalse(result.hasNext());
+
+                 List<Integer> updatedList = Arrays.asList(1, 2, 3);
+                 ByteBuffer updatedListBytes = listType.serializer.serialize(updatedList);
+
+                 String update = "BEGIN TRANSACTION\n" +
+                                "  LET row1 = (SELECT * FROM " + keyspace + ".tbl WHERE k = ?);\n" +
+                                "  SELECT row1.int_list;\n" +
+                                "  IF row1.int_list = ? THEN\n" +
+                                "    UPDATE " + keyspace + ".tbl SET int_list = ? WHERE k = ?;\n" +
+                                "  END IF\n" +
+                                "COMMIT TRANSACTION";
+
+                 // TODO: Retry on preemption may become unnecessary after the Unified Log is integrated.
+                 assertRowEqualsWithPreemptedRetry(cluster, new Object[] {initialList}, update, 0, initialListBytes, updatedListBytes, 0);
+
+                 String check = "BEGIN TRANSACTION\n" +
+                                "  SELECT * FROM " + keyspace + ".tbl WHERE k = ?;\n" +
+                                "COMMIT TRANSACTION";
+
+                 // TODO: Retry on preemption may become unnecessary after the Unified Log is integrated.
+                 assertRowEqualsWithPreemptedRetry(cluster, new Object[] {0, updatedList}, check, 0);
+             }
+        );
     }
 
     @Test

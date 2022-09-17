@@ -28,6 +28,8 @@ import com.google.common.base.Preconditions;
 import org.apache.cassandra.db.TypeSizes;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.marshal.NumberType;
+import org.apache.cassandra.db.rows.Cell;
+import org.apache.cassandra.db.rows.ColumnData;
 import org.apache.cassandra.io.IVersionedSerializer;
 import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.DataOutputPlus;
@@ -170,7 +172,9 @@ public abstract class TxnReferenceValue
             // TODO: confirm all references can be satisfied as part of the txn condition
             // TODO: if the receiver type is not the same as the column type here, we need to do the neccesary conversion
             Preconditions.checkArgument(receiver == reference.column().type);
-            return reference.getCell(data).buffer();
+            ColumnData columnData = reference.getColumnData(data);
+            assert !columnData.column().isComplex() : "TODO: Complex column support";
+            return ((Cell<?>) columnData).buffer();
         }
 
         static final Serializer<Substitution> serializer = new Serializer<Substitution>()

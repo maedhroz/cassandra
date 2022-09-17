@@ -20,6 +20,7 @@ package org.apache.cassandra.service.accord.txn;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -32,10 +33,14 @@ import org.apache.cassandra.db.TypeSizes;
 import org.apache.cassandra.db.marshal.ByteBufferAccessor;
 import org.apache.cassandra.db.partitions.FilteredPartition;
 import org.apache.cassandra.db.rows.Cell;
+import org.apache.cassandra.db.rows.ColumnData;
+import org.apache.cassandra.db.rows.ComplexColumnData;
 import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.io.IVersionedSerializer;
 import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.DataOutputPlus;
+import org.apache.cassandra.serializers.CollectionSerializer;
+import org.apache.cassandra.transport.ProtocolVersion;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
 import static org.apache.cassandra.service.accord.SerializationUtils.deserializeList;
@@ -189,7 +194,8 @@ public abstract class TxnCondition
 
             if (exists && reference.selectsCell())
             {
-                Cell<?> cell = reference.getCell(row);
+                // TODO: collection support
+                Cell<?> cell = (Cell<?>) reference.getColumnData(row);
                 exists = cell != null && !cell.isTombstone();
             }
 
@@ -274,12 +280,39 @@ public abstract class TxnCondition
         @Override
         public boolean applies(TxnData data)
         {
-            Cell<?> cell = reference.getCell(data);
-            if (cell == null)
+            ColumnData columnData = reference.getColumnData(data);
+
+            if (columnData == null)
                 return false;
+            
+            if (columnData.column().isComplex())
+            {
+                if (columnData.column().type.isCollection())
+                {
+                    ByteBuffer packed = toCollectionBytes((ComplexColumnData) columnData);
+                    int cmp = reference.column().type.compare(packed, value);
+                    return evaluateComparisonForKind(cmp);
+                }
+                
+                // TODO: UDTs and tuples
+            }
 
-            int cmp = compare(cell);
+            int cmp = compare((Cell<?>) columnData);
+            return evaluateComparisonForKind(cmp);
+        }
 
+        private ByteBuffer toCollectionBytes(ComplexColumnData columnData)
+        {
+            List<ByteBuffer> values = new ArrayList<>(columnData.cellsCount());
+
+            for (Cell<?> cell : columnData)
+                values.add(cell.buffer());
+
+            return CollectionSerializer.pack(values, columnData.cellsCount(), ProtocolVersion.V3);
+        }
+
+        private boolean evaluateComparisonForKind(int cmp)
+        {
             switch (kind())
             {
                 case EQUAL:

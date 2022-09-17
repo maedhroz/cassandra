@@ -53,7 +53,7 @@ import org.apache.cassandra.db.SinglePartitionReadCommand;
 import org.apache.cassandra.db.SinglePartitionReadQuery;
 import org.apache.cassandra.db.filter.DataLimits;
 import org.apache.cassandra.db.partitions.FilteredPartition;
-import org.apache.cassandra.db.rows.Cell;
+import org.apache.cassandra.db.rows.ColumnData;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.service.ClientState;
@@ -264,8 +264,8 @@ public class TransactionStatement implements CQLStatement
             
             for (ColumnReference reference : returningReferences)
             {
-                Cell<?> cell = reference.toValueReference(options).getCell(data);
-                result.add(cell, FBUtilities.nowInSeconds());
+                ColumnData columnData = reference.toValueReference(options).getColumnData(data);
+                result.add(columnData, FBUtilities.nowInSeconds());
             }
 
             return new ResultMessage.Rows(result.build());
