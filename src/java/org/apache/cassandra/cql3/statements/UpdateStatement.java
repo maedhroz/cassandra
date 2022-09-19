@@ -137,11 +137,9 @@ public class UpdateStatement extends ModificationStatement
                             Attributes.Raw attrs,
                             List<ColumnIdentifier> columnNames,
                             List<Object> columnValues,
-                            boolean ifNotExists,
-                            boolean isForTxn,
-                            String txnReadName)
+                            boolean ifNotExists)
         {
-            super(name, StatementType.INSERT, attrs, null, ifNotExists, false, isForTxn, txnReadName);
+            super(name, StatementType.INSERT, attrs, null, ifNotExists, false);
             this.columnNames = columnNames;
             this.columnValues = columnValues;
         }
@@ -226,9 +224,9 @@ public class UpdateStatement extends ModificationStatement
         private final Json.Raw jsonValue;
         private final boolean defaultUnset;
 
-        public ParsedInsertJson(QualifiedName name, Attributes.Raw attrs, Json.Raw jsonValue, boolean defaultUnset, boolean ifNotExists, boolean isForTxn, String txnReadName)
+        public ParsedInsertJson(QualifiedName name, Attributes.Raw attrs, Json.Raw jsonValue, boolean defaultUnset, boolean ifNotExists)
         {
-            super(name, StatementType.INSERT, attrs, null, ifNotExists, false, isForTxn, txnReadName);
+            super(name, StatementType.INSERT, attrs, null, ifNotExists, false);
             this.jsonValue = jsonValue;
             this.defaultUnset = defaultUnset;
         }
@@ -347,6 +345,7 @@ public class UpdateStatement extends ModificationStatement
         // Provided for an UPDATE
         private final OperationCollector updates;
         private final WhereClause whereClause;
+        private final boolean isForTxn;
 
         /**
          * Creates a new UpdateStatement from a column family name, columns map, consistency
@@ -366,9 +365,10 @@ public class UpdateStatement extends ModificationStatement
                             boolean ifExists,
                             boolean isForTxn)
         {
-            super(name, StatementType.UPDATE, attrs, conditions, false, ifExists, isForTxn, null);
+            super(name, StatementType.UPDATE, attrs, conditions, false, ifExists);
             this.updates = updates;
             this.whereClause = whereClause;
+            this.isForTxn = isForTxn;
         }
 
         @Override

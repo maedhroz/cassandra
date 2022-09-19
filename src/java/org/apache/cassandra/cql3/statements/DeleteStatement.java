@@ -131,10 +131,9 @@ public class DeleteStatement extends ModificationStatement
                       List<Operation.RawDeletion> deletions,
                       WhereClause whereClause,
                       List<Pair<ColumnIdentifier, ColumnCondition.Raw>> conditions,
-                      boolean ifExists,
-                      boolean isForTxn)
+                      boolean ifExists)
         {
-            super(name, StatementType.DELETE, attrs, conditions, false, ifExists, isForTxn, null);
+            super(name, StatementType.DELETE, attrs, conditions, false, ifExists);
             this.deletions = deletions;
             this.whereClause = whereClause;
         }

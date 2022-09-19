@@ -555,7 +555,7 @@ normalInsertStatement [QualifiedName qn] returns [UpdateStatement.ParsedInsert e
       ( K_IF K_NOT K_EXISTS { ifNotExists = true; } )?
       ( usingClause[attrs] )?
       {
-          $expr = new UpdateStatement.ParsedInsert(qn, attrs, columnNames, values, ifNotExists, isParsingTxn, null);
+          $expr = new UpdateStatement.ParsedInsert(qn, attrs, columnNames, values, ifNotExists);
       }
     ;
 
@@ -575,7 +575,7 @@ jsonInsertStatement [QualifiedName qn] returns [UpdateStatement.ParsedInsertJson
       ( K_IF K_NOT K_EXISTS { ifNotExists = true; } )?
       ( usingClause[attrs] )?
       {
-          $expr = new UpdateStatement.ParsedInsertJson(qn, attrs, val, defaultUnset, ifNotExists, isParsingTxn, "");
+          $expr = new UpdateStatement.ParsedInsertJson(qn, attrs, val, defaultUnset, ifNotExists);
       }
     ;
 
@@ -653,8 +653,7 @@ deleteStatement returns [DeleteStatement.Parsed expr]
                                              columnDeletions,
                                              wclause.build(),
                                              conditions == null ? Collections.<Pair<ColumnIdentifier, ColumnCondition.Raw>>emptyList() : conditions,
-                                             ifExists,
-                                             isParsingTxn);
+                                             ifExists);
       }
     ;
 

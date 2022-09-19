@@ -961,7 +961,8 @@ public abstract class ModificationStatement implements CQLStatement.SingleKeyspa
         private final List<Pair<ColumnIdentifier, ColumnCondition.Raw>> conditions;
         private final boolean ifNotExists;
         private final boolean ifExists;
-        final boolean isForTxn;
+
+        // TODO: Find a way to localize this to txn preparation. 
         String txnReadName;
 
         protected Parsed(QualifiedName name,
@@ -969,17 +970,14 @@ public abstract class ModificationStatement implements CQLStatement.SingleKeyspa
                          Attributes.Raw attrs,
                          List<Pair<ColumnIdentifier, ColumnCondition.Raw>> conditions,
                          boolean ifNotExists,
-                         boolean ifExists, boolean isForTxn, String txnReadName)
+                         boolean ifExists)
         {
             super(name);
-            Preconditions.checkArgument(txnReadName == null || isForTxn);
             this.type = type;
             this.attrs = attrs;
             this.conditions = conditions == null ? Collections.emptyList() : conditions;
             this.ifNotExists = ifNotExists;
             this.ifExists = ifExists;
-            this.isForTxn = isForTxn;
-            this.txnReadName = txnReadName;
         }
 
         public boolean hasSelfReference()
@@ -1032,7 +1030,6 @@ public abstract class ModificationStatement implements CQLStatement.SingleKeyspa
             if (ifNotExists)
             {
                 assert conditions.isEmpty();
-                assert !ifExists;
                 return Conditions.IF_NOT_EXISTS_CONDITION;
             }
 
