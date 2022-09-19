@@ -95,14 +95,14 @@ public class ValueReference
         return rowIdx >= 0;
     }
 
-    public boolean selectsCell()
+    public boolean selectsColumn()
     {
         return selectsRow() && column != null;
     }
 
     public boolean selectsPath()
     {
-        return selectsCell() && path != null;
+        return selectsColumn() && path != null;
     }
 
     public FilteredPartition getPartition(TxnData data)

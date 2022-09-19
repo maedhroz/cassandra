@@ -30,6 +30,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
 import org.apache.cassandra.db.TypeSizes;
+import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.marshal.ByteBufferAccessor;
 import org.apache.cassandra.db.partitions.FilteredPartition;
 import org.apache.cassandra.db.rows.Cell;
@@ -192,11 +193,40 @@ public abstract class TxnCondition
                 exists = row != null && !row.isEmpty();
             }
 
-            if (exists && reference.selectsCell())
+            if (exists && reference.selectsColumn())
             {
-                // TODO: collection support
-                Cell<?> cell = (Cell<?>) reference.getColumnData(row);
-                exists = cell != null && !cell.isTombstone();
+                ColumnData columnData = reference.getColumnData(row);
+
+                if (columnData == null)
+                {
+                    exists = false;
+                }
+                else if (columnData.column().isComplex())
+                {
+                    AbstractType<?> type = columnData.column().type;
+
+                    if (type.isCollection())
+                    {
+                        // TODO: Single cell selection
+                    }
+                    else if (type.isTuple())
+                    {
+                        // TODO: Single cell selection
+                    }
+                    else if (type.isUDT())
+                    {
+                        // TODO: Single cell selection
+                    }
+                    else
+                    {
+                        throw new IllegalStateException("Unknown complex type: " + type);
+                    }
+                }
+                else
+                {
+                    Cell<?> cell = (Cell<?>) columnData;
+                    exists = !cell.isTombstone();
+                }
             }
 
             switch (kind())
@@ -247,7 +277,7 @@ public abstract class TxnCondition
             this.reference = reference;
             this.value = value;
             Preconditions.checkArgument(KINDS.contains(kind));
-            Preconditions.checkArgument(reference.selectsCell());
+            Preconditions.checkArgument(reference.selectsColumn());
         }
 
         @Override
@@ -272,11 +302,6 @@ public abstract class TxnCondition
             return reference.toString() + ' ' + kind.symbol + " 0x" + ByteBufferUtil.bytesToHex(value);
         }
 
-        private <T> int compare(Cell<T> cell)
-        {
-            return reference.column().type.compare(cell.value(), cell.accessor(), value, ByteBufferAccessor.instance);
-        }
-
         @Override
         public boolean applies(TxnData data)
         {
@@ -299,6 +324,11 @@ public abstract class TxnCondition
 
             int cmp = compare((Cell<?>) columnData);
             return evaluateComparisonForKind(cmp);
+        }
+
+        private <T> int compare(Cell<T> cell)
+        {
+            return reference.column().type.compare(cell.value(), cell.accessor(), value, ByteBufferAccessor.instance);
         }
 
         private ByteBuffer toCollectionBytes(ComplexColumnData columnData)

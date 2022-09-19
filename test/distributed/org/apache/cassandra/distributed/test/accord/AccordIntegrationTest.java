@@ -141,7 +141,6 @@ public class AccordIntegrationTest extends TestBaseImpl
                            "  SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0;\n" +
                            "COMMIT TRANSACTION";
 
-            // TODO: Retry on preemption may become unnecessary after the Unified Log is integrated.
             assertRowEqualsWithPreemptedRetry(cluster, new Object[] { 0, 0, 1 }, check);
         });
     }
@@ -319,7 +318,6 @@ public class AccordIntegrationTest extends TestBaseImpl
                            "  SELECT * FROM " + keyspace + ".tbl WHERE k=? AND c=?;\n" +
                            "COMMIT TRANSACTION";
 
-            // TODO: Retry on preemption may become unnecessary after the Unified Log is integrated.
             assertRowEqualsWithPreemptedRetry(cluster, new Object[] {0, 0, 1}, check, 0, 0);
         });
     }
@@ -346,7 +344,6 @@ public class AccordIntegrationTest extends TestBaseImpl
                            "  SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0;\n" +
                            "COMMIT TRANSACTION";
 
-            // TODO: Retry on preemption may become unnecessary after the Unified Log is integrated.
             assertRowEqualsWithPreemptedRetry(cluster, new Object[] {0, 0, 1}, check);
         });
     }
@@ -378,15 +375,54 @@ public class AccordIntegrationTest extends TestBaseImpl
                                 "  END IF\n" +
                                 "COMMIT TRANSACTION";
 
-                 // TODO: Retry on preemption may become unnecessary after the Unified Log is integrated.
                  assertRowEqualsWithPreemptedRetry(cluster, new Object[] {initialList}, update, 0, initialListBytes, updatedListBytes, 0);
 
                  String check = "BEGIN TRANSACTION\n" +
                                 "  SELECT * FROM " + keyspace + ".tbl WHERE k = ?;\n" +
                                 "COMMIT TRANSACTION";
 
-                 // TODO: Retry on preemption may become unnecessary after the Unified Log is integrated.
                  assertRowEqualsWithPreemptedRetry(cluster, new Object[] {0, updatedList}, check, 0);
+             }
+        );
+    }
+
+    @Test
+    public void testNullListConditions() throws Exception
+    {
+        test("CREATE TABLE " + keyspace + ".tbl (k int PRIMARY KEY, int_list list<int>)",
+             cluster ->
+             {
+                 cluster.coordinator(1).execute("INSERT INTO " + keyspace + ".tbl (k, int_list) VALUES (0, null);", ConsistencyLevel.ALL);
+                 
+                 ListType<Integer> listType = ListType.getInstance(Int32Type.instance, true);
+                 List<Integer> initialList = Arrays.asList(1, 2);
+                 ByteBuffer initialListBytes = listType.serializer.serialize(initialList);
+
+                 String insert = "BEGIN TRANSACTION\n" +
+                                 "  LET row1 = (SELECT * FROM " + keyspace + ".tbl WHERE k = ?);\n" +
+                                 "  SELECT row1.int_list;\n" +
+                                 "  IF row1.int_list IS NULL THEN\n" +
+                                 "    INSERT INTO " + keyspace + ".tbl (k, int_list) VALUES (?, ?);\n" +
+                                 "  END IF\n" +
+                                 "COMMIT TRANSACTION";
+                 assertRowEqualsWithPreemptedRetry(cluster, new Object[]{null}, insert, 0, 0, initialListBytes);
+
+                 String check = "BEGIN TRANSACTION\n" +
+                                "  SELECT * FROM " + keyspace + ".tbl WHERE k = ?;\n" +
+                                "COMMIT TRANSACTION";
+                 assertRowEqualsWithPreemptedRetry(cluster, new Object[]{0, initialList}, check, 0);
+
+                 String update = "BEGIN TRANSACTION\n" +
+                                 "  LET row1 = (SELECT * FROM " + keyspace + ".tbl WHERE k = ?);\n" +
+                                 "  SELECT row1.int_list;\n" +
+                                 "  IF row1.int_list IS NOT NULL THEN\n" +
+                                 "    UPDATE " + keyspace + ".tbl SET int_list = ? WHERE k = ?;\n" +
+                                 "  END IF\n" +
+                                 "COMMIT TRANSACTION";
+
+                 List<Integer> updatedList = Arrays.asList(1, 2, 3);
+                 ByteBuffer updatedListBytes = listType.serializer.serialize(updatedList);
+                 assertRowEqualsWithPreemptedRetry(cluster, new Object[] {initialList}, update, 0, updatedListBytes, 0);
              }
         );
     }
@@ -419,8 +455,6 @@ public class AccordIntegrationTest extends TestBaseImpl
             String check = "BEGIN TRANSACTION\n" +
                            "  SELECT * FROM " + keyspace + ".tbl1 WHERE k=1 AND c=2;\n" +
                            "COMMIT TRANSACTION";
-
-            // TODO: Retry on preemption may become unnecessary after the Unified Log is integrated.
             assertRowEqualsWithPreemptedRetry(cluster, new Object[] {1, 2, 4}, check);
         }
     }
@@ -558,6 +592,7 @@ public class AccordIntegrationTest extends TestBaseImpl
         }
     }
 
+    // TODO: Retry on preemption may become unnecessary after the Unified Log is integrated.
     private static void assertRowEqualsWithPreemptedRetry(Cluster cluster, Object[] row, String check, Object... boundValues)
     {
         try
