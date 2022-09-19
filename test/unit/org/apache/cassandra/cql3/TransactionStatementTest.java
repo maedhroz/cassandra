@@ -481,7 +481,7 @@ public class TransactionStatementTest
     {
         String query = "BEGIN TRANSACTION\n" +
                        "  LET row1 = (SELECT * FROM ks.tbl3 WHERE k=1);\n" +
-                       "  SELECT row1.\"with spaces\", row1.\"with\"\"quote\", row1.\"MiXeD_CaSe\";\n" +
+                       "  SELECT \"row1\".\"with spaces\", row1.\"with\"\"quote\", row1.\"MiXeD_CaSe\";\n" +
                        "  IF row1.\"with spaces\" IS NULL THEN\n" +
                        "    INSERT INTO ks.tbl3 (k, \"with spaces\") VALUES (1, 2);\n" +
                        "  END IF\n" +

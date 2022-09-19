@@ -753,7 +753,7 @@ batchStatementObjective returns [ModificationStatement.Parsed statement]
     }
     : K_BEGIN K_TRANSACTION
       ( let=letStatement ';' { assignments.add(let); })*
-      ( ( s=selectStatement ';' { select = s; hasFullSelect = true; }) | ( {!hasFullSelect}? ( K_SELECT r=references ';' { returning = r; })) )?
+      ( ( s=selectStatement ';' { select = s; hasFullSelect = true; }) | ( {!hasFullSelect}? ( K_SELECT r=columnReferences ';' { returning = r; })) )?
       ( K_IF conditions=txnConditions K_THEN { isTxnConditional = true; } )?
       ( upd=batchStatementObjective ';' { updates.add(upd); } )*
       ( {!isTxnConditional}? (K_COMMIT K_TRANSACTION) | {isTxnConditional}? (K_END K_IF K_COMMIT K_TRANSACTION))
@@ -763,7 +763,7 @@ batchStatementObjective returns [ModificationStatement.Parsed statement]
     ;
     finally { isParsingTxn = false; }
 
-references returns [List<ColumnReference.Raw> returning]
+columnReferences returns [List<ColumnReference.Raw> returning]
     : r1=columnReference { returning = new ArrayList<ColumnReference.Raw>(); returning.add(r1); }
       (',' rN=columnReference { returning.add(rN); })*
     ;
@@ -1741,8 +1741,8 @@ columnReference returns [ColumnReference.Raw vterm]
     @init { List<Term.Raw> terms = new ArrayList<>(2); }
     @after { $vterm = newColumnReference(terms); }
     : {isParsingTxn}?
-      ( v1=IDENT { terms.add(Constants.Literal.string($v1.text)); }
-      ('.' v2=IDENT { terms.add(Constants.Literal.string($v2.text)); } | ('.' v2=QUOTED_NAME { terms.add(Constants.Literal.string($v2.text)); }))? )
+      ((v1=IDENT { terms.add(Constants.Literal.string($v1.text)); } | v1=QUOTED_NAME { terms.add(Constants.Literal.string($v1.text)); })
+       ('.' v2=IDENT { terms.add(Constants.Literal.string($v2.text)); } | ('.' v2=QUOTED_NAME { terms.add(Constants.Literal.string($v2.text)); }))? )
     ;
 
 termOrColumnRef returns [Term.Raw term]
