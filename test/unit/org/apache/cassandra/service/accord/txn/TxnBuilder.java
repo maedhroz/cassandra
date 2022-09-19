@@ -77,19 +77,16 @@ public class TxnBuilder
         return this;
     }
 
-    public TxnBuilder withWrite(String query, TxnReferenceOperations referenceOps)
+    public TxnBuilder withWrite(String query, TxnReferenceOperations referenceOps, VariableSpecifications variables, QueryOptions options)
     {
         ModificationStatement.Parsed parsed = (ModificationStatement.Parsed) QueryProcessor.parseStatement(query);
-        VariableSpecifications bindVariables = VariableSpecifications.empty();
-        ModificationStatement prepared = parsed.prepare(bindVariables);
-
-        // TODO: Is forInternalCalls() correct here?
-        return withWrite(prepared.getTxnUpdate(ClientState.forInternalCalls(), QueryOptions.DEFAULT), referenceOps);
+        ModificationStatement prepared = parsed.prepare(variables);
+        return withWrite(prepared.getTxnUpdate(ClientState.forInternalCalls(), options), referenceOps);
     }
 
     public TxnBuilder withWrite(String query)
     {
-        return withWrite(query, TxnReferenceOperations.empty());
+        return withWrite(query, TxnReferenceOperations.empty(), VariableSpecifications.empty(), QueryOptions.DEFAULT);
     }
 
     static ValueReference reference(String name, int index, String column)

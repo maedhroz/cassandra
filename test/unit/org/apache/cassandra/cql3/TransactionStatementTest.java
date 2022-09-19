@@ -20,10 +20,12 @@ package org.apache.cassandra.cql3;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 
 import com.google.common.collect.ImmutableList;
+
 import org.assertj.core.api.Assertions;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -37,6 +39,8 @@ import org.apache.cassandra.db.Columns;
 import org.apache.cassandra.db.DecoratedKey;
 import org.apache.cassandra.db.LivenessInfo;
 import org.apache.cassandra.db.RegularAndStaticColumns;
+import org.apache.cassandra.db.marshal.Int32Type;
+import org.apache.cassandra.db.marshal.ListType;
 import org.apache.cassandra.db.partitions.PartitionUpdate;
 import org.apache.cassandra.db.rows.BTreeRow;
 import org.apache.cassandra.db.rows.Row;
@@ -79,10 +83,12 @@ public class TransactionStatementTest
     private static final TableId TABLE1_ID = TableId.fromString("00000000-0000-0000-0000-000000000001");
     private static final TableId TABLE2_ID = TableId.fromString("00000000-0000-0000-0000-000000000002");
     private static final TableId TABLE3_ID = TableId.fromString("00000000-0000-0000-0000-000000000003");
+    private static final TableId TABLE4_ID = TableId.fromString("00000000-0000-0000-0000-000000000004");
 
     private static TableMetadata TABLE1;
     private static TableMetadata TABLE2;
     private static TableMetadata TABLE3;
+    private static TableMetadata TABLE4;
 
     @BeforeClass
     public static void beforeClass() throws Exception
@@ -91,11 +97,53 @@ public class TransactionStatementTest
         SchemaLoader.createKeyspace("ks", KeyspaceParams.simple(1),
                                     parse("CREATE TABLE tbl1 (k int, c int, v int, primary key (k, c))", "ks").id(TABLE1_ID),
                                     parse("CREATE TABLE tbl2 (k int, c int, v int, primary key (k, c))", "ks").id(TABLE2_ID),
-                                    parse("CREATE TABLE tbl3 (k int PRIMARY KEY, \"with spaces\" int, \"with\"\"quote\" int, \"MiXeD_CaSe\" int)", "ks").id(TABLE3_ID));
+                                    parse("CREATE TABLE tbl3 (k int PRIMARY KEY, \"with spaces\" int, \"with\"\"quote\" int, \"MiXeD_CaSe\" int)", "ks").id(TABLE3_ID),
+                                    parse("CREATE TABLE tbl4 (k int PRIMARY KEY, int_list list<int>)", "ks").id(TABLE4_ID));
 
         TABLE1 = Schema.instance.getTableMetadata("ks", "tbl1");
         TABLE2 = Schema.instance.getTableMetadata("ks", "tbl2");
         TABLE3 = Schema.instance.getTableMetadata("ks", "tbl3");
+        TABLE4 = Schema.instance.getTableMetadata("ks", "tbl4");
+    }
+
+    @Test
+    public void testListCondition()
+    {
+        String update = "BEGIN TRANSACTION\n" +
+                        "  LET row1 = (SELECT * FROM ks.tbl4 WHERE k = ?);\n" +
+                        "  SELECT row1.int_list;\n" +
+                        "  IF row1.int_list = ? THEN\n" +
+                        "    UPDATE ks.tbl4 SET int_list = ? WHERE k = ?;\n" +
+                        "  END IF\n" +
+                        "COMMIT TRANSACTION";
+
+        ListType<Integer> listType = ListType.getInstance(Int32Type.instance, true);
+        List<Integer> initialList = Arrays.asList(1, 2);
+        ByteBuffer initialListBytes = listType.serializer.serialize(initialList);
+
+        List<Integer> updatedList = Arrays.asList(1, 2, 3);
+        ByteBuffer updatedListBytes = listType.serializer.serialize(updatedList);
+
+        Txn expected = TxnBuilder.builder()
+                                 .withRead("row1", "SELECT * FROM ks.tbl4 WHERE k = 0")
+                                 .withWrite("UPDATE ks.tbl4 SET int_list = ? WHERE k = 0",
+                                            TxnReferenceOperations.empty(),
+                                            new VariableSpecifications(Collections.singletonList(new ColumnIdentifier("int_list", true))),
+                                            QueryOptions.forInternalCalls(Collections.singletonList(updatedListBytes)))
+                                 .withEqualsCondition("row1", 0, "ks.tbl4.int_list", initialListBytes)
+                                 .build();
+
+        TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(update);
+        TransactionStatement statement = (TransactionStatement) parsed.prepare(ClientState.forInternalCalls());
+
+        List<ByteBuffer> values = ImmutableList.of(bytes(0), initialListBytes, updatedListBytes, bytes(0));
+        Txn actual = statement.createTxn(ClientState.forInternalCalls(), QueryOptions.forInternalCalls(values));
+        
+        // TODO: Find a better way to test, given list paths are randomly generated and therefore not comparable.
+        assertEquals(expected.toString().length(), actual.toString().length());
+        
+        assertEquals(1, statement.getReturningReferences().size());
+        assertEquals("int_list", statement.getReturningReferences().get(0).column.name.toString());
     }
 
     @Test
