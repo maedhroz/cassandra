@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.util.Objects;
 
 import org.apache.cassandra.db.rows.BufferCell;
+import org.apache.cassandra.db.rows.Cell;
 import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.io.IVersionedSerializer;
 import org.apache.cassandra.io.util.DataInputPlus;
@@ -67,10 +68,13 @@ public class TxnReferenceOperation
         return receiver;
     }
 
-    public void apply(TxnData data, Row.Builder row, long timestamp, int nowInSeconds)
+    public void apply(TxnData data, Row.Builder row, long timestamp)
     {
-        // FIXME: this will probably be insufficient when dealing with collection columns
-        row.addCell(BufferCell.live(receiver, timestamp, value.compute(data, receiver.type)));
+        if (receiver.isComplex())
+            for (Cell<?> cell : value.computeComplex(data, receiver.type))
+                row.addCell(cell);
+        else
+            row.addCell(BufferCell.live(receiver, timestamp, value.compute(data, receiver.type)));
     }
 
     public static final IVersionedSerializer<TxnReferenceOperation> serializer = new IVersionedSerializer<TxnReferenceOperation>()

@@ -147,6 +147,42 @@ public class TransactionStatementTest
     }
 
     @Test
+    public void testListSubstitution()
+    {
+        String update = "BEGIN TRANSACTION\n" +
+                        "  LET row1 = (SELECT * FROM ks.tbl4 WHERE k = ?);\n" +
+                        "  SELECT row1.int_list;\n" +
+                        "  IF row1.int_list = [1, 2] THEN\n" +
+                        "    UPDATE ks.tbl4 SET int_list = row1.int_list WHERE k = ?;\n" +
+                        "  END IF\n" +
+                        "COMMIT TRANSACTION";
+
+        ListType<Integer> listType = ListType.getInstance(Int32Type.instance, true);
+        List<Integer> initialList = Arrays.asList(1, 2);
+        ByteBuffer initialListBytes = listType.serializer.serialize(initialList);
+
+        List<TxnReferenceOperation> partitionOps = new ArrayList<>();
+        partitionOps.add(new TxnReferenceOperation(column(TABLE4, "int_list"), new Substitution(reference("row1", TABLE4, "int_list", 0))));
+        TxnReferenceOperations referenceOps = new TxnReferenceOperations(TABLE4, Clustering.EMPTY, partitionOps, Collections.emptyList());
+
+        Txn expected = TxnBuilder.builder()
+                                 .withRead("row1", "SELECT * FROM ks.tbl4 WHERE k = 0")
+                                 .withWrite(emptyUpdate(TABLE4, 1, Clustering.EMPTY, false), referenceOps)
+                                 .withEqualsCondition("row1", 0, "ks.tbl4.int_list", initialListBytes)
+                                 .build();
+
+        TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(update);
+        TransactionStatement statement = (TransactionStatement) parsed.prepare(ClientState.forInternalCalls());
+
+        List<ByteBuffer> values = ImmutableList.of(bytes(0), bytes(1));
+        Txn actual = statement.createTxn(ClientState.forInternalCalls(), QueryOptions.forInternalCalls(values));
+
+        assertEquals(expected, actual);
+        assertEquals(1, statement.getReturningReferences().size());
+        assertEquals("int_list", statement.getReturningReferences().get(0).column.name.toString());
+    }
+
+    @Test
     public void shouldRejectReferenceSelectOutsideTxn()
     {
         Assertions.assertThatThrownBy(() -> QueryProcessor.parseStatement("SELECT row1.v, row2.v;"))
@@ -661,12 +697,17 @@ public class TransactionStatementTest
 
     private static PartitionUpdate emptyUpdate(TableMetadata metadata, int k, int c, boolean forInsert)
     {
+        return emptyUpdate(metadata, k, new BufferClustering(bytes(c)), forInsert);
+    }
+
+    private static PartitionUpdate emptyUpdate(TableMetadata metadata, int k, Clustering<?> c, boolean forInsert)
+    {
         DecoratedKey dk = metadata.partitioner.decorateKey(bytes(k));
         RegularAndStaticColumns columns = new RegularAndStaticColumns(Columns.from(metadata.regularColumns()), Columns.NONE);
         PartitionUpdate.Builder builder = new PartitionUpdate.Builder(metadata, dk, columns, 1);
 
         Row.Builder row = BTreeRow.unsortedBuilder();
-        row.newRow(new BufferClustering(bytes(c)));
+        row.newRow(c);
         if (forInsert)
             row.addPrimaryKeyLivenessInfo(LivenessInfo.create(0, 0));
         builder.add(row.build());

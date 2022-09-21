@@ -26,8 +26,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.Executor;
-import java.util.function.Function;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
@@ -252,7 +250,7 @@ public class TxnWrite extends AbstractKeySorted<TxnWrite.Update> implements Writ
                 builder.newRow(clustering);
             }
 
-            operations.forEach(op -> op.apply(data, builder, 0, 0));
+            operations.forEach(op -> op.apply(data, builder, 0));
 
             return builder.build();
         }
@@ -269,7 +267,6 @@ public class TxnWrite extends AbstractKeySorted<TxnWrite.Update> implements Writ
                                                                                    baseUpdate.canHaveShadowedData());
 
             Row.Builder rowBuilder = BTreeRow.unsortedBuilder();
-
             Row staticRow = applyUpdates(baseUpdate.staticRow(), referenceOps.statics, Clustering.STATIC_CLUSTERING, rowBuilder, data);
 
             if (!staticRow.isEmpty())

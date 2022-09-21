@@ -30,6 +30,7 @@ import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.marshal.NumberType;
 import org.apache.cassandra.db.rows.Cell;
 import org.apache.cassandra.db.rows.ColumnData;
+import org.apache.cassandra.db.rows.ComplexColumnData;
 import org.apache.cassandra.io.IVersionedSerializer;
 import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.DataOutputPlus;
@@ -54,6 +55,11 @@ public abstract class TxnReferenceValue
 
     public abstract Kind kind();
     public abstract ByteBuffer compute(TxnData data, AbstractType<?> receiver);
+    
+    public ComplexColumnData computeComplex(TxnData data, AbstractType<?> receiver)
+    {
+        throw new UnsupportedOperationException("Complex compute not supported on type " + receiver + " for kind " + kind());
+    }
 
     /**
      * Serializer for everything except Kind
@@ -172,9 +178,21 @@ public abstract class TxnReferenceValue
             // TODO: confirm all references can be satisfied as part of the txn condition
             // TODO: if the receiver type is not the same as the column type here, we need to do the neccesary conversion
             Preconditions.checkArgument(receiver == reference.column().type);
+            Preconditions.checkArgument(!reference.column().isComplex());
+
             ColumnData columnData = reference.getColumnData(data);
-            assert !columnData.column().isComplex() : "TODO: Complex column support";
             return ((Cell<?>) columnData).buffer();
+        }
+
+        @Override
+        public ComplexColumnData computeComplex(TxnData data, AbstractType<?> receiver)
+        {
+            // TODO: Add messages if we keep these...
+            Preconditions.checkArgument(receiver == reference.column().type);
+            Preconditions.checkArgument(reference.column().isComplex());
+
+            ColumnData columnData = reference.getColumnData(data);
+            return (ComplexColumnData) columnData;
         }
 
         static final Serializer<Substitution> serializer = new Serializer<Substitution>()

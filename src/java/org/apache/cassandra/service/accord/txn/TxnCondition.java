@@ -318,8 +318,8 @@ public abstract class TxnCondition
                     int cmp = reference.column().type.compare(packed, value);
                     return evaluateComparisonForKind(cmp);
                 }
-                
-                // TODO: UDTs and tuples
+
+                throw new UnsupportedOperationException("TODO: UDT and tuple support");
             }
 
             int cmp = compare((Cell<?>) columnData);
@@ -331,7 +331,8 @@ public abstract class TxnCondition
             return reference.column().type.compare(cell.value(), cell.accessor(), value, ByteBufferAccessor.instance);
         }
 
-        private ByteBuffer toCollectionBytes(ComplexColumnData columnData)
+        // TODO: What would the best place for this be?
+        static ByteBuffer toCollectionBytes(ComplexColumnData columnData)
         {
             List<ByteBuffer> values = new ArrayList<>(columnData.cellsCount());
 
