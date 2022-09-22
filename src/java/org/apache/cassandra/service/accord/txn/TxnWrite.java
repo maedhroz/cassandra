@@ -53,6 +53,7 @@ import org.apache.cassandra.service.accord.SerializationUtils;
 import org.apache.cassandra.service.accord.api.AccordKey;
 import org.apache.cassandra.service.accord.api.AccordKey.PartitionKey;
 import org.apache.cassandra.utils.ByteBufferUtil;
+import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.ObjectSizes;
 import org.apache.cassandra.utils.concurrent.*;
 
@@ -250,7 +251,8 @@ public class TxnWrite extends AbstractKeySorted<TxnWrite.Update> implements Writ
                 builder.newRow(clustering);
             }
 
-            operations.forEach(op -> op.apply(data, builder, 0));
+            // TODO: Is this always the correct timestamp?
+            operations.forEach(op -> op.apply(data, builder, FBUtilities.timestampMicros()));
 
             return builder.build();
         }

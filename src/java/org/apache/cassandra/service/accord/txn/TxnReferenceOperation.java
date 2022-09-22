@@ -21,6 +21,7 @@ package org.apache.cassandra.service.accord.txn;
 import java.io.IOException;
 import java.util.Objects;
 
+import org.apache.cassandra.db.DeletionTime;
 import org.apache.cassandra.db.rows.BufferCell;
 import org.apache.cassandra.db.rows.Cell;
 import org.apache.cassandra.db.rows.Row;
@@ -28,6 +29,7 @@ import org.apache.cassandra.io.IVersionedSerializer;
 import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.DataOutputPlus;
 import org.apache.cassandra.schema.ColumnMetadata;
+import org.apache.cassandra.utils.FBUtilities;
 
 import static org.apache.cassandra.service.accord.SerializationUtils.columnMetadataSerializer;
 
@@ -71,8 +73,20 @@ public class TxnReferenceOperation
     public void apply(TxnData data, Row.Builder row, long timestamp)
     {
         if (receiver.isComplex())
+        {
             for (Cell<?> cell : value.computeComplex(data, receiver.type))
-                row.addCell(cell);
+                row.addCell(cell.withUpdatedTimestampAndLocalDeletionTime(timestamp, cell.localDeletionTime()));
+            
+            // TODO: Find a way to do this without instanceof...
+            if (value instanceof TxnReferenceValue.Substitution)
+            {
+                row.addComplexDeletion(receiver, new DeletionTime(timestamp, FBUtilities.nowInSeconds()));
+            }
+            else
+            {
+                throw new IllegalStateException("TODO: Support list/set concatenation");
+            }
+        }
         else
             row.addCell(BufferCell.live(receiver, timestamp, value.compute(data, receiver.type)));
     }
