@@ -47,7 +47,7 @@ public abstract class TxnReferenceValue
 
         final Serializer serializer;
 
-        Kind(Serializer serializer)
+        Kind(Serializer<? extends TxnReferenceValue> serializer)
         {
             this.serializer = serializer;
         }
