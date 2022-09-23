@@ -42,8 +42,8 @@ public abstract class TxnReferenceValue
     {
         CONSTANT(Constant.serializer),
         SUBSTITUTION(Substitution.serializer),
-        ADDITION(Addition.serializer),
-        SUBTRACTION(Subtraction.serializer);
+        SUM(Sum.serializer),
+        DIFFERENCE(Difference.serializer);
 
         final Serializer serializer;
 
@@ -275,9 +275,9 @@ public abstract class TxnReferenceValue
         }
     }
 
-    public static class Addition extends BiValue
+    public static class Sum extends BiValue
     {
-        public Addition(TxnReferenceValue left, TxnReferenceValue right)
+        public Sum(TxnReferenceValue left, TxnReferenceValue right)
         {
             super(left, right);
         }
@@ -291,9 +291,16 @@ public abstract class TxnReferenceValue
         @Override
         public Kind kind()
         {
-            return Kind.ADDITION;
+            return Kind.SUM;
         }
 
+        @Override
+        public ComplexColumnData computeComplex(TxnData data, AbstractType<?> receiver)
+        {
+            // TODO: Works for list append, given the left substitution is a self-reference, but what are we missing?
+            return right.computeComplex(data, receiver);
+        }
+        
         @Override
         public ByteBuffer compute(TxnData data, AbstractType<?> receiver)
         {
@@ -308,12 +315,12 @@ public abstract class TxnReferenceValue
             }
         }
 
-        public static final Serializer<Addition> serializer = new BiValueSerializer<>(Addition::new);
+        public static final Serializer<Sum> serializer = new BiValueSerializer<>(Sum::new);
     }
 
-    public static class Subtraction extends BiValue
+    public static class Difference extends BiValue
     {
-        public Subtraction(TxnReferenceValue left, TxnReferenceValue right)
+        public Difference(TxnReferenceValue left, TxnReferenceValue right)
         {
             super(left, right);
         }
@@ -327,7 +334,7 @@ public abstract class TxnReferenceValue
         @Override
         public Kind kind()
         {
-            return Kind.SUBTRACTION;
+            return Kind.DIFFERENCE;
         }
 
         @Override
@@ -344,7 +351,7 @@ public abstract class TxnReferenceValue
             }
         }
 
-        public static final Serializer<Subtraction> serializer = new BiValueSerializer<>(Subtraction::new);
+        public static final Serializer<Difference> serializer = new BiValueSerializer<>(Difference::new);
     }
 
     public static final IVersionedSerializer<TxnReferenceValue> serializer = new IVersionedSerializer<TxnReferenceValue>()

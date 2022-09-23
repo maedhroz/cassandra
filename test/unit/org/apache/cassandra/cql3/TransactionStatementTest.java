@@ -55,10 +55,10 @@ import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.service.accord.txn.TxnBuilder;
 import org.apache.cassandra.service.accord.txn.TxnReferenceOperation;
 import org.apache.cassandra.service.accord.txn.TxnReferenceOperations;
-import org.apache.cassandra.service.accord.txn.TxnReferenceValue.Addition;
+import org.apache.cassandra.service.accord.txn.TxnReferenceValue.Sum;
 import org.apache.cassandra.service.accord.txn.TxnReferenceValue.Constant;
 import org.apache.cassandra.service.accord.txn.TxnReferenceValue.Substitution;
-import org.apache.cassandra.service.accord.txn.TxnReferenceValue.Subtraction;
+import org.apache.cassandra.service.accord.txn.TxnReferenceValue.Difference;
 import org.apache.cassandra.service.accord.txn.ValueReference;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
@@ -671,13 +671,13 @@ public class TransactionStatementTest
 
         List<TxnReferenceOperation> row1Values = new ArrayList<>();
         row1Values.add(new TxnReferenceOperation(column(TABLE1, "v"),
-                                                 new Addition(new Substitution(reference("update1", TABLE1, "v", 0)),
+                                                 new Sum(new Substitution(reference("update1", TABLE1, "v", 0)),
                                                               new Constant(ByteBufferUtil.bytes(1)))));
         TxnReferenceOperations row1Ops = new TxnReferenceOperations(TABLE1, Clustering.make(bytes(2)), row1Values, Collections.emptyList());
 
         List<TxnReferenceOperation> row2Values = new ArrayList<>();
         row2Values.add(new TxnReferenceOperation(column(TABLE2, "v"),
-                                              new Subtraction(new Substitution(reference("update2", TABLE2, "v", 0)),
+                                              new Difference(new Substitution(reference("update2", TABLE2, "v", 0)),
                                                               new Constant(ByteBufferUtil.bytes(1)))));
         TxnReferenceOperations row2Ops = new TxnReferenceOperations(TABLE2, Clustering.make(bytes(2)), row2Values, Collections.emptyList());
 

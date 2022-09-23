@@ -350,7 +350,7 @@ public class AccordIntegrationTest extends TestBaseImpl
 
     // TODO: Paremeterize these for frozen/unfrozen...
     @Test
-    public void testListReferences() throws Exception
+    public void testListEqCondition() throws Exception
     {
         test("CREATE TABLE " + keyspace + ".tbl (k int PRIMARY KEY, int_list list<int>)",
              cluster ->
@@ -461,25 +461,51 @@ public class AccordIntegrationTest extends TestBaseImpl
     public void testListReplacement() throws Exception
     {
         test("CREATE TABLE " + keyspace + ".tbl (k int PRIMARY KEY, int_list list<int>)",
-                cluster ->
-                {
-                    cluster.coordinator(1).execute("INSERT INTO " + keyspace + ".tbl (k, int_list) VALUES (0, [1, 2]);", ConsistencyLevel.ALL);
-                    cluster.coordinator(1).execute("INSERT INTO " + keyspace + ".tbl (k, int_list) VALUES (1, [3, 4]);", ConsistencyLevel.ALL);
-    
-                    String update = "BEGIN TRANSACTION\n" +
-                                    "  LET row1 = (SELECT * FROM " + keyspace + ".tbl WHERE k = 1);\n" +
-                                    "  SELECT row1.int_list;\n" +
-                                    "  IF row1.int_list = [3, 4] THEN\n" +
-                                    "    UPDATE " + keyspace + ".tbl SET int_list = row1.int_list WHERE k=0;\n" +
-                                    "  END IF\n" +
-                                    "COMMIT TRANSACTION";
-                    assertRowEqualsWithPreemptedRetry(cluster, new Object[]{ Arrays.asList(3, 4) }, update);
-    
-                    String check = "BEGIN TRANSACTION\n" +
-                                   "  SELECT * FROM " + keyspace + ".tbl WHERE k = 0;\n" +
-                                   "COMMIT TRANSACTION";
-                    assertRowEqualsWithPreemptedRetry(cluster, new Object[] {0, Arrays.asList(3, 4)}, check);
-                }
+             cluster ->
+             {
+                 cluster.coordinator(1).execute("INSERT INTO " + keyspace + ".tbl (k, int_list) VALUES (0, [1, 2]);", ConsistencyLevel.ALL);
+                 cluster.coordinator(1).execute("INSERT INTO " + keyspace + ".tbl (k, int_list) VALUES (1, [3, 4]);", ConsistencyLevel.ALL);
+
+                 String update = "BEGIN TRANSACTION\n" +
+                                 "  LET row1 = (SELECT * FROM " + keyspace + ".tbl WHERE k = 1);\n" +
+                                 "  SELECT row1.int_list;\n" +
+                                 "  IF row1.int_list = [3, 4] THEN\n" +
+                                 "    UPDATE " + keyspace + ".tbl SET int_list = row1.int_list WHERE k=0;\n" +
+                                 "  END IF\n" +
+                                 "COMMIT TRANSACTION";
+                 assertRowEqualsWithPreemptedRetry(cluster, new Object[] {Arrays.asList(3, 4)}, update);
+
+                 String check = "BEGIN TRANSACTION\n" +
+                                "  SELECT * FROM " + keyspace + ".tbl WHERE k = 0;\n" +
+                                "COMMIT TRANSACTION";
+                 assertRowEqualsWithPreemptedRetry(cluster, new Object[] {0, Arrays.asList(3, 4)}, check);
+             }
+        );
+    }
+
+    @Test
+    public void testListAppend() throws Exception
+    {
+        test("CREATE TABLE " + keyspace + ".tbl (k int PRIMARY KEY, int_list list<int>)",
+             cluster ->
+             {
+                 cluster.coordinator(1).execute("INSERT INTO " + keyspace + ".tbl (k, int_list) VALUES (0, [1, 2]);", ConsistencyLevel.ALL);
+                 cluster.coordinator(1).execute("INSERT INTO " + keyspace + ".tbl (k, int_list) VALUES (1, [3, 4]);", ConsistencyLevel.ALL);
+
+                 String update = "BEGIN TRANSACTION\n" +
+                                 "  LET row1 = (SELECT * FROM " + keyspace + ".tbl WHERE k = 1);\n" +
+                                 "  SELECT row1.int_list;\n" +
+                                 "  IF row1.int_list = [3, 4] THEN\n" +
+                                 "    UPDATE " + keyspace + ".tbl SET int_list += row1.int_list WHERE k=0;\n" +
+                                 "  END IF\n" +
+                                 "COMMIT TRANSACTION";
+                 assertRowEqualsWithPreemptedRetry(cluster, new Object[] {Arrays.asList(3, 4)}, update);
+
+                 String check = "BEGIN TRANSACTION\n" +
+                                "  SELECT * FROM " + keyspace + ".tbl WHERE k = 0;\n" +
+                                "COMMIT TRANSACTION";
+                 assertRowEqualsWithPreemptedRetry(cluster, new Object[] {0, Arrays.asList(1, 2, 3, 4)}, check);
+             }
         );
     }
 

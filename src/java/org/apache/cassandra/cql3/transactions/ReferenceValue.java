@@ -206,7 +206,7 @@ public abstract class ReferenceValue
         @Override
         public TxnReferenceValue bindAndGet(QueryOptions options)
         {
-            return new TxnReferenceValue.Addition(left.bindAndGet(options), right.bindAndGet(options));
+            return new TxnReferenceValue.Sum(left.bindAndGet(options), right.bindAndGet(options));
         }
 
         public static class Raw extends ReferenceValue.Raw
@@ -262,7 +262,7 @@ public abstract class ReferenceValue
         @Override
         public TxnReferenceValue bindAndGet(QueryOptions options)
         {
-            return new TxnReferenceValue.Subtraction(left.bindAndGet(options), right.bindAndGet(options));
+            return new TxnReferenceValue.Difference(left.bindAndGet(options), right.bindAndGet(options));
         }
 
         public static class Raw extends ReferenceValue.Raw

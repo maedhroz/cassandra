@@ -74,18 +74,19 @@ public class TxnReferenceOperation
     {
         if (receiver.isComplex())
         {
+            // TODO: Do we actually want to support list subtraction, given it requires a read?
+            if (value instanceof TxnReferenceValue.Difference)
+                throw new IllegalStateException("TODO: Support list/set subtraction");
+            
             for (Cell<?> cell : value.computeComplex(data, receiver.type))
+                // TODO: Should we create a new Cell w/ new paths to account for TTLs?
+                
                 row.addCell(cell.withUpdatedTimestampAndLocalDeletionTime(timestamp, cell.localDeletionTime()));
             
             // TODO: Find a way to do this without instanceof...
             if (value instanceof TxnReferenceValue.Substitution)
-            {
-                row.addComplexDeletion(receiver, new DeletionTime(timestamp, FBUtilities.nowInSeconds()));
-            }
-            else
-            {
-                throw new IllegalStateException("TODO: Support list/set concatenation");
-            }
+                // TODO: Reconcile w/ Lists.Setter?
+                row.addComplexDeletion(receiver, new DeletionTime(timestamp - 1, FBUtilities.nowInSeconds()));
         }
         else
             row.addCell(BufferCell.live(receiver, timestamp, value.compute(data, receiver.type)));

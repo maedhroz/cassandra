@@ -1756,14 +1756,24 @@ columnOperation[UpdateStatement.OperationCollector operations]
 
 columnOperationDifferentiator[UpdateStatement.OperationCollector operations, ColumnIdentifier key]
     : '=' normalColumnOperation[operations, key]
-    | '=' columnReferenceOperation[operations, key]
+    | columnReferenceOperation[operations, key]
     | shorthandColumnOperation[operations, key]
     | '[' k=term ']' collectionColumnOperation[operations, key, k]
     | '.' field=fident udtColumnOperation[operations, key, field]
     ;
 
 columnReferenceOperation[UpdateStatement.OperationCollector operations, ColumnIdentifier key]
-    : c=columnReference { addRawReferenceOperation(operations, key, new ReferenceOperation.Assignment.Raw(key, new ReferenceValue.Substitution.Raw(c))); }
+    : '=' c=columnReference 
+      {
+        addRawReferenceOperation(operations, key, new ReferenceOperation.Assignment.Raw(key, new ReferenceValue.Substitution.Raw(c)));
+      }
+    | '+=' c=columnReference
+      {
+        ReferenceValue.Raw left = new ReferenceValue.SelfReference(key);
+        ReferenceValue.Raw right = new ReferenceValue.Substitution.Raw(c);
+        ReferenceValue.Raw operation = new ReferenceValue.Addition.Raw(left, right);
+        addRawReferenceOperation(operations, key, new ReferenceOperation.Assignment.Raw(key, operation));
+      }
     ;
 
 normalColumnOperation[UpdateStatement.OperationCollector operations, ColumnIdentifier key]
