@@ -1741,13 +1741,14 @@ columnReference returns [ColumnReference.Raw vterm]
     @init { List<Term.Raw> terms = new ArrayList<>(2); }
     @after { $vterm = newColumnReference(terms); }
     : {isParsingTxn}?
-      ((v1=IDENT { terms.add(Constants.Literal.string($v1.text)); } | v1=QUOTED_NAME { terms.add(Constants.Literal.string($v1.text)); })
-       ('.' v2=IDENT { terms.add(Constants.Literal.string($v2.text)); } | ('.' v2=QUOTED_NAME { terms.add(Constants.Literal.string($v2.text)); }))? )
+      (v1=identOrQuotedName { terms.add(Constants.Literal.string($v1.text)); })
+      ('.' v2=identOrQuotedName { terms.add(Constants.Literal.string($v2.text)); }
+       ('[' v3=term ']' { terms.add(v3); })?)?
     ;
-
-termOrColumnRef returns [Term.Raw term]
-    : t=term            { $term = t; }
-    | c=columnReference { $term = c; }
+    
+identOrQuotedName
+    : IDENT
+    | QUOTED_NAME
     ;
 
 columnOperation[UpdateStatement.OperationCollector operations]

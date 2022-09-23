@@ -33,6 +33,7 @@ import com.google.common.base.Splitter;
 import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.Uninterruptibles;
 
 import org.assertj.core.api.Assertions;
@@ -574,6 +575,30 @@ public class AccordIntegrationTest extends TestBaseImpl
                                 "  SELECT * FROM " + keyspace + ".tbl WHERE k = 0;\n" +
                                 "COMMIT TRANSACTION";
                  assertRowEqualsWithPreemptedRetry(cluster, new Object[] {0, Arrays.asList(1, 2)}, check);
+             }
+        );
+    }
+
+    @Test
+    public void testSetSelection() throws Exception
+    {
+        test("CREATE TABLE " + keyspace + ".tbl (k int PRIMARY KEY, int_set set<int>)",
+             cluster ->
+             {
+                 cluster.coordinator(1).execute("INSERT INTO " + keyspace + ".tbl (k, int_set) VALUES (1, {10, 20, 30, 40});", ConsistencyLevel.ALL);
+
+                 String selectEntireSet = "BEGIN TRANSACTION\n" +
+                                          "  LET row1 = (SELECT * FROM " + keyspace + ".tbl WHERE k = 1);\n" +
+                                          "  SELECT row1.int_set;\n" +
+                                          "COMMIT TRANSACTION";
+                 assertRowEqualsWithPreemptedRetry(cluster, new Object[] { ImmutableSet.of(10, 20, 30, 40) }, selectEntireSet);
+
+                 String selectSingleElement = "BEGIN TRANSACTION\n" +
+                                              "  LET row1 = (SELECT * FROM " + keyspace + ".tbl WHERE k = 1);\n" +
+                                              "  SELECT row1.int_set[10];\n" +
+                                              "COMMIT TRANSACTION";
+                 // TODO: Look at full qualified name...
+                 assertRowEqualsWithPreemptedRetry(cluster, new Object[] { 10 }, selectSingleElement);
              }
         );
     }

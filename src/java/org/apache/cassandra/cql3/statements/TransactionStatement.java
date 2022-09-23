@@ -52,7 +52,9 @@ import org.apache.cassandra.db.ReadQuery;
 import org.apache.cassandra.db.SinglePartitionReadCommand;
 import org.apache.cassandra.db.SinglePartitionReadQuery;
 import org.apache.cassandra.db.filter.DataLimits;
+import org.apache.cassandra.db.marshal.SetType;
 import org.apache.cassandra.db.partitions.FilteredPartition;
+import org.apache.cassandra.db.rows.Cell;
 import org.apache.cassandra.db.rows.ColumnData;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.schema.TableMetadata;
@@ -255,7 +257,13 @@ public class TransactionStatement implements CQLStatement
             for (ColumnReference reference : returningReferences)
             {
                 ColumnIdentifier fullName = reference.getFullyQualifiedName();
-                names.add(reference.column.withNewName(fullName));
+                ColumnMetadata forMetadata = reference.column.withNewName(fullName);
+                
+                // TODO: This likely will need some expansion for tuple/UDT?
+                if (reference.isSetElementSelection())
+                    forMetadata = forMetadata.withNewType(((SetType<?>) forMetadata.type).nameComparator());
+                
+                names.add(forMetadata);
                 columns.add(reference.column);
             }
 
@@ -265,7 +273,11 @@ public class TransactionStatement implements CQLStatement
             for (ColumnReference reference : returningReferences)
             {
                 ColumnData columnData = reference.toValueReference(options).getColumnData(data);
-                result.add(columnData, FBUtilities.nowInSeconds());
+                
+                if (reference.isSetElementSelection())
+                    result.add(((Cell<?>) columnData).path().get(0));
+                else
+                    result.add(columnData, FBUtilities.nowInSeconds());
             }
 
             return new ResultMessage.Rows(result.build());

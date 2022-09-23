@@ -27,7 +27,9 @@ import com.google.common.base.Preconditions;
 
 import org.apache.cassandra.cql3.functions.Function;
 import org.apache.cassandra.db.marshal.AbstractType;
+import org.apache.cassandra.db.marshal.CollectionType;
 import org.apache.cassandra.db.marshal.Int32Type;
+import org.apache.cassandra.db.marshal.SetType;
 import org.apache.cassandra.db.marshal.UTF8Type;
 import org.apache.cassandra.db.rows.CellPath;
 import org.apache.cassandra.exceptions.InvalidRequestException;
@@ -45,8 +47,8 @@ public class ColumnReference implements Term
     private final String selectName;
     private final Term rowIndex;
     public final ColumnMetadata column;
-
     private final Term cellPath;
+    
     public ColumnReference(String selectName, Term rowIndex, ColumnMetadata column, Term cellPath)
     {
         this.selectName = selectName;
@@ -87,6 +89,11 @@ public class ColumnReference implements Term
     {
         // TODO: this
     }
+    
+    public boolean isSetElementSelection()
+    {
+        return cellPath != null && column.type instanceof SetType;
+    }
 
     private int bindRowIndex(QueryOptions options)
     {
@@ -100,13 +107,14 @@ public class ColumnReference implements Term
 
     public ValueReference toValueReference(QueryOptions options)
     {
-        Preconditions.checkArgument(cellPath == null);
+        Preconditions.checkArgument(cellPath == null || column.isComplex());
         return new ValueReference(selectName, bindRowIndex(options), column, bindCellPath(options));
     }
 
     public ColumnIdentifier getFullyQualifiedName()
     {
-        return new ColumnIdentifier(selectName + '.' + column.name.toString(), true);
+        String fullName = selectName + '.' + column.name.toString() + (cellPath == null ? "" : '[' + cellPath.toString() + ']');
+        return new ColumnIdentifier(fullName, true);
     }
 
     public static class Raw extends Term.Raw
@@ -176,7 +184,32 @@ public class ColumnReference implements Term
                 return;
             }
 
-            throw new UnsupportedOperationException("TODO: support collections, udts, etc");
+            if (column.type.isCollection() && column.type.isMultiCell())
+            {
+                Term.Raw subSelection = termIterator.next();
+                cellPath = subSelection.prepare(column.ksName, specForElementOrSlice(column, "Element"));
+            }
+            else
+            {
+                throw new UnsupportedOperationException("TODO: support frozen collections, udts, etc");
+            }
+
+            if (!termIterator.hasNext())
+            {
+                resolveFinished();
+                return;
+            }
+        }
+
+        private ColumnSpecification specForElementOrSlice(ColumnSpecification receiver, String selectionType)
+        {
+            switch (((CollectionType<?>) receiver.type).kind)
+            {
+                case LIST: throw new InvalidRequestException(String.format("%s selection is only allowed on sets and maps", selectionType));
+                case SET: return Sets.valueSpecOf(receiver);
+                case MAP: return Maps.keySpecOf(receiver);
+                default: throw new AssertionError();
+            }
         }
 
         public void manualResolve(String selectName, ColumnMetadata column, int rowIndex, Term cellPath)
