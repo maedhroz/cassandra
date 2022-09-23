@@ -1774,6 +1774,13 @@ columnReferenceOperation[UpdateStatement.OperationCollector operations, ColumnId
         ReferenceValue.Raw operation = new ReferenceValue.Addition.Raw(left, right);
         addRawReferenceOperation(operations, key, new ReferenceOperation.Assignment.Raw(key, operation));
       }
+    | '-=' c=columnReference
+      {
+        ReferenceValue.Raw left = new ReferenceValue.SelfReference(key);
+        ReferenceValue.Raw right = new ReferenceValue.Substitution.Raw(c);
+        ReferenceValue.Raw operation = new ReferenceValue.Subtraction.Raw(left, right);
+        addRawReferenceOperation(operations, key, new ReferenceOperation.Assignment.Raw(key, operation));
+      }
     ;
 
 normalColumnOperation[UpdateStatement.OperationCollector operations, ColumnIdentifier key]

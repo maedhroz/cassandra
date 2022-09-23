@@ -348,11 +348,21 @@ public class AccordIntegrationTest extends TestBaseImpl
         });
     }
 
-    // TODO: Paremeterize these for frozen/unfrozen...
     @Test
-    public void testListEqCondition() throws Exception
+    public void testMultiCellListEqCondition() throws Exception
     {
-        test("CREATE TABLE " + keyspace + ".tbl (k int PRIMARY KEY, int_list list<int>)",
+        testListEqCondition("CREATE TABLE " + keyspace + ".tbl (k int PRIMARY KEY, int_list list<int>)");
+    }
+
+    @Test
+    public void testFrozenListEqCondition() throws Exception
+    {
+        testListEqCondition("CREATE TABLE " + keyspace + ".tbl (k int PRIMARY KEY, int_list frozen<list<int>>)");
+    }
+
+    private void testListEqCondition(String ddl) throws Exception
+    {
+        test(ddl,
              cluster ->
              {
                  ListType<Integer> listType = ListType.getInstance(Int32Type.instance, true);
@@ -388,9 +398,20 @@ public class AccordIntegrationTest extends TestBaseImpl
     }
 
     @Test
-    public void testNullListConditions() throws Exception
+    public void testNullMultiCellListConditions() throws Exception
     {
-        test("CREATE TABLE " + keyspace + ".tbl (k int PRIMARY KEY, int_list list<int>)",
+        testNullListConditions("CREATE TABLE " + keyspace + ".tbl (k int PRIMARY KEY, int_list list<int>)");
+    }
+
+    @Test
+    public void testNullFrozenListConditions() throws Exception
+    {
+        testNullListConditions("CREATE TABLE " + keyspace + ".tbl (k int PRIMARY KEY, int_list frozen<list<int>>)");
+    }
+
+    private void testNullListConditions(String ddl) throws Exception
+    {
+        test(ddl,
              cluster ->
              {
                  cluster.coordinator(1).execute("INSERT INTO " + keyspace + ".tbl (k, int_list) VALUES (0, null);", ConsistencyLevel.ALL);
@@ -429,9 +450,20 @@ public class AccordIntegrationTest extends TestBaseImpl
     }
 
     @Test
-    public void testListSubstitution() throws Exception
+    public void testMultiCellListSubstitution() throws Exception
     {
-        test("CREATE TABLE " + keyspace + ".tbl (k int PRIMARY KEY, int_list list<int>)",
+        testListSubstitution("CREATE TABLE " + keyspace + ".tbl (k int PRIMARY KEY, int_list list<int>)");
+    }
+
+    @Test
+    public void testFrozenListSubstitution() throws Exception
+    {
+        testListSubstitution("CREATE TABLE " + keyspace + ".tbl (k int PRIMARY KEY, int_list frozen<list<int>>)");
+    }
+
+    private void testListSubstitution(String ddl) throws Exception
+    {
+        test(ddl,
              cluster ->
              {
                  ListType<Integer> listType = ListType.getInstance(Int32Type.instance, true);
@@ -458,9 +490,20 @@ public class AccordIntegrationTest extends TestBaseImpl
     }
 
     @Test
-    public void testListReplacement() throws Exception
+    public void testMultiCellListReplacement() throws Exception
     {
-        test("CREATE TABLE " + keyspace + ".tbl (k int PRIMARY KEY, int_list list<int>)",
+        testListReplacement("CREATE TABLE " + keyspace + ".tbl (k int PRIMARY KEY, int_list list<int>)");
+    }
+
+    @Test
+    public void testFrozenListReplacement() throws Exception
+    {
+        testListReplacement("CREATE TABLE " + keyspace + ".tbl (k int PRIMARY KEY, int_list frozen<list<int>>)");
+    }
+
+    private void testListReplacement(String ddl) throws Exception
+    {
+        test(ddl,
              cluster ->
              {
                  cluster.coordinator(1).execute("INSERT INTO " + keyspace + ".tbl (k, int_list) VALUES (0, [1, 2]);", ConsistencyLevel.ALL);
@@ -505,6 +548,32 @@ public class AccordIntegrationTest extends TestBaseImpl
                                 "  SELECT * FROM " + keyspace + ".tbl WHERE k = 0;\n" +
                                 "COMMIT TRANSACTION";
                  assertRowEqualsWithPreemptedRetry(cluster, new Object[] {0, Arrays.asList(1, 2, 3, 4)}, check);
+             }
+        );
+    }
+
+    @Test
+    public void testListSubtraction() throws Exception
+    {
+        test("CREATE TABLE " + keyspace + ".tbl (k int PRIMARY KEY, int_list list<int>)",
+             cluster ->
+             {
+                 cluster.coordinator(1).execute("INSERT INTO " + keyspace + ".tbl (k, int_list) VALUES (0, [1, 2, 3, 4]);", ConsistencyLevel.ALL);
+                 cluster.coordinator(1).execute("INSERT INTO " + keyspace + ".tbl (k, int_list) VALUES (1, [3, 4]);", ConsistencyLevel.ALL);
+
+                 String update = "BEGIN TRANSACTION\n" +
+                                 "  LET row1 = (SELECT * FROM " + keyspace + ".tbl WHERE k = 1);\n" +
+                                 "  SELECT row1.int_list;\n" +
+                                 "  IF row1.int_list = [3, 4] THEN\n" +
+                                 "    UPDATE " + keyspace + ".tbl SET int_list -= row1.int_list WHERE k=0;\n" +
+                                 "  END IF\n" +
+                                 "COMMIT TRANSACTION";
+                 assertRowEqualsWithPreemptedRetry(cluster, new Object[] {Arrays.asList(3, 4)}, update);
+
+                 String check = "BEGIN TRANSACTION\n" +
+                                "  SELECT * FROM " + keyspace + ".tbl WHERE k = 0;\n" +
+                                "COMMIT TRANSACTION";
+                 assertRowEqualsWithPreemptedRetry(cluster, new Object[] {0, Arrays.asList(1, 2)}, check);
              }
         );
     }

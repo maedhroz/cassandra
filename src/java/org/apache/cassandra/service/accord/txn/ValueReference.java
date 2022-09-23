@@ -77,7 +77,7 @@ public class ValueReference
         if (column != null)
             sb.append(':').append(column.ksName).append('.').append(column.cfName).append('.').append(column.name.toString());
 
-        sb.append('[').append(Integer.toString(rowIdx)).append(']');
+        sb.append('[').append(rowIdx).append(']');
 
         if (path != null)
             sb.append(path);
@@ -100,6 +100,7 @@ public class ValueReference
         return selectsRow() && column != null;
     }
 
+    // TODO: Use when collection elements come into play?
     public boolean selectsPath()
     {
         return selectsColumn() && path != null;

@@ -20,21 +20,28 @@ package org.apache.cassandra.service.accord.txn;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.BiFunction;
 
 import com.google.common.base.Preconditions;
 
+import org.apache.cassandra.db.DeletionTime;
 import org.apache.cassandra.db.TypeSizes;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.marshal.NumberType;
+import org.apache.cassandra.db.rows.BufferCell;
 import org.apache.cassandra.db.rows.Cell;
 import org.apache.cassandra.db.rows.ColumnData;
 import org.apache.cassandra.db.rows.ComplexColumnData;
+import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.io.IVersionedSerializer;
 import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.DataOutputPlus;
+import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.utils.ByteBufferUtil;
+import org.apache.cassandra.utils.FBUtilities;
 
 public abstract class TxnReferenceValue
 {
@@ -56,6 +63,11 @@ public abstract class TxnReferenceValue
     public abstract Kind kind();
     public abstract ByteBuffer compute(TxnData data, AbstractType<?> receiver);
     
+    public void applyComplex(TxnData data, ColumnMetadata receiver, Row.Builder row, long timestamp)
+    {
+        throw new UnsupportedOperationException("Complex apply not supported on type " + receiver + " for kind " + kind());
+    }
+
     public ComplexColumnData computeComplex(TxnData data, AbstractType<?> receiver)
     {
         throw new UnsupportedOperationException("Complex compute not supported on type " + receiver + " for kind " + kind());
@@ -195,6 +207,21 @@ public abstract class TxnReferenceValue
             return (ComplexColumnData) columnData;
         }
 
+        @Override
+        public void applyComplex(TxnData data, ColumnMetadata receiver, Row.Builder row, long timestamp)
+        {
+            // TODO: Add messages if we keep these...
+            Preconditions.checkArgument(receiver.type == reference.column().type);
+            Preconditions.checkArgument(reference.column().isComplex());
+
+            for (Cell<?> cell : computeComplex(data, receiver.type))
+                // TODO: Should we create a new Cell w/ new paths...account for TTLs?
+                row.addCell(cell.withUpdatedTimestampAndLocalDeletionTime(timestamp, cell.localDeletionTime()));
+
+            // TODO: Reconcile w/ Lists.Setter?
+            row.addComplexDeletion(receiver, new DeletionTime(timestamp - 1, FBUtilities.nowInSeconds()));
+        }
+
         static final Serializer<Substitution> serializer = new Serializer<Substitution>()
         {
             @Override
@@ -295,10 +322,11 @@ public abstract class TxnReferenceValue
         }
 
         @Override
-        public ComplexColumnData computeComplex(TxnData data, AbstractType<?> receiver)
+        public void applyComplex(TxnData data, ColumnMetadata receiver, Row.Builder row, long timestamp)
         {
-            // TODO: Works for list append, given the left substitution is a self-reference, but what are we missing?
-            return right.computeComplex(data, receiver);
+            for (Cell<?> cell : right.computeComplex(data, receiver.type))
+                // TODO: Should we create a new Cell w/ new paths...account for TTLs?
+                row.addCell(cell.withUpdatedTimestampAndLocalDeletionTime(timestamp, cell.localDeletionTime()));
         }
         
         @Override
@@ -349,6 +377,23 @@ public abstract class TxnReferenceValue
             {
                 throw new IllegalArgumentException("Unhandled type for addition: " + receiver);
             }
+        }
+
+        @Override
+        public void applyComplex(TxnData data, ColumnMetadata receiver, Row.Builder row, long timestamp)
+        {
+            ComplexColumnData existingCells = left.computeComplex(data, receiver.type);
+            ComplexColumnData doomedCells = right.computeComplex(data, receiver.type);
+
+            List<ByteBuffer> toDiscard = new ArrayList<>(doomedCells.cellsCount());
+            for (Cell<?> cell : doomedCells)
+                toDiscard.add(cell.buffer());
+
+            // TODO: Reuse logic in Lists.Discarder?
+            for (Cell<?> cell : existingCells)
+                if (toDiscard.contains(cell.buffer()))
+                    // TODO: Source nowInSeconds from overall txn context?
+                    row.addCell(BufferCell.tombstone(receiver, timestamp, FBUtilities.nowInSeconds(), cell.path()));
         }
 
         public static final Serializer<Difference> serializer = new BiValueSerializer<>(Difference::new);
