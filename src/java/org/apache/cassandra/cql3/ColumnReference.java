@@ -19,13 +19,16 @@
 package org.apache.cassandra.cql3;
 
 import java.nio.ByteBuffer;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 import com.google.common.base.Preconditions;
 
+import com.google.common.collect.ImmutableList;
 import org.apache.cassandra.cql3.functions.Function;
+import org.apache.cassandra.cql3.selection.Selectable;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.marshal.CollectionType;
 import org.apache.cassandra.db.marshal.Int32Type;
@@ -133,11 +136,37 @@ public class ColumnReference implements Term
 
         private ColumnReference prepared;
 
-
         public Raw(List<Term.Raw> terms)
         {
             Preconditions.checkArgument(terms != null && !terms.isEmpty());
             this.terms = terms;
+        }
+
+        public static Raw fromSelectable(Selectable.Raw selectable)
+        {
+            // TODO: Ideall it would be nice not to have to make items in the Selectables public
+            if (selectable instanceof Selectable.WithFieldSelection.Raw)
+            {
+                Selectable.WithFieldSelection.Raw selection = (Selectable.WithFieldSelection.Raw) selectable;
+                return new ColumnReference.Raw(ImmutableList.of(Constants.Literal.string(selection.selected.toString()),
+                                                                Constants.Literal.string(selection.field.toString())));
+            }
+            if (selectable instanceof Selectable.WithElementSelection.Raw)
+            {
+                Selectable.WithElementSelection.Raw elementSelection = (Selectable.WithElementSelection.Raw) selectable;
+                Selectable.WithFieldSelection.Raw fieldSelection = (Selectable.WithFieldSelection.Raw) elementSelection.selected;
+                ImmutableList<Term.Raw> terms = ImmutableList.of(Constants.Literal.string(fieldSelection.selected.toString()),
+                                                                 Constants.Literal.string(fieldSelection.field.toString()),
+                                                                 elementSelection.element);
+                return new ColumnReference.Raw(terms);
+            }
+            else if (selectable instanceof Selectable.RawIdentifier)
+            {
+                Selectable.RawIdentifier selection = (Selectable.RawIdentifier) selectable;
+                return new ColumnReference.Raw(Collections.singletonList(Constants.Literal.string(selection.toString())));
+            }
+
+            throw new UnsupportedOperationException("Cannot create column reference from selectable: " + selectable);
         }
 
         private void resolveFinished()

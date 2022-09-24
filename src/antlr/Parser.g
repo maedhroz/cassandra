@@ -29,8 +29,6 @@ options {
 
     // enables parsing txn specific syntax when true
     protected boolean isParsingTxn = false;
-    // tracks whether a txn is using a full SELECT or referencing LET variables
-    protected boolean hasFullSelect = false;
     // tracks whether a txn has conditional updates
     protected boolean isTxnConditional = false;
 
@@ -82,7 +80,7 @@ options {
         return marker;
     }
 
-    public ColumnReference.Raw newColumnReference(List<Term.Raw> terms)
+    public ColumnReference.Raw newColumnReferenceForUpdate(List<Term.Raw> terms)
     {
         if (!isParsingTxn)
             throw new IllegalStateException();
@@ -91,6 +89,19 @@ options {
             columnReferences = new ArrayList<>();
 
         ColumnReference.Raw reference = new ColumnReference.Raw(terms);
+        columnReferences.add(reference);
+        return reference;
+    }
+    
+    public ColumnReference.Raw newColumnReference(Selectable.Raw selectable)
+    {
+        if (!isParsingTxn || selectable == null)
+            throw new IllegalStateException();
+    
+        if (columnReferences == null)
+            columnReferences = new ArrayList<>();
+    
+        ColumnReference.Raw reference = ColumnReference.Raw.fromSelectable(selectable);
         columnReferences.add(reference);
         return reference;
     }
@@ -561,7 +572,7 @@ normalInsertStatement [QualifiedName qn] returns [UpdateStatement.ParsedInsert e
 
 insertValue[List<Object> values]
     : t=term { values.add(t); }
-    | r=columnReference { values.add(new ReferenceValue.Substitution.Raw(r)); }
+    | r=columnReferenceForUpdate { values.add(new ReferenceValue.Substitution.Raw(r)); }
     ;
 
 jsonInsertStatement [QualifiedName qn] returns [UpdateStatement.ParsedInsertJson expr]
@@ -743,7 +754,7 @@ batchStatementObjective returns [ModificationStatement.Parsed statement]
  *   INSERT INTO <table> (k, c, v) VALUES (0, 0, 1);
  * COMMIT TRANSACTION
  */
- batchTxnStatement returns [TransactionStatement.Parsed expr]
+batchTxnStatement returns [TransactionStatement.Parsed expr]
     @init {
         isParsingTxn = true;
         List<SelectStatement.RawStatement> assignments = new ArrayList<>();
@@ -753,7 +764,7 @@ batchStatementObjective returns [ModificationStatement.Parsed statement]
     }
     : K_BEGIN K_TRANSACTION
       ( let=letStatement ';' { assignments.add(let); })*
-      ( ( s=selectStatement ';' { select = s; hasFullSelect = true; }) | ( {!hasFullSelect}? ( K_SELECT r=columnReferences ';' { returning = r; })) )?
+      ( ( (selectStatement) => s=selectStatement ';' { select = s; }) | ( K_SELECT r=columnReferences ';' { returning = r; }) )?
       ( K_IF conditions=txnConditions K_THEN { isTxnConditional = true; } )?
       ( upd=batchStatementObjective ';' { updates.add(upd); } )*
       ( {!isTxnConditional}? (K_COMMIT K_TRANSACTION) | {isTxnConditional}? (K_END K_IF K_COMMIT K_TRANSACTION))
@@ -763,9 +774,12 @@ batchStatementObjective returns [ModificationStatement.Parsed statement]
     ;
     finally { isParsingTxn = false; }
 
-columnReferences returns [List<ColumnReference.Raw> returning]
-    : r1=columnReference { returning = new ArrayList<ColumnReference.Raw>(); returning.add(r1); }
-      (',' rN=columnReference { returning.add(rN); })*
+columnReferences returns [List<ColumnReference.Raw> refs]
+    : r1=columnReference { refs = new ArrayList<ColumnReference.Raw>(); refs.add(r1); } (',' rN=columnReference { refs.add(rN); })*
+    ;
+
+columnReference returns [ColumnReference.Raw ref]
+    : s=selectionGroup { $ref = newColumnReference(s);}
     ;
 
 txnConditions returns [List<ConditionStatement.Raw> conditions]
@@ -783,12 +797,16 @@ txnConditionKind returns [ConditionStatement.Kind op]
     ;
 
 txnColumnCondition[List<ConditionStatement.Raw> conditions]
-    : reference=columnReference
-        ( op=txnConditionKind t=term { conditions.add(new ConditionStatement.Raw(reference, op, t)); }
-        | op=txnConditionKind cr=columnReference { conditions.add(new ConditionStatement.Raw(reference, op, cr)); }
-        | K_IS K_NOT K_NULL { conditions.add(new ConditionStatement.Raw(reference, ConditionStatement.Kind.IS_NOT_NULL, null)); }
-        | K_IS K_NULL { conditions.add(new ConditionStatement.Raw(reference, ConditionStatement.Kind.IS_NULL, null)); }
+    : r=columnReference
+      ( 
+        K_IS 
+        (
+            K_NOT K_NULL { conditions.add(new ConditionStatement.Raw(r, ConditionStatement.Kind.IS_NOT_NULL, null)); }
+            | K_NULL { conditions.add(new ConditionStatement.Raw(r, ConditionStatement.Kind.IS_NULL, null)); }
         )
+        | (txnConditionKind term)=> op=txnConditionKind t=term { conditions.add(new ConditionStatement.Raw(r, op, t)); }
+        | op=txnConditionKind cr=columnReference { conditions.add(new ConditionStatement.Raw(r, op, cr)); }
+      )
     ;
 
 createAggregateStatement returns [CreateAggregateStatement.Raw stmt]
@@ -1737,13 +1755,13 @@ simpleTerm returns [Term.Raw term]
     | K_CAST '(' t=simpleTerm K_AS n=native_type ')' { $term = FunctionCall.Raw.newCast(t, n); }
     ;
 
-columnReference returns [ColumnReference.Raw vterm]
+// TODO: Can we parse this into a Selectable.Raw?
+columnReferenceForUpdate returns [ColumnReference.Raw vterm]
     @init { List<Term.Raw> terms = new ArrayList<>(2); }
-    @after { $vterm = newColumnReference(terms); }
+    @after { $vterm = newColumnReferenceForUpdate(terms); }
     : {isParsingTxn}?
       (v1=identOrQuotedName { terms.add(Constants.Literal.string($v1.text)); })
-      ('.' v2=identOrQuotedName { terms.add(Constants.Literal.string($v2.text)); }
-       ('[' v3=term ']' { terms.add(v3); })?)?
+      ('.' v2=identOrQuotedName { terms.add(Constants.Literal.string($v2.text)); })?
     ;
     
 identOrQuotedName
@@ -1764,22 +1782,16 @@ columnOperationDifferentiator[UpdateStatement.OperationCollector operations, Col
     ;
 
 columnReferenceOperation[UpdateStatement.OperationCollector operations, ColumnIdentifier key]
-    : '=' c=columnReference 
+    : '=' c=columnReferenceForUpdate 
       {
         addRawReferenceOperation(operations, key, new ReferenceOperation.Assignment.Raw(key, new ReferenceValue.Substitution.Raw(c)));
       }
-    | '+=' c=columnReference
+    | sig=('+=' | '-=')
+      c=columnReferenceForUpdate
       {
         ReferenceValue.Raw left = new ReferenceValue.SelfReference(key);
         ReferenceValue.Raw right = new ReferenceValue.Substitution.Raw(c);
-        ReferenceValue.Raw operation = new ReferenceValue.Addition.Raw(left, right);
-        addRawReferenceOperation(operations, key, new ReferenceOperation.Assignment.Raw(key, operation));
-      }
-    | '-=' c=columnReference
-      {
-        ReferenceValue.Raw left = new ReferenceValue.SelfReference(key);
-        ReferenceValue.Raw right = new ReferenceValue.Substitution.Raw(c);
-        ReferenceValue.Raw operation = new ReferenceValue.Subtraction.Raw(left, right);
+        ReferenceValue.Raw operation = $sig.text.equals("+=") ? new ReferenceValue.Addition.Raw(left, right) : new ReferenceValue.Subtraction.Raw(left, right);
         addRawReferenceOperation(operations, key, new ReferenceOperation.Assignment.Raw(key, operation));
       }
     ;

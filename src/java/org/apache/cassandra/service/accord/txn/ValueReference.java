@@ -121,10 +121,10 @@ public class ValueReference
     {
         if (column != null && column.isStatic())
             return partition.staticRow();
-        int maxIdx = partition.rowCount() - 1;
-        if (rowIdx > maxIdx)
+        assert partition.rowCount() <= 1 : "Multi-row references are not allowed";
+        if (partition.rowCount() == 0)
             return null;
-        return partition.getAtIdx(rowIdx);
+        return partition.getAtIdx(0);
     }
 
     public ColumnData getColumnData(Row row)

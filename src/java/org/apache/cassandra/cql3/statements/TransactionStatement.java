@@ -444,6 +444,7 @@ public class TransactionStatement implements CQLStatement
 
             List<ConditionStatement> preparedConditions = new ArrayList<>(conditions.size());
             for (ConditionStatement.Raw condition : conditions)
+                // TODO: Is this synthetic ks name dangerous?
                 preparedConditions.add(condition.prepare("[txn]", bindVariables));
 
             return new TransactionStatement(preparedAssignments, returningSelect, returningReferences, preparedUpdates, preparedConditions, bindVariables);
