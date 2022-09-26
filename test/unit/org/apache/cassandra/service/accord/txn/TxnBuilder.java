@@ -89,7 +89,7 @@ public class TxnBuilder
         return withWrite(query, TxnReferenceOperations.empty(), VariableSpecifications.empty(), QueryOptions.DEFAULT);
     }
 
-    static ValueReference reference(String name, int index, String column)
+    static ValueReference reference(String name, String column)
     {
         ColumnMetadata metadata = null;
         if (column != null)
@@ -101,7 +101,7 @@ public class TxnBuilder
             metadata = table.getColumn(new ColumnIdentifier(parts[2], true));
             Preconditions.checkArgument(metadata != null);
         }
-        return new ValueReference(name, index, metadata);
+        return new ValueReference(name, metadata);
     }
 
     private TxnBuilder withCondition(TxnCondition condition)
@@ -110,29 +110,29 @@ public class TxnBuilder
         return this;
     }
 
-    public TxnBuilder withValueCondition(String name, int index, String column, TxnCondition.Kind kind, ByteBuffer value)
+    public TxnBuilder withValueCondition(String name, String column, TxnCondition.Kind kind, ByteBuffer value)
     {
-        return withCondition(new TxnCondition.Value(reference(name, index, column), kind, value));
+        return withCondition(new TxnCondition.Value(reference(name, column), kind, value));
     }
 
-    public TxnBuilder withEqualsCondition(String name, int index, String column, ByteBuffer value)
+    public TxnBuilder withEqualsCondition(String name, String column, ByteBuffer value)
     {
-        return withValueCondition(name, index, column, TxnCondition.Kind.EQUAL, value);
+        return withValueCondition(name, column, TxnCondition.Kind.EQUAL, value);
     }
 
-    private TxnBuilder withExistenceCondition(String name, int index, String column, TxnCondition.Kind kind)
+    private TxnBuilder withExistenceCondition(String name, String column, TxnCondition.Kind kind)
     {
-        return withCondition(new TxnCondition.Exists(reference(name, index, column), kind));
+        return withCondition(new TxnCondition.Exists(reference(name, column), kind));
     }
 
-    public TxnBuilder withIsNotNullCondition(String name, int index, String column)
+    public TxnBuilder withIsNotNullCondition(String name, String column)
     {
-        return withExistenceCondition(name, index, column, TxnCondition.Kind.IS_NOT_NULL);
+        return withExistenceCondition(name, column, TxnCondition.Kind.IS_NOT_NULL);
     }
 
-    public TxnBuilder withIsNullCondition(String name, int index, String column)
+    public TxnBuilder withIsNullCondition(String name, String column)
     {
-        return withExistenceCondition(name, index, column, TxnCondition.Kind.IS_NULL);
+        return withExistenceCondition(name, column, TxnCondition.Kind.IS_NULL);
     }
 
     Keys toKeys(SortedSet<Key> keySet)

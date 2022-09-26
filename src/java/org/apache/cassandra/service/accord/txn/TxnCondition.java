@@ -187,7 +187,7 @@ public abstract class TxnCondition
             boolean exists = partition != null && !partition.isEmpty();
 
             Row row = null;
-            if (exists && reference.selectsRow())
+            if (exists)
             {
                 row = reference.getRow(partition);
                 exists = row != null && !row.isEmpty();

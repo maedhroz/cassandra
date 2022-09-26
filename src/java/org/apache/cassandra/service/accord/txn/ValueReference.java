@@ -38,21 +38,19 @@ import static org.apache.cassandra.service.accord.SerializationUtils.columnMetad
 public class ValueReference
 {
     private final String name;
-    private final int rowIdx;
     private final ColumnMetadata column;
     private final CellPath path;
 
-    public ValueReference(String name, int rowIdx, ColumnMetadata column, CellPath path)
+    public ValueReference(String name, ColumnMetadata column, CellPath path)
     {
         this.name = name;
-        this.rowIdx = rowIdx;
         this.column = column;
         this.path = path;
     }
 
-    public ValueReference(String name, int rowIdx, ColumnMetadata column)
+    public ValueReference(String name, ColumnMetadata column)
     {
-        this(name, rowIdx, column, null);
+        this(name, column, null);
     }
 
     @Override
@@ -61,13 +59,13 @@ public class ValueReference
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         ValueReference reference = (ValueReference) o;
-        return rowIdx == reference.rowIdx && name.equals(reference.name) && Objects.equals(column, reference.column) && Objects.equals(path, reference.path);
+        return name.equals(reference.name) && Objects.equals(column, reference.column) && Objects.equals(path, reference.path);
     }
 
     @Override
     public int hashCode()
     {
-        return Objects.hash(name, rowIdx, column, path);
+        return Objects.hash(name, column, path);
     }
 
     @Override
@@ -76,8 +74,6 @@ public class ValueReference
         StringBuilder sb = new StringBuilder("REF:").append(name);
         if (column != null)
             sb.append(':').append(column.ksName).append('.').append(column.cfName).append('.').append(column.name.toString());
-
-        sb.append('[').append(rowIdx).append(']');
 
         if (path != null)
             sb.append(path);
@@ -90,14 +86,9 @@ public class ValueReference
         return column;
     }
 
-    public boolean selectsRow()
-    {
-        return rowIdx >= 0;
-    }
-
     public boolean selectsColumn()
     {
-        return selectsRow() && column != null;
+        return column != null;
     }
 
     // TODO: Use when collection elements come into play?
@@ -147,7 +138,6 @@ public class ValueReference
         public void serialize(ValueReference reference, DataOutputPlus out, int version) throws IOException
         {
             out.writeUTF(reference.name);
-            out.writeInt(reference.rowIdx);
             out.writeBoolean(reference.column != null);
             if (reference.column != null)
                 columnMetadataSerializer.serialize(reference.column, out, version);
@@ -159,10 +149,9 @@ public class ValueReference
         public ValueReference deserialize(DataInputPlus in, int version) throws IOException
         {
             String name = in.readUTF();
-            int rowIdx = in.readInt();
             ColumnMetadata column = in.readBoolean() ? columnMetadataSerializer.deserialize(in, version) : null;
             // TODO: serialize path
-            return new ValueReference(name, rowIdx, column, null);
+            return new ValueReference(name, column, null);
         }
 
         @Override

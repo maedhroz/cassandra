@@ -170,7 +170,7 @@ public abstract class ReferenceValue
             Preconditions.checkState(metadata != null);
             ColumnMetadata columnMetadata = metadata.getColumn(column);
             checkNotNull(column, "%s doesn't reference a valid column", column);
-            return new Substitution(ColumnReference.Raw.prepare("", receiver, sourceName, 0, columnMetadata, null));
+            return new Substitution(ColumnReference.Raw.prepare("", receiver, sourceName, columnMetadata, null));
         }
 
         @Override

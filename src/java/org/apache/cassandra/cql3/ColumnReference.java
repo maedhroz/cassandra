@@ -31,14 +31,11 @@ import org.apache.cassandra.cql3.functions.Function;
 import org.apache.cassandra.cql3.selection.Selectable;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.marshal.CollectionType;
-import org.apache.cassandra.db.marshal.Int32Type;
 import org.apache.cassandra.db.marshal.SetType;
-import org.apache.cassandra.db.marshal.UTF8Type;
 import org.apache.cassandra.db.rows.CellPath;
 import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.service.accord.txn.ValueReference;
-import org.apache.cassandra.utils.ByteBufferUtil;
 
 import static org.apache.cassandra.cql3.statements.RequestValidations.checkNotNull;
 
@@ -48,14 +45,12 @@ public class ColumnReference implements Term
     public static final String COLUMN_NOT_IN_TUPLE_MESSAGE = "Column '%s' does not exist in tuple '%s'.";
 
     private final String selectName;
-    private final Term rowIndex;
     public final ColumnMetadata column;
     private final Term cellPath;
     
-    public ColumnReference(String selectName, Term rowIndex, ColumnMetadata column, Term cellPath)
+    public ColumnReference(String selectName, ColumnMetadata column, Term cellPath)
     {
         this.selectName = selectName;
-        this.rowIndex = rowIndex;
         this.column = column;
         this.cellPath = cellPath;
     }
@@ -63,8 +58,6 @@ public class ColumnReference implements Term
     @Override
     public void collectMarkerSpecification(VariableSpecifications boundNames)
     {
-        if (rowIndex != null)
-            rowIndex.collectMarkerSpecification(boundNames);
         if (cellPath != null)
             cellPath.collectMarkerSpecification(boundNames);
     }
@@ -84,7 +77,7 @@ public class ColumnReference implements Term
     @Override
     public boolean containsBindMarker()
     {
-        return rowIndex.containsBindMarker() || (cellPath != null && cellPath.containsBindMarker());
+        return cellPath != null && cellPath.containsBindMarker();
     }
 
     @Override
@@ -98,11 +91,6 @@ public class ColumnReference implements Term
         return cellPath != null && column.type instanceof SetType;
     }
 
-    private int bindRowIndex(QueryOptions options)
-    {
-        return ByteBufferUtil.toInt(rowIndex.bindAndGet(options));
-    }
-
     private CellPath bindCellPath(QueryOptions options)
     {
         return cellPath != null ? CellPath.create(cellPath.bindAndGet(options)) : null;
@@ -111,7 +99,7 @@ public class ColumnReference implements Term
     public ValueReference toValueReference(QueryOptions options)
     {
         Preconditions.checkArgument(cellPath == null || column.isComplex());
-        return new ValueReference(selectName, bindRowIndex(options), column, bindCellPath(options));
+        return new ValueReference(selectName, column, bindCellPath(options));
     }
 
     public ColumnIdentifier getFullyQualifiedName()
@@ -122,16 +110,11 @@ public class ColumnReference implements Term
 
     public static class Raw extends Term.Raw
     {
-        private static final ColumnSpecification TEXT_TERM = new ColumnSpecification(null, null, null, UTF8Type.instance);
-        private static final ColumnSpecification INT_TERM = new ColumnSpecification(null, null, null, Int32Type.instance);
-        private static final Constants.Value ROW_IDX_ZERO = new Constants.Value(ByteBufferUtil.bytes(0));
-
         private final List<Term.Raw> terms;
         private boolean isResolved = false;
 
         private String tupleName;
         private ColumnMetadata column;
-        private Term rowIndex = null;
         private Term cellPath = null;
 
         private ColumnReference prepared;
@@ -172,8 +155,6 @@ public class ColumnReference implements Term
         private void resolveFinished()
         {
             isResolved = true;
-            if (rowIndex == null)
-                rowIndex = ROW_IDX_ZERO;
         }
 
         public void resolveReference(Map<String, ReferenceSource> sources)
@@ -195,9 +176,7 @@ public class ColumnReference implements Term
                 return;
             }
 
-            if (source.isPointSelect())
-                rowIndex = new Constants.Value(ByteBufferUtil.bytes(0));
-            else
+            if (!source.isPointSelect())
                 throw new UnsupportedOperationException("Multi-row reference sources are not allowed!");
 
             literal = (Constants.Literal) termIterator.next();
@@ -241,17 +220,6 @@ public class ColumnReference implements Term
             }
         }
 
-        public void manualResolve(String selectName, ColumnMetadata column, int rowIndex, Term cellPath)
-        {
-            Preconditions.checkState(!isResolved);
-            this.tupleName = selectName;
-            this.column = column;
-            this.rowIndex = new Constants.Value(ByteBufferUtil.bytes(rowIndex));
-            Preconditions.checkArgument(cellPath == null, "TODO: support collections etc");
-            isResolved = true;
-
-        }
-
         public void checkResolved()
         {
             if (!isResolved)
@@ -267,31 +235,25 @@ public class ColumnReference implements Term
 
 
         public static ColumnReference prepare(String keyspace, ColumnSpecification receiver,
-                                              String selectName, Term rowIndex, ColumnMetadata column, Term cellPath)
+                                              String selectName, ColumnMetadata column, Term cellPath)
         {
             if (!column.testAssignment(keyspace, receiver).isAssignable())
                 throw new InvalidRequestException(String.format("Invalid reference type %s (%s) for \"%s\" of type %s", column.type, column.name, receiver.name, receiver.type.asCQL3Type()));
-            return new ColumnReference(selectName, rowIndex, column, cellPath);
-        }
-
-        public static ColumnReference prepare(String keyspace, ColumnSpecification receiver,
-                                              String selectName, int rowIndex, ColumnMetadata column, Term cellPath)
-        {
-            return prepare(keyspace, receiver, selectName, new Constants.Value(ByteBufferUtil.bytes(rowIndex)), column, cellPath);
+            return new ColumnReference(selectName, column, cellPath);
         }
 
         @Override
         public Term prepare(String keyspace, ColumnSpecification receiver) throws InvalidRequestException
         {
             checkResolved();
-            prepared = prepare(keyspace, receiver, tupleName, rowIndex, column, cellPath);
+            prepared = prepare(keyspace, receiver, tupleName, column, cellPath);
             return prepared;
         }
 
         public ColumnReference prepareAsReceiver()
         {
             checkResolved();
-            prepared = new ColumnReference(tupleName, rowIndex, column, cellPath);
+            prepared = new ColumnReference(tupleName, column, cellPath);
             return prepared;
         }
 
@@ -304,7 +266,7 @@ public class ColumnReference implements Term
         @Override
         public String getText()
         {
-//            checkResolved();
+            // TODO: What uses this, and do we need to check for resolution?
             return terms.stream().map(Term.Raw::getText).reduce("", (l, r) -> l + '.' + r);
         }
 
