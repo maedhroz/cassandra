@@ -25,19 +25,29 @@ import java.sql.Timestamp;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.Date;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.cassandra.cql3.ReservedKeywords;
+import org.assertj.core.api.Assertions;
 import org.quicktheories.core.Gen;
 import org.quicktheories.core.RandomnessSource;
 import org.quicktheories.generators.SourceDSL;
 import org.quicktheories.impl.Constraint;
+
+import static org.quicktheories.QuickTheory.qt;
 
 public final class Generators
 {
@@ -69,6 +79,25 @@ public final class Generators
         // see CASSANDRA-17919
         return !("P".equals(value) || "PT".equals(value));
     }
+    public static final Gen<String> SYMBOL_NOT_RESERVED_KEYWORD_GEN = Generators.filter(SYMBOL_GEN, s -> !ReservedKeywords.isReserved(s));
+
+    public static Gen<String> uniqueSymbolGen()
+    {
+        return uniqueSymbolGen(SYMBOL_GEN);
+    }
+
+    public static Gen<String> uniqueSymbolGen(Gen<String> gen)
+    {
+        Set<String> uniq = new HashSet<>();
+        return rnd -> {
+            String name;
+            while (!uniq.add((name = gen.generate(rnd))))
+            {
+            }
+            return name;
+        };
+    }
+
     private static final char CHAR_UNDERSCORE = 95;
     public static Gen<String> symbolGen(Gen<Integer> size)
     {
@@ -255,7 +284,6 @@ public final class Generators
 
     public static Gen<String> string(Gen<Integer> sizes, char[] domain, IntCharBiPredicate fn)
     {
-        // note, map is overloaded so String::new is ambugious to javac, so need a lambda here
         return charArray(sizes, domain, fn).map(c -> new String(c));
     }
 
@@ -379,6 +407,54 @@ public final class Generators
             default:
                 return false;
         }
+    }
+
+    public static <T> T get(Gen<T> gen)
+    {
+        return get(42, gen);
+    }
+
+    public static <T> T get(long seed, Gen<T> gen)
+    {
+        class Capture {T value;}
+        Capture c = new Capture();
+        qt().withFixedSeed(seed).withExamples(1).withShrinkCycles(0).forAll(gen).checkAssert(t -> c.value = t);
+        return c.value;
+    }
+
+    public static <T> Gen<T> mix(Gen<T>... gens)
+    {
+        int weight = 100 / gens.length;
+        return mix(Stream.of(gens).collect(Collectors.toMap(Function.identity(), ignore -> weight)));
+    }
+
+    public static <T> Gen<T> mix(Map<Gen<T>, Integer> gens)
+    {
+        int sum = gens.values().stream().mapToInt(Integer::intValue).sum();
+        if (sum > 100)
+            throw new IllegalArgumentException("Weights are more than 100: " + sum);
+        Object[] array = new Object[gens.size()];
+        int[] weights = new int[gens.size()];
+        {
+            sum = 0;
+            int i = 0;
+            for (Map.Entry<Gen<T>, Integer> e : gens.entrySet())
+            {
+                array[i] = e.getKey();
+                weights[i++] = sum += e.getValue();
+            }
+        }
+
+        Constraint c = Constraint.between(0L, 99L);
+        return rnd -> {
+            long picked = rnd.next(c);
+            for (int i = 0; i < weights.length; i++)
+            {
+                if (picked < weights[i])
+                    return ((Gen<T>) array[i]).generate(rnd);
+            }
+            throw new AssertionError();
+        };
     }
 
     private static final class LazySharedBlob
