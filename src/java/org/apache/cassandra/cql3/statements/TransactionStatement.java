@@ -130,7 +130,15 @@ public class TransactionStatement implements CQLStatement
     @Override
     public void authorize(ClientState state)
     {
-        // TODO: Likely just authorize all the constituent reads and modifications
+        // Assess read permissions for all data from both explicit LET statements and generated reads.
+        for (NamedSelect let : assignments)
+            let.select.authorize(state);
+
+        if (returningSelect != null)
+            returningSelect.select.authorize(state);
+
+        for (ModificationStatement update : updates)
+            update.authorize(state);
     }
 
     @Override
