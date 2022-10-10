@@ -544,6 +544,29 @@ public class AccordIntegrationTest extends TestBaseImpl
     }
 
     @Test
+    public void reversedRef() throws Exception
+    {
+        test("CREATE TABLE " + keyspace + ".tbl (k INT, c INT, v INT, PRIMARY KEY (k, c)) WITH CLUSTERING ORDER BY (c DESC)", cluster -> {
+            cluster.coordinator(1).execute("INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (1, 1, 1)", ConsistencyLevel.ALL);
+
+            String update = "BEGIN TRANSACTION\n" +
+                            "  LET row1 = (SELECT * FROM " + keyspace + ".tbl WHERE k = 1 AND c = 1);\n" +
+                            "  SELECT row1.k, row1.c, row1.v;\n" +
+                            "  IF row1.c = 1 THEN\n" +
+                            "    UPDATE " + keyspace + ".tbl SET v += row1.c WHERE k=1 AND c=1;\n" +
+                            "  END IF\n" +
+                            "COMMIT TRANSACTION";
+            //TODO broken, partition/clustering columns are NULL
+            assertRowEqualsWithPreemptedRetry(cluster, new Object[] {null, null, 1}, update);
+
+            String check = "BEGIN TRANSACTION\n" +
+                           "  SELECT * FROM " + keyspace + ".tbl WHERE k = 1 AND c = 1;\n" +
+                           "COMMIT TRANSACTION";
+            assertRowEqualsWithPreemptedRetry(cluster, new Object[] {1, 1, 2}, check);
+        });
+    }
+
+    @Test
     public void testListAppend() throws Exception
     {
         test("CREATE TABLE " + keyspace + ".tbl (k int PRIMARY KEY, int_list list<int>)",
@@ -796,7 +819,7 @@ public class AccordIntegrationTest extends TestBaseImpl
         try
         {
             Object[][] checkResult = cluster.coordinator(1).execute(check, ConsistencyLevel.ANY, boundValues);
-            assertArrayEquals(new Object[]{ row }, checkResult);
+            Assertions.assertThat(checkResult).isEqualTo(new Object[]{ row });
         }
         catch (Throwable t)
         {
