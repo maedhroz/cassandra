@@ -332,14 +332,14 @@ public class AccordIntegrationTest extends TestBaseImpl
             String query = "BEGIN TRANSACTION\n" +
                            "  LET row1 = (SELECT * FROM " + keyspace + ".tbl WHERE k = ? AND c = ?);\n" +
                            "  LET row2 = (SELECT * FROM " + keyspace + ".tbl WHERE k = ? AND c = ?);\n" +
-                           "  SELECT row1.v, row2.v;\n" +
+                           "  SELECT row1.v, row2.k, row2.v;\n" +
                            "  IF row1 IS NULL AND row2.v = ? THEN\n" +
                            "    INSERT INTO " + keyspace + ".tbl (k, c, v) VALUES (?, ?, ?);\n" +
                            "  END IF\n" +
                            "COMMIT TRANSACTION";
             SimpleQueryResult result = cluster.coordinator(1).executeWithResult(query, ConsistencyLevel.ANY, 0, 0, 1, 0, 3, 0, 0, 1);
-            assertEquals(ImmutableList.of("row1.v", "row2.v"), result.names());
-            assertThat(result).hasSize(1).contains(null, 3);
+            assertEquals(ImmutableList.of("row1.v", "row2.k", "row2.v"), result.names());
+            assertThat(result).hasSize(1).contains(null, 1, 3);
 
             String check = "BEGIN TRANSACTION\n" +
                            "  SELECT * FROM " + keyspace + ".tbl WHERE k=0 AND c=0;\n" +
