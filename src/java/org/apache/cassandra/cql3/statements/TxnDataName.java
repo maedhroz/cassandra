@@ -18,18 +18,12 @@
 
 package org.apache.cassandra.cql3.statements;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
-
-import com.google.common.io.ByteStreams;
 
 import org.apache.cassandra.db.DecoratedKey;
 import org.apache.cassandra.db.TypeSizes;
@@ -41,6 +35,8 @@ import org.apache.cassandra.utils.ByteBufferUtil;
 
 public class TxnDataName implements Comparable<TxnDataName>
 {
+    private static final TxnDataName RETURNING = new TxnDataName(Kind.RETURNING);
+
     public enum Kind
     {
         USER((byte) 1),
@@ -86,7 +82,7 @@ public class TxnDataName implements Comparable<TxnDataName>
 
     public static TxnDataName returning()
     {
-        return new TxnDataName(Kind.RETURNING);
+        return RETURNING;
     }
 
     public static TxnDataName partitionRead(TableMetadata metadata, DecoratedKey key)
@@ -96,64 +92,12 @@ public class TxnDataName implements Comparable<TxnDataName>
 
     private static String bytesToString(ByteBuffer bytes)
     {
-        byte[] array = ByteBufferUtil.getArray(bytes);
-        byte[] compressed = compress(array);
-        byte[] chosen = array;
-        if (compressed.length < array.length)
-            chosen = compressed;
-        return ByteBufferUtil.bytesToHex(ByteBuffer.wrap(chosen));
+        return ByteBufferUtil.bytesToHex(bytes);
     }
 
     private static ByteBuffer stringToBytes(String string)
     {
-        ByteBuffer bytes = ByteBufferUtil.hexToBytes(string);
-        if (bytes.remaining() > 2 && maybeGzip(bytes.get(0), bytes.get(1)))
-        {
-            // might be gzip
-            bytes = ByteBuffer.wrap(decompress(ByteBufferUtil.getArray(bytes)));
-        }
-        return bytes;
-    }
-
-    private static byte[] compress(byte[] array)
-    {
-        ByteArrayOutputStream obj = new ByteArrayOutputStream();
-        try (GZIPOutputStream gzip = new GZIPOutputStream(obj))
-        {
-            gzip.write(array);
-            gzip.flush();
-        }
-        catch (IOException e)
-        {
-            // failed to gzip... just return the original array
-            return array;
-        }
-        return obj.toByteArray();
-    }
-
-    private static boolean maybeGzip(byte first, byte second)
-    {
-        return first == (byte) (GZIPInputStream.GZIP_MAGIC) && second == (byte) (GZIPInputStream.GZIP_MAGIC >> 8);
-    }
-
-    private static byte[] decompress(byte[] array)
-    {
-        if (array.length < 2)
-            return array; // can't be gzip
-        if (maybeGzip(array[0], array[1]))
-        {
-            // looks like gzip...
-            try (GZIPInputStream gis = new GZIPInputStream(new ByteArrayInputStream(array)))
-            {
-                return ByteStreams.toByteArray(gis);
-            }
-            catch (IOException e)
-            {
-                // wasn't really gzip...
-                return array;
-            }
-        }
-        return array;
+        return ByteBufferUtil.hexToBytes(string);
     }
 
     public Kind getKind()
