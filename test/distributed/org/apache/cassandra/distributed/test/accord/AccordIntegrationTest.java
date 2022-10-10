@@ -89,8 +89,6 @@ import static org.apache.cassandra.utils.Clock.Global.nanoTime;
 
 //TODO there are too many new clusters, this will cause Metaspace issues.  Once Schema and topology are integrated, can switch
 // to a shared cluster with isolated tables
-// Tests to write:
-// column reference to a reversed clustering column (wrapped in ReversedType)
 @SuppressWarnings("Convert2MethodRef")
 public class AccordIntegrationTest extends TestBaseImpl
 {
