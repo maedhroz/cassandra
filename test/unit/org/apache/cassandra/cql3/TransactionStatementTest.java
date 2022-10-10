@@ -26,6 +26,8 @@ import java.util.List;
 
 import com.google.common.collect.ImmutableList;
 
+import org.apache.cassandra.cql3.statements.TxnDataName;
+import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.assertj.core.api.Assertions;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -55,13 +57,12 @@ import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.service.accord.txn.TxnBuilder;
 import org.apache.cassandra.service.accord.txn.TxnReferenceOperation;
 import org.apache.cassandra.service.accord.txn.TxnReferenceOperations;
-import org.apache.cassandra.service.accord.txn.TxnReferenceValue.Sum;
 import org.apache.cassandra.service.accord.txn.TxnReferenceValue.Constant;
 import org.apache.cassandra.service.accord.txn.TxnReferenceValue.Substitution;
-import org.apache.cassandra.service.accord.txn.TxnReferenceValue.Difference;
 import org.apache.cassandra.service.accord.txn.ValueReference;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
+import static org.apache.cassandra.cql3.statements.TxnDataName.user;
 import static org.junit.Assert.assertEquals;
 
 import static org.apache.cassandra.cql3.ColumnReference.CANNOT_FIND_TUPLE_MESSAGE;
@@ -138,10 +139,10 @@ public class TransactionStatementTest
 
         List<ByteBuffer> values = ImmutableList.of(bytes(0), initialListBytes, updatedListBytes, bytes(0));
         Txn actual = statement.createTxn(ClientState.forInternalCalls(), QueryOptions.forInternalCalls(values));
-        
+
         // TODO: Find a better way to test, given list paths are randomly generated and therefore not comparable.
         assertEquals(expected.toString().length(), actual.toString().length());
-        
+
         assertEquals(1, statement.getReturningReferences().size());
         assertEquals("int_list", statement.getReturningReferences().get(0).column.name.toString());
     }
@@ -162,7 +163,7 @@ public class TransactionStatementTest
         ByteBuffer initialListBytes = listType.serializer.serialize(initialList);
 
         List<TxnReferenceOperation> partitionOps = new ArrayList<>();
-        partitionOps.add(new TxnReferenceOperation(column(TABLE4, "int_list"), new Substitution(reference("row1", TABLE4, "int_list"))));
+        partitionOps.add(new TxnReferenceOperation(TxnReferenceOperation.Kind.Setter, column(TABLE4, "int_list"), new Substitution(reference(user("row1"), TABLE4, "int_list"))));
         TxnReferenceOperations referenceOps = new TxnReferenceOperations(TABLE4, Clustering.EMPTY, partitionOps, Collections.emptyList());
 
         Txn expected = TxnBuilder.builder()
@@ -440,20 +441,6 @@ public class TransactionStatementTest
     }
 
     @Test
-    public void shouldRejectLetUpdateNameConflict()
-    {
-        String query = "BEGIN TRANSACTION\n" +
-                       "  LET update1 = (SELECT * FROM ks.tbl1 WHERE k=1 AND c=2);\n" +
-                       "  UPDATE ks.tbl1 SET v += 1 WHERE k=1 AND c=2;\n" +
-                       "COMMIT TRANSACTION";
-
-        TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(query);
-        Assertions.assertThatThrownBy(() -> parsed.prepare(ClientState.forInternalCalls()))
-                  .isInstanceOf(InvalidRequestException.class)
-                  .hasMessageContaining(String.format(DUPLICATE_TUPLE_NAME_MESSAGE, "update1"));
-    }
-
-    @Test
     public void simpleQueryTest()
     {
         String query = "BEGIN TRANSACTION\n" +
@@ -468,9 +455,9 @@ public class TransactionStatementTest
         Txn expected = TxnBuilder.builder()
                                  .withRead("row1", "SELECT * FROM ks.tbl1 WHERE k=1 AND c=2")
                                  .withRead("row2", "SELECT * FROM ks.tbl2 WHERE k=2 AND c=2")
-                                 .withRead("returning", "SELECT v FROM ks.tbl1 WHERE k=2 AND c=2")
+                                 .withRead(TxnDataName.returning(), "SELECT v FROM ks.tbl1 WHERE k=2 AND c=2")
                                  .withWrite("UPDATE ks.tbl1 SET v=1 WHERE k=1 AND c=2")
-                                 .withIsNotNullCondition("row1", null)
+                                 .withIsNotNullCondition(user("row1"), null)
                                  .withEqualsCondition("row1", "ks.tbl1.v", bytes(3))
                                  .withEqualsCondition("row2", "ks.tbl2.v", bytes(4))
                                  .build();
@@ -499,7 +486,7 @@ public class TransactionStatementTest
                                  .withRead("row1", "SELECT * FROM ks.tbl1 WHERE k=1 AND c=2")
                                  .withRead("row2", "SELECT * FROM ks.tbl2 WHERE k=2 AND c=2")
                                  .withWrite("UPDATE ks.tbl1 SET v=1 WHERE k=1 AND c=2")
-                                 .withIsNotNullCondition("row1", null)
+                                 .withIsNotNullCondition(user("row1"), null)
                                  .withEqualsCondition("row1", "ks.tbl1.v", bytes(3))
                                  .withEqualsCondition("row2", "ks.tbl2.v", bytes(4))
                                  .build();
@@ -526,7 +513,7 @@ public class TransactionStatementTest
         Txn expected = TxnBuilder.builder()
                                  .withRead("row1", "SELECT * FROM ks.tbl3 WHERE k=1")
                                  .withWrite("INSERT INTO ks.tbl3 (k, \"with spaces\") VALUES (1, 2)")
-                                 .withIsNullCondition("row1", "ks.tbl3.with spaces")
+                                 .withIsNullCondition(user("row1"), "ks.tbl3.with spaces")
                                  .build();
 
         TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(query);
@@ -553,13 +540,13 @@ public class TransactionStatementTest
                        "COMMIT TRANSACTION";
 
         List<TxnReferenceOperation> regularOps = new ArrayList<>();
-        regularOps.add(new TxnReferenceOperation(column(TABLE1, "v"),
-                                                 new Substitution(reference("row2", TABLE2, "v"))));
+        regularOps.add(new TxnReferenceOperation(TxnReferenceOperation.Kind.Setter, column(TABLE1, "v"),
+                                                 new Substitution(reference(user("row2"), TABLE2, "v"))));
         TxnReferenceOperations referenceOps = new TxnReferenceOperations(TABLE1, Clustering.make(bytes(2)), regularOps, Collections.emptyList());
         Txn expected = TxnBuilder.builder()
                                  .withRead("row1", "SELECT * FROM ks.tbl1 WHERE k=1 AND c=2")
                                  .withRead("row2", "SELECT * FROM ks.tbl2 WHERE k=2 AND c=2")
-                                 .withRead("returning", "SELECT v FROM ks.tbl1 WHERE k=1 AND c=2")
+                                 .withRead(TxnDataName.returning(), "SELECT v FROM ks.tbl1 WHERE k=1 AND c=2")
                                  .withWrite(emptyUpdate(TABLE1, 1, 2, false), referenceOps)
                                  .withEqualsCondition("row1", "ks.tbl1.v", bytes(3))
                                  .withEqualsCondition("row2", "ks.tbl2.v", bytes(4))
@@ -584,13 +571,13 @@ public class TransactionStatementTest
                        "COMMIT TRANSACTION";
 
         List<TxnReferenceOperation> regularOps = new ArrayList<>();
-        regularOps.add(new TxnReferenceOperation(column(TABLE1, "v"),
-                                                   new Substitution(reference("row2", TABLE2, "v"))));
+        regularOps.add(new TxnReferenceOperation(TxnReferenceOperation.Kind.Setter, column(TABLE1, "v"),
+                                                   new Substitution(reference(user("row2"), TABLE2, "v"))));
         TxnReferenceOperations referenceOps = new TxnReferenceOperations(TABLE1, Clustering.make(bytes(2)), regularOps, Collections.emptyList());
         Txn expected = TxnBuilder.builder()
                                  .withRead("row1", "SELECT * FROM ks.tbl1 WHERE k=1 AND c=2")
                                  .withRead("row2", "SELECT * FROM ks.tbl2 WHERE k=2 AND c=2")
-                                 .withRead("returning", "SELECT v FROM ks.tbl1 WHERE k=1 AND c=2")
+                                 .withRead(TxnDataName.returning(), "SELECT v FROM ks.tbl1 WHERE k=1 AND c=2")
                                  .withWrite(emptyUpdate(TABLE1, 1, 2, true), referenceOps)
                                  .withEqualsCondition("row1", "ks.tbl1.v", bytes(3))
                                  .withEqualsCondition("row2", "ks.tbl2.v", bytes(4))
@@ -619,7 +606,7 @@ public class TransactionStatementTest
         Txn expected = TxnBuilder.builder()
                                  .withRead("row1", "SELECT v FROM ks.tbl1 WHERE k=1 AND c=2")
                                  .withRead("row2", "SELECT * FROM ks.tbl2 WHERE k=2 AND c=2")
-                                 .withRead("returning", "SELECT v FROM ks.tbl1 WHERE k=1 AND c=2")
+                                 .withRead(TxnDataName.returning(), "SELECT v FROM ks.tbl1 WHERE k=1 AND c=2")
                                  .withWrite("UPDATE ks.tbl1 SET v=3 WHERE k=1 AND c=2")
                                  .withWrite("UPDATE ks.tbl2 SET v=4 WHERE k=2 AND c=2")
                                  .withEqualsCondition("row1", "ks.tbl1.v", bytes(3))
@@ -648,7 +635,7 @@ public class TransactionStatementTest
         Txn expected = TxnBuilder.builder()
                                  .withRead("row1", "SELECT v FROM ks.tbl1 WHERE k=1 AND c=2")
                                  .withRead("row2", "SELECT * FROM ks.tbl2 WHERE k=2 AND c=2")
-                                 .withRead("returning", "SELECT v FROM ks.tbl1 WHERE k=1 AND c=2")
+                                 .withRead(TxnDataName.returning(), "SELECT v FROM ks.tbl1 WHERE k=1 AND c=2")
                                  .withWrite("INSERT INTO ks.tbl1 (k, c, v) VALUES (1, 2, 3)")
                                  .withWrite("INSERT INTO ks.tbl2 (k, c, v) VALUES (2, 2, 4)")
                                  .withEqualsCondition("row1", "ks.tbl1.v", bytes(3))
@@ -660,9 +647,19 @@ public class TransactionStatementTest
         assertEquals(expected, actual);
     }
 
+    private static TxnDataName autoRead(TableMetadata metadata, int key)
+    {
+        ByteBuffer value = Int32Type.instance.decompose(key);
+        return TxnDataName.partitionRead(metadata, Murmur3Partitioner.instance.decorateKey(value));
+    }
+
     @Test
     public void additionAssignmentTest()
     {
+        //TODO so switching to Operation shows that this should not have ever worked and that Accord drifted from
+        // the existing Mutation logic... "v -= 1" is not allowed and fails with
+        // InvalidRequestException: Invalid operation (v = v - 1) for non counter column v
+        // see https://a1391190.slack.com/archives/C020N0N73AT/p1664316603948829
         String query = "BEGIN TRANSACTION\n" +
                        "  SELECT v FROM ks.tbl1 WHERE k=1 AND c=2;\n" +
                        "  UPDATE ks.tbl1 SET v+=1 WHERE k=1 AND c=2;\n" +
@@ -670,21 +667,19 @@ public class TransactionStatementTest
                        "COMMIT TRANSACTION";
 
         List<TxnReferenceOperation> row1Values = new ArrayList<>();
-        row1Values.add(new TxnReferenceOperation(column(TABLE1, "v"),
-                                                 new Sum(new Substitution(reference("update1", TABLE1, "v")),
-                                                              new Constant(ByteBufferUtil.bytes(1)))));
+        row1Values.add(new TxnReferenceOperation(TxnReferenceOperation.Kind.Adder, column(TABLE1, "v"),
+                                                 new Constant(ByteBufferUtil.bytes(1))));
         TxnReferenceOperations row1Ops = new TxnReferenceOperations(TABLE1, Clustering.make(bytes(2)), row1Values, Collections.emptyList());
 
         List<TxnReferenceOperation> row2Values = new ArrayList<>();
-        row2Values.add(new TxnReferenceOperation(column(TABLE2, "v"),
-                                              new Difference(new Substitution(reference("update2", TABLE2, "v")),
-                                                              new Constant(ByteBufferUtil.bytes(1)))));
+        row2Values.add(new TxnReferenceOperation(TxnReferenceOperation.Kind.Substracter, column(TABLE2, "v"),
+                                                 new Constant(ByteBufferUtil.bytes(1))));
         TxnReferenceOperations row2Ops = new TxnReferenceOperations(TABLE2, Clustering.make(bytes(2)), row2Values, Collections.emptyList());
 
         Txn expected = TxnBuilder.builder()
                                  .withRead("update1", "SELECT * FROM ks.tbl1 WHERE k=1 AND c=2 LIMIT 1")
                                  .withRead("update2", "SELECT * FROM ks.tbl2 WHERE k=2 AND c=2 LIMIT 1")
-                                 .withRead("returning", "SELECT v FROM ks.tbl1 WHERE k=1 AND c=2")
+                                 .withRead(TxnDataName.returning(), "SELECT v FROM ks.tbl1 WHERE k=1 AND c=2")
                                  .withWrite(emptyUpdate(TABLE1, 1, 2, false), row1Ops)
                                  .withWrite(emptyUpdate(TABLE2, 2, 2, false), row2Ops)
                                  .build();
@@ -720,7 +715,7 @@ public class TransactionStatementTest
         return metadata.getColumn(new ColumnIdentifier(name, true));
     }
 
-    private static ValueReference reference(String name, TableMetadata metadata, String column)
+    private static ValueReference reference(TxnDataName name, TableMetadata metadata, String column)
     {
         return new ValueReference(name, column(metadata, column), null);
     }

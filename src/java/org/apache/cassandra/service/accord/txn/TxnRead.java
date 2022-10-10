@@ -21,10 +21,7 @@ package org.apache.cassandra.service.accord.txn;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.function.BiConsumer;
-
-import com.google.common.collect.Maps;
 
 import accord.api.Data;
 import accord.api.DataStore;
@@ -48,27 +45,15 @@ import static org.apache.cassandra.service.accord.SerializationUtils.serializedA
 public class TxnRead extends AbstractKeySorted<TxnNamedRead> implements Read
 {
     private static final long EMPTY_SIZE = ObjectSizes.measure(new TxnRead(new TxnNamedRead[0]));
-    private final Map<String, TxnNamedRead> readsByName;
-
-    private static Map<String, TxnNamedRead> indexReads(TxnNamedRead[] reads)
-    {
-        Map<String, TxnNamedRead> index = Maps.newHashMapWithExpectedSize(reads.length);
-        for (TxnNamedRead read : reads)
-            if (index.put(read.name(), read) != null)
-                throw new IllegalArgumentException("More than one read is named " + read.name());
-        return index;
-    }
 
     public TxnRead(TxnNamedRead[] items)
     {
         super(items);
-        this.readsByName = indexReads(this.items);
     }
 
     public TxnRead(List<TxnNamedRead> items)
     {
         super(items);
-        this.readsByName = indexReads(this.items);
     }
 
     public long estimatedSizeOnHeap()
@@ -98,7 +83,7 @@ public class TxnRead extends AbstractKeySorted<TxnNamedRead> implements Read
     }
 
     @Override
-    public Future<Data> read(Key key, CommandStore commandStore, Timestamp executeAt, DataStore store)
+    public Future<Data> read(Key key, boolean forRead, CommandStore commandStore, Timestamp executeAt, DataStore store)
     {
         List<Future<Data>> futures = new ArrayList<>();
         forEachForKey((PartitionKey) key, read -> futures.add(read.read(commandStore, executeAt)));

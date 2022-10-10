@@ -23,6 +23,7 @@ import java.util.Objects;
 
 import com.google.common.base.Preconditions;
 
+import org.apache.cassandra.cql3.statements.TxnDataName;
 import org.apache.cassandra.db.TypeSizes;
 import org.apache.cassandra.db.partitions.FilteredPartition;
 import org.apache.cassandra.db.rows.CellPath;
@@ -37,18 +38,18 @@ import static org.apache.cassandra.service.accord.SerializationUtils.columnMetad
 
 public class ValueReference
 {
-    private final String name;
+    private final TxnDataName name;
     private final ColumnMetadata column;
     private final CellPath path;
 
-    public ValueReference(String name, ColumnMetadata column, CellPath path)
+    public ValueReference(TxnDataName name, ColumnMetadata column, CellPath path)
     {
         this.name = name;
         this.column = column;
         this.path = path;
     }
 
-    public ValueReference(String name, ColumnMetadata column)
+    public ValueReference(TxnDataName name, ColumnMetadata column)
     {
         this(name, column, null);
     }
@@ -137,7 +138,7 @@ public class ValueReference
         @Override
         public void serialize(ValueReference reference, DataOutputPlus out, int version) throws IOException
         {
-            out.writeUTF(reference.name);
+            TxnDataName.serializer.serialize(reference.name, out, version);
             out.writeBoolean(reference.column != null);
             if (reference.column != null)
                 columnMetadataSerializer.serialize(reference.column, out, version);
@@ -148,7 +149,7 @@ public class ValueReference
         @Override
         public ValueReference deserialize(DataInputPlus in, int version) throws IOException
         {
-            String name = in.readUTF();
+            TxnDataName name = TxnDataName.serializer.deserialize(in, version);
             ColumnMetadata column = in.readBoolean() ? columnMetadataSerializer.deserialize(in, version) : null;
             // TODO: serialize path
             return new ValueReference(name, column, null);
@@ -158,8 +159,7 @@ public class ValueReference
         public long serializedSize(ValueReference reference, int version)
         {
             long size = 0;
-            size += TypeSizes.sizeof(reference.name);
-            size += TypeSizes.INT_SIZE;
+            size += TxnDataName.serializer.serializedSize(reference.name, version);
             size += TypeSizes.BOOL_SIZE;
             if (reference.column != null)
                 size += columnMetadataSerializer.serializedSize(reference.column, version);

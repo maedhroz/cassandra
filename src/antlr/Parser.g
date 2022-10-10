@@ -1784,15 +1784,14 @@ columnOperationDifferentiator[UpdateStatement.OperationCollector operations, Col
 columnReferenceOperation[UpdateStatement.OperationCollector operations, ColumnIdentifier key]
     : '=' c=columnReferenceForUpdate 
       {
-        addRawReferenceOperation(operations, key, new ReferenceOperation.Assignment.Raw(key, new ReferenceValue.Substitution.Raw(c)));
+        addRawReferenceOperation(operations, key, new ReferenceOperation.Assignment.Raw(new Operation.SetValue(c), key, new ReferenceValue.Substitution.Raw(c)));
       }
     | sig=('+=' | '-=')
       c=columnReferenceForUpdate
       {
-        ReferenceValue.Raw left = new ReferenceValue.SelfReference(key);
         ReferenceValue.Raw right = new ReferenceValue.Substitution.Raw(c);
-        ReferenceValue.Raw operation = $sig.text.equals("+=") ? new ReferenceValue.Addition.Raw(left, right) : new ReferenceValue.Subtraction.Raw(left, right);
-        addRawReferenceOperation(operations, key, new ReferenceOperation.Assignment.Raw(key, operation));
+        Operation.RawUpdate operation = $sig.text.equals("+=") ? new Operation.Addition(c) : new Operation.Substraction(c);
+        addRawReferenceOperation(operations, key, new ReferenceOperation.Assignment.Raw(operation, key, right));
       }
     ;
 
@@ -1832,10 +1831,9 @@ shorthandColumnOperation[UpdateStatement.OperationCollector operations, ColumnId
       {
             if (isParsingTxn)
             {
-                ReferenceValue.Raw left = new ReferenceValue.SelfReference(key);
                 ReferenceValue.Raw right = new ReferenceValue.Constant.Raw(t);
-                ReferenceValue.Raw operation = $sig.text.equals("+=") ? new ReferenceValue.Addition.Raw(left, right) : new ReferenceValue.Subtraction.Raw(left, right);
-                addRawReferenceOperation(operations, key, new ReferenceOperation.Assignment.Raw(key, operation));
+                Operation.RawUpdate operation = $sig.text.equals("+=") ? new Operation.Addition(t) : new Operation.Substraction(t);
+                addRawReferenceOperation(operations, key, new ReferenceOperation.Assignment.Raw(operation, key, right));
             }
             else
             {

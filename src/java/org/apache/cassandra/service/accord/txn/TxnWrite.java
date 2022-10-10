@@ -36,13 +36,14 @@ import accord.api.Write;
 import accord.local.CommandStore;
 import accord.primitives.Timestamp;
 import org.apache.cassandra.concurrent.Stage;
+import org.apache.cassandra.cql3.UpdateParameters;
 import org.apache.cassandra.db.Clustering;
 import org.apache.cassandra.db.Columns;
+import org.apache.cassandra.db.DecoratedKey;
 import org.apache.cassandra.db.Mutation;
 import org.apache.cassandra.db.RegularAndStaticColumns;
 import org.apache.cassandra.db.TypeSizes;
 import org.apache.cassandra.db.partitions.PartitionUpdate;
-import org.apache.cassandra.db.rows.BTreeRow;
 import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.io.IVersionedSerializer;
 import org.apache.cassandra.io.util.DataInputPlus;
@@ -53,7 +54,6 @@ import org.apache.cassandra.service.accord.SerializationUtils;
 import org.apache.cassandra.service.accord.api.AccordKey;
 import org.apache.cassandra.service.accord.api.AccordKey.PartitionKey;
 import org.apache.cassandra.utils.ByteBufferUtil;
-import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.ObjectSizes;
 import org.apache.cassandra.utils.concurrent.*;
 
@@ -233,7 +233,7 @@ public class TxnWrite extends AbstractKeySorted<TxnWrite.Update> implements Writ
                                                columns(current.regulars, referenceOps.regulars));
         }
 
-        private static Row applyUpdates(Row existing, List<TxnReferenceOperation> operations, Clustering<?> clustering, Row.Builder builder, TxnData data)
+        private static Row applyUpdates(Row existing, List<TxnReferenceOperation> operations, DecoratedKey key, Clustering<?> clustering, UpdateParameters up, TxnData data)
         {
             if (operations.isEmpty())
                 return existing;
@@ -241,45 +241,46 @@ public class TxnWrite extends AbstractKeySorted<TxnWrite.Update> implements Writ
             if (existing != null && !existing.isEmpty())
             {
                 Preconditions.checkState(existing.clustering().equals(clustering));
-                builder.newRow(existing.clustering());
-                builder.addRowDeletion(existing.deletion());
-                builder.addPrimaryKeyLivenessInfo(existing.primaryKeyLivenessInfo());
-                existing.cells().forEach(builder::addCell);
+                up.newRow(existing.clustering());
+                up.addRowDeletion(existing.deletion());
+                up.addPrimaryKeyLivenessInfo(existing.primaryKeyLivenessInfo());
+                existing.cells().forEach(up::addCell);
             }
             else
             {
-                builder.newRow(clustering);
+                up.newRow(clustering);
             }
 
-            // TODO: Is this always the correct timestamp?
-            operations.forEach(op -> op.apply(data, builder, FBUtilities.timestampMicros()));
+            operations.forEach(op -> op.apply(data, key, up));
 
-            return builder.build();
+            return up.buildRow();
         }
 
-        public Update complete(TxnData data)
+        public Update complete(AccordUpdateParameters parameters)
         {
             if (referenceOps.isEmpty())
                 return new Update(key, index, baseUpdate);
 
+            DecoratedKey key = baseUpdate.partitionKey();
             PartitionUpdate.Builder updateBuilder = new PartitionUpdate.Builder(baseUpdate.metadata(),
-                                                                                   baseUpdate.partitionKey(),
-                                                                                   columns(baseUpdate, referenceOps),
-                                                                                   baseUpdate.rowCount(),
-                                                                                   baseUpdate.canHaveShadowedData());
+                                                                                key,
+                                                                                columns(baseUpdate, referenceOps),
+                                                                                baseUpdate.rowCount(),
+                                                                                baseUpdate.canHaveShadowedData());
 
-            Row.Builder rowBuilder = BTreeRow.unsortedBuilder();
-            Row staticRow = applyUpdates(baseUpdate.staticRow(), referenceOps.statics, Clustering.STATIC_CLUSTERING, rowBuilder, data);
+            UpdateParameters up = parameters.updateParameters(baseUpdate.metadata());
+            TxnData data = parameters.getData();
+            Row staticRow = applyUpdates(baseUpdate.staticRow(), referenceOps.statics, key, Clustering.STATIC_CLUSTERING, up, data);
 
             if (!staticRow.isEmpty())
                 updateBuilder.add(staticRow);
 
             Row existing = !baseUpdate.isEmpty() ? Iterables.getOnlyElement(baseUpdate) : null;
-            Row row = applyUpdates(existing, referenceOps.regulars, referenceOps.clustering, rowBuilder, data);
+            Row row = applyUpdates(existing, referenceOps.regulars, key, referenceOps.clustering, up, data);
             if (row != null)
                 updateBuilder.add(row);
 
-            return new Update(key, index, updateBuilder.build());
+            return new Update(this.key, index, updateBuilder.build());
         }
 
         public static final IVersionedSerializer<Fragment> serializer = new IVersionedSerializer<Fragment>()

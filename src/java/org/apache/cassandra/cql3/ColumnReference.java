@@ -29,6 +29,7 @@ import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
 import org.apache.cassandra.cql3.functions.Function;
 import org.apache.cassandra.cql3.selection.Selectable;
+import org.apache.cassandra.cql3.statements.TxnDataName;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.marshal.CollectionType;
 import org.apache.cassandra.db.marshal.SetType;
@@ -44,11 +45,11 @@ public class ColumnReference implements Term
     public static final String CANNOT_FIND_TUPLE_MESSAGE = "Cannot resolve reference to tuple '%s'.";
     public static final String COLUMN_NOT_IN_TUPLE_MESSAGE = "Column '%s' does not exist in tuple '%s'.";
 
-    private final String selectName;
+    private final TxnDataName selectName;
     public final ColumnMetadata column;
     private final Term cellPath;
     
-    public ColumnReference(String selectName, ColumnMetadata column, Term cellPath)
+    public ColumnReference(TxnDataName selectName, ColumnMetadata column, Term cellPath)
     {
         this.selectName = selectName;
         this.column = column;
@@ -65,13 +66,13 @@ public class ColumnReference implements Term
     @Override
     public Terminal bind(QueryOptions options) throws InvalidRequestException
     {
-        throw new UnsupportedOperationException("TODO");
+        throw new UnsupportedOperationException("TODO: " + getFullyQualifiedName());
     }
 
     @Override
     public ByteBuffer bindAndGet(QueryOptions options) throws InvalidRequestException
     {
-        throw new UnsupportedOperationException("TODO");
+        throw new UnsupportedOperationException("TODO: " + getFullyQualifiedName());
     }
 
     @Override
@@ -104,7 +105,7 @@ public class ColumnReference implements Term
 
     public ColumnIdentifier getFullyQualifiedName()
     {
-        String fullName = selectName + '.' + column.name.toString() + (cellPath == null ? "" : '[' + cellPath.toString() + ']');
+        String fullName = selectName.name() + '.' + column.name.toString() + (cellPath == null ? "" : '[' + cellPath.toString() + ']');
         return new ColumnIdentifier(fullName, true);
     }
 
@@ -113,7 +114,7 @@ public class ColumnReference implements Term
         private final List<Term.Raw> terms;
         private boolean isResolved = false;
 
-        private String tupleName;
+        private TxnDataName tupleName;
         private ColumnMetadata column;
         private Term cellPath = null;
 
@@ -157,7 +158,7 @@ public class ColumnReference implements Term
             isResolved = true;
         }
 
-        public void resolveReference(Map<String, ReferenceSource> sources)
+        public void resolveReference(Map<TxnDataName, ReferenceSource> sources)
         {
             if (isResolved)
                 return;
@@ -166,9 +167,9 @@ public class ColumnReference implements Term
 
             // root level name
             Constants.Literal literal = (Constants.Literal) termIterator.next();
-            tupleName = literal.getRawText();
+            tupleName = TxnDataName.user(literal.getRawText());
             ReferenceSource source = sources.get(tupleName);
-            checkNotNull(source, CANNOT_FIND_TUPLE_MESSAGE, tupleName);
+            checkNotNull(source, CANNOT_FIND_TUPLE_MESSAGE, tupleName.name());
 
             if (!termIterator.hasNext())
             {
@@ -181,7 +182,7 @@ public class ColumnReference implements Term
 
             literal = (Constants.Literal) termIterator.next();
             column = source.getColumn(literal.getRawText());
-            checkNotNull(column, COLUMN_NOT_IN_TUPLE_MESSAGE, literal.getRawText(), tupleName);
+            checkNotNull(column, COLUMN_NOT_IN_TUPLE_MESSAGE, literal.getRawText(), tupleName.name());
 
             // TODO: confirm update partition key terms don't contain column references. This can't be done in prepare
             //   because there can be intermediate functions (ie: pk=row.v+1 or pk=_add(row.v, 5)). Need a recursive Term visitor
@@ -235,7 +236,7 @@ public class ColumnReference implements Term
 
 
         public static ColumnReference prepare(String keyspace, ColumnSpecification receiver,
-                                              String selectName, ColumnMetadata column, Term cellPath)
+                                              TxnDataName selectName, ColumnMetadata column, Term cellPath)
         {
             if (!column.testAssignment(keyspace, receiver).isAssignable())
                 throw new InvalidRequestException(String.format("Invalid reference type %s (%s) for \"%s\" of type %s", column.type, column.name, receiver.name, receiver.type.asCQL3Type()));

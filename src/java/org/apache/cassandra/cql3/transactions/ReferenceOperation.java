@@ -19,6 +19,7 @@
 package org.apache.cassandra.cql3.transactions;
 
 import org.apache.cassandra.cql3.ColumnIdentifier;
+import org.apache.cassandra.cql3.Operation;
 import org.apache.cassandra.cql3.QueryOptions;
 import org.apache.cassandra.cql3.VariableSpecifications;
 import org.apache.cassandra.schema.ColumnMetadata;
@@ -37,10 +38,25 @@ public abstract class ReferenceOperation
         this.receiver = receiver;
     }
 
+    /**
+     * Creates a {@link ReferenceOperation} from the given {@link  Operation} for the purpose of defering execution
+     * within a transaction. When the language sees an Operation using a reference one is created already, but for cases
+     * that needs to defer execution (such as when {@link Operation#requiresRead()} is true), this method can be used.
+     */
+    public static ReferenceOperation create(Operation operation)
+    {
+        TxnReferenceOperation.Kind kind = TxnReferenceOperation.Kind.toKind(operation);
+        ColumnMetadata receiver = operation.column;
+        ReferenceValue value = new ReferenceValue.Constant(operation.term());
+        return new Assignment(kind, receiver, value);
+    }
+
     public ColumnMetadata receiver()
     {
         return receiver;
     }
+
+    public abstract boolean requiresRead();
 
 
     public abstract TxnReferenceOperation bindAndGet(QueryOptions options);
@@ -54,36 +70,57 @@ public abstract class ReferenceOperation
             this.column = column;
         }
 
-        public abstract boolean hasSelfReference();
-        public abstract void setSelfSourceName(String name);
-
-        public abstract void setTableMetadata(TableMetadata metadata);
         public abstract ReferenceOperation prepare(TableMetadata metadata, VariableSpecifications bindVariables);
     }
 
+    //TODO there is now only one type... simplfy
     public static class Assignment extends ReferenceOperation
     {
+        private final TxnReferenceOperation.Kind kind;
         private final ReferenceValue value;
 
-        public Assignment(ColumnMetadata receiver, ReferenceValue value)
+        public Assignment(TxnReferenceOperation.Kind kind, ColumnMetadata receiver, ReferenceValue value)
         {
             super(receiver);
+            this.kind = kind;
             this.value = value;
+        }
+
+        @Override
+        public boolean requiresRead()
+        {
+            //TODO this is super hacky but required to delegate to Operation... can we find a better way?
+            return new TxnReferenceOperation(kind, receiver(), null).getOperation(null).requiresRead();
         }
 
         @Override
         public TxnReferenceOperation bindAndGet(QueryOptions options)
         {
-            return new TxnReferenceOperation(receiver(), value.bindAndGet(options));
+            return new TxnReferenceOperation(kind, receiver(), value.bindAndGet(options));
         }
+
+        // new Operation.SetValue(t)
+        // new Operation.SetValue(t))
+        // new Operation.Prepend(t)
+        // $sig.text.equals("+") ? new Operation.Addition(t) : new Operation.Substraction(t)
+        // new Operation.Addition(Constants.Literal.integer($i.text))
+        // $sig.text.equals("+=") ? new Operation.Addition(t) : new Operation.Substraction(t)
+        //TODO
+        // new Operation.ColumnDeletion(c)
+        // new Operation.ElementDeletion(c, t)
+        // new Operation.FieldDeletion(c, field)
+        // new Operation.SetElement(k, t)
+        // new Operation.SetField(field, t)
 
         public static class Raw extends ReferenceOperation.Raw
         {
+            private final Operation.RawUpdate operation;
             private final ReferenceValue.Raw value;
 
-            public Raw(ColumnIdentifier column, ReferenceValue.Raw value)
+            public Raw(Operation.RawUpdate operation, ColumnIdentifier column, ReferenceValue.Raw value)
             {
                 super(column);
+                this.operation = operation;
                 this.value = value;
             }
 
@@ -91,26 +128,9 @@ public abstract class ReferenceOperation
             public ReferenceOperation prepare(TableMetadata metadata, VariableSpecifications bindVariables)
             {
                 ColumnMetadata receiver = metadata.getColumn(column);
+                Operation op = operation.prepare(metadata, receiver, true);
                 checkTrue(receiver != null, UNDEFINED_COLUMN_NAME_MESSAGE, column.toCQLString(), metadata);
-                return new Assignment(receiver, value.prepare(receiver, bindVariables));
-            }
-
-            @Override
-            public boolean hasSelfReference()
-            {
-                return value.hasSelfReference();
-            }
-
-            @Override
-            public void setSelfSourceName(String name)
-            {
-                value.setSelfSourceName(name);
-            }
-
-            @Override
-            public void setTableMetadata(TableMetadata metadata)
-            {
-                value.setTableMetadata(metadata);
+                return new Assignment(TxnReferenceOperation.Kind.toKind(op), receiver, value.prepare(receiver, bindVariables));
             }
         }
     }

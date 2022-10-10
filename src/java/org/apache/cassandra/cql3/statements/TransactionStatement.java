@@ -48,6 +48,7 @@ import org.apache.cassandra.cql3.VariableSpecifications;
 import org.apache.cassandra.cql3.selection.ResultSetBuilder;
 import org.apache.cassandra.cql3.selection.Selection;
 import org.apache.cassandra.cql3.transactions.ConditionStatement;
+import org.apache.cassandra.cql3.transactions.ReferenceOperation;
 import org.apache.cassandra.db.ReadQuery;
 import org.apache.cassandra.db.SinglePartitionReadCommand;
 import org.apache.cassandra.db.SinglePartitionReadQuery;
@@ -88,10 +89,10 @@ public class TransactionStatement implements CQLStatement
 
     static class NamedSelect
     {
-        final String name;
+        final TxnDataName name;
         final SelectStatement select;
 
-        public NamedSelect(String name, SelectStatement select)
+        public NamedSelect(TxnDataName name, SelectStatement select)
         {
             this.name = name;
             this.select = select;
@@ -183,6 +184,10 @@ public class TransactionStatement implements CQLStatement
             keyConsumer.accept(read.key());
             reads.add(read);
         }
+
+        for (NamedSelect select : autoReads.values())
+            // don't need keyConsumer as the keys are known to exist due to Modification
+            reads.add(createNamedRead(select, options));
         
         return new TxnRead(reads);
     }
@@ -201,6 +206,8 @@ public class TransactionStatement implements CQLStatement
         return new TxnCondition.BooleanGroup(TxnCondition.Kind.AND, result);
     }
 
+    private final Map<TxnDataName, NamedSelect> autoReads = new HashMap<>();
+
     List<TxnWrite.Fragment> createWriteFragments(ClientState state, QueryOptions options, Consumer<Key> keyConsumer)
     {
         List<TxnWrite.Fragment> fragments = new ArrayList<>(updates.size());
@@ -210,6 +217,13 @@ public class TransactionStatement implements CQLStatement
             TxnWrite.Fragment fragment = modification.getTxnWriteFragment(idx++, state, options);
             keyConsumer.accept(fragment.key);
             fragments.add(fragment);
+
+            if (modification.allReferenceOperations().stream().anyMatch(ReferenceOperation::requiresRead))
+            {
+                TxnDataName partitionName = TxnDataName.partitionRead(modification.metadata(), fragment.key.partitionKey());
+                if (!autoReads.containsKey(partitionName))
+                    autoReads.put(partitionName, new NamedSelect(partitionName, ((UpdateStatement) modification).createSelectForTxn()));
+            }
         }
         return fragments;
     }
@@ -228,15 +242,16 @@ public class TransactionStatement implements CQLStatement
     public Txn createTxn(ClientState state, QueryOptions options)
     {
         SortedSet<Key> keySet = new TreeSet<>();
-        TxnRead read = createRead(options, keySet::add);
         if (updates.isEmpty())
         {
             Preconditions.checkState(conditions.isEmpty());
+            TxnRead read = createRead(options, keySet::add);
             return new Txn.InMemory(toKeys(keySet), read, TxnQuery.ALL);
         }
         else
         {
             TxnUpdate update = createUpdate(state, options, keySet::add);
+            TxnRead read = createRead(options, keySet::add);
             return new Txn.InMemory(toKeys(keySet), read, TxnQuery.ALL, update);
         }
     }
@@ -248,7 +263,7 @@ public class TransactionStatement implements CQLStatement
         
         if (returningSelect != null)
         {
-            FilteredPartition partition = data.get("returning");
+            FilteredPartition partition = data.get(TxnDataName.returning());
             Selection.Selectors selectors = returningSelect.select.getSelection().newSelectors(options);
             ResultSetBuilder result = new ResultSetBuilder(returningSelect.select.getResultMetadata(), selectors, null);
             returningSelect.select.processPartition(partition.rowIterator(), options, result, FBUtilities.nowInSeconds());
@@ -380,14 +395,14 @@ public class TransactionStatement implements CQLStatement
                 checkTrue(select != null ^ returning != null, "Cannot specify both a full SELECT and a SELECT w/ LET references.");
 
             List<NamedSelect> preparedAssignments = new ArrayList<>(assignments.size());
-            Map<String, ColumnReference.ReferenceSource> refSources = new HashMap<>();
-            Set<String> selectNames = new HashSet<>();
+            Map<TxnDataName, ColumnReference.ReferenceSource> refSources = new HashMap<>();
+            Set<TxnDataName> selectNames = new HashSet<>();
 
             for (SelectStatement.RawStatement select : assignments)
             {
-                String name = select.parameters.refName;
+                TxnDataName name = TxnDataName.user(select.parameters.refName);
                 checkNotNull(name, "Assignments must be named");
-                checkTrue(selectNames.add(name), DUPLICATE_TUPLE_NAME_MESSAGE, name);
+                checkTrue(selectNames.add(name), DUPLICATE_TUPLE_NAME_MESSAGE, name.name());
                 checkFalse(name.equals("returning"), "Assignments may not use the name \"returning\"");
 
                 SelectStatement prepared = select.prepare(bindVariables);
@@ -408,12 +423,13 @@ public class TransactionStatement implements CQLStatement
             if (select != null)
             {
                 SelectStatement prepared = select.prepare(bindVariables);
-                // TODO: Accord saves the result of this read, so limit to a single row until that is no longer true. 
+                // TODO: Accord saves the result of this read, so limit to a single row until that is no longer true.
                 checkAtMostOneRowSpecified(prepared, INCOMPLETE_PRIMARY_KEY_SELECT_MESSAGE);
-                returningSelect = new NamedSelect("returning", prepared);
+                returningSelect = new NamedSelect(TxnDataName.returning(), prepared);
             }
 
             List<ColumnReference> returningReferences = null;
+
             if (returning != null)
             {
                 // TODO: Eliminate/modify this check if we allow full tuple selections.
@@ -429,25 +445,11 @@ public class TransactionStatement implements CQLStatement
             {
                 ModificationStatement.Parsed parsed = updates.get(i);
 
-                if (parsed.hasSelfReference())
-                {
-                    Preconditions.checkState(parsed.txnReadName == null, "Explicit naming of updates is not allowed.");
-                    parsed.txnReadName = "update" + (i + 1);
-                    parsed.setSelfSourceName(parsed.txnReadName);
-                }
-
                 ModificationStatement prepared = parsed.prepare(bindVariables);
                 checkFalse(prepared.hasConditions(), NO_CONDITIONS_IN_UPDATES_MESSAGE);
                 checkFalse(prepared.isTimestampSet(), NO_TIMESTAMPS_IN_UPDATES_MESSAGE);
 
                 preparedUpdates.add(prepared);
-
-                if (parsed.txnReadName != null)
-                {
-                    // TODO: can we borrow placeholder terms for the selection pk?? Test
-                    checkTrue(selectNames.add(parsed.txnReadName), DUPLICATE_TUPLE_NAME_MESSAGE, parsed.txnReadName);
-                    preparedAssignments.add(new NamedSelect(parsed.txnReadName, ((UpdateStatement) prepared).createSelectForTxn()));
-                }
             }
 
             List<ConditionStatement> preparedConditions = new ArrayList<>(conditions.size());

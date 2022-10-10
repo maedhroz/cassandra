@@ -56,6 +56,11 @@ public abstract class Operation
         this.t = t;
     }
 
+    public Term term()
+    {
+        return t;
+    }
+
     public void addFunctionsTo(List<Function> functions)
     {
         if (t != null)
