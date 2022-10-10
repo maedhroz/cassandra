@@ -277,7 +277,6 @@ public class AccordIntegrationTest extends TestBaseImpl
         }
     }
 
-    //TODO Failing
     @Test
     public void testLostCommitReadTriggersFallbackRead() throws Exception
     {
@@ -590,8 +589,6 @@ public class AccordIntegrationTest extends TestBaseImpl
         );
     }
 
-    //TODO Failing
-    //NOTES: prefetch didn't happen, why?
     @Test
     public void testListSubtraction() throws Exception
     {
@@ -618,8 +615,6 @@ public class AccordIntegrationTest extends TestBaseImpl
         );
     }
 
-    // TODO: Fix this in TransactionStatement preparation...
-    //TODO Failing
     @Test
     public void testSetSelection() throws Exception
     {
@@ -676,7 +671,7 @@ public class AccordIntegrationTest extends TestBaseImpl
         }
     }
 
-    //TODO Failing
+    //TODO Failing; need to implement number - number
     @Test
     public void additionAssignment() throws Throwable
     {
@@ -783,7 +778,7 @@ public class AccordIntegrationTest extends TestBaseImpl
             String addDoc =  "BEGIN TRANSACTION\n" +
                              "  LET demo_user = (SELECT * FROM ks.org_users WHERE org_name='demo' LIMIT 1);\n" +
                              "  LET existing = (SELECT * FROM ks.org_docs WHERE org_name='demo' AND doc_id=101);\n" +
-                             "  SELECT members_version FROM ks.org_users WHERE org_name='demo';\n" +
+                             "  SELECT members_version FROM ks.org_users WHERE org_name='demo' LIMIT 1;\n" +
                              "  IF demo_user.members_version = 5 AND existing IS NULL THEN\n" +
                              "    UPDATE ks.org_docs SET title='slides.key', permissions=777, contents_version += 1 WHERE org_name='demo' AND doc_id=101;\n" +
                              "    UPDATE ks.user_docs SET title='slides.key', permissions=777 WHERE user='blake' AND doc_id=101;\n" +
@@ -799,7 +794,7 @@ public class AccordIntegrationTest extends TestBaseImpl
             String addUser = "BEGIN TRANSACTION\n" +
                              "  LET demo_doc = (SELECT * FROM ks.org_docs WHERE org_name='demo' LIMIT 1);\n" +
                              "  LET existing = (SELECT * FROM ks.org_users WHERE org_name='demo' AND user='benedict');\n" +
-                             "  SELECT contents_version FROM ks.org_docs WHERE org_name='demo';\n" +
+                             "  SELECT contents_version FROM ks.org_docs WHERE org_name='demo' LIMIT 1;\n" +
                              "  IF demo_doc.contents_version = 6 AND existing IS NULL THEN\n" +
                              "    UPDATE ks.org_users SET permissions=777, members_version += 1 WHERE org_name='demo' AND user='benedict';\n" +
                              "    UPDATE ks.user_docs SET title='README', permissions=644 WHERE user='benedict' AND doc_id=100;\n" +

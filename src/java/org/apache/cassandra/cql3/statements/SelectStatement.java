@@ -1602,7 +1602,7 @@ public class SelectStatement implements CQLStatement.SingleKeyspaceCqlStatement
         }
     }
 
-    private String asCQL(QueryOptions options, ClientState state)
+    public String asCQL(QueryOptions options, ClientState state)
     {
         ColumnFilter columnFilter = selection.newSelectors(options).getColumnFilter();
         StringBuilder sb = new StringBuilder();
