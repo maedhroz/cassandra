@@ -29,6 +29,7 @@ import com.google.common.collect.Iterators;
 import org.apache.cassandra.cql3.QueryOptions;
 import org.apache.cassandra.cql3.QueryProcessor;
 import org.apache.cassandra.cql3.VariableSpecifications;
+import org.apache.cassandra.cql3.statements.TxnDataName;
 import org.apache.cassandra.service.accord.txn.TxnBuilder;
 import org.apache.cassandra.service.accord.txn.TxnData;
 import org.apache.cassandra.service.accord.txn.TxnReferenceOperations;
@@ -117,7 +118,7 @@ public class PairOfSequencesAccordSimulation extends AbstractPairOfSequencesPaxo
         return () -> {
             TxnBuilder builder = new TxnBuilder();
             VariableSpecifications bindVariables = new VariableSpecifications(singletonList(null));
-            builder.withRead("returning", SELECT, bindVariables, primaryKey);
+            builder.withRead(TxnDataName.returning(), SELECT, bindVariables, primaryKey);
             // TODO (now): support complex columns
             return execute(builder.build(), "pk", "count", "seq1", "seq2");
         };

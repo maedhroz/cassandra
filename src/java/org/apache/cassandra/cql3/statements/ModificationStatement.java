@@ -21,7 +21,6 @@ import java.nio.ByteBuffer;
 import java.util.*;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.Iterables;
 import org.slf4j.Logger;
@@ -344,6 +343,11 @@ public abstract class ModificationStatement implements CQLStatement.SingleKeyspa
     public Iterable<Operation> allOperations()
     {
         return operations;
+    }
+
+    public Collection<ReferenceOperation> allReferenceOperations()
+    {
+        return operations.refs();
     }
 
     public Iterable<ColumnMetadata> getColumnsWithConditions()
@@ -742,8 +746,10 @@ public abstract class ModificationStatement implements CQLStatement.SingleKeyspa
     @VisibleForTesting
     public PartitionUpdate getTxnUpdate(ClientState state, QueryOptions options)
     {
-        IMutation mutation = Iterables.getOnlyElement(getMutations(state, options, false, 0, 0, 0));
-        return Iterables.getOnlyElement(mutation.getPartitionUpdates());
+        List<? extends IMutation> mutations = getMutations(state, options, false, 0, 0, 0);
+        if (mutations.size() != 1)
+            throw new IllegalArgumentException("When running withing a transaction, modification statements may only mutate a single partition");
+        return Iterables.getOnlyElement(mutations.get(0).getPartitionUpdates());
     }
 
     private List<TxnReferenceOperation> getTxnReferenceOps(List<ReferenceOperation> operations, QueryOptions options)
@@ -767,6 +773,11 @@ public abstract class ModificationStatement implements CQLStatement.SingleKeyspa
 
     public TxnWrite.Fragment getTxnWriteFragment(int index, ClientState state, QueryOptions options)
     {
+        // When an Operation requires a read, this can not be done right away and must be done by the transaction itself,
+        // so migrate those Operations to a ReferenceOperation which works properly in this case
+        //TODO - Seems that += is a ref operation regardless of rhs... is this a parser bug?  That change made this
+        // logic only defensive...
+        operations.migrateReadRequiredOperations();
         PartitionUpdate baseUpdate = getTxnUpdate(state, options);
         TxnReferenceOperations referenceOps = getTxnReferenceOps(options, state);
         return new TxnWrite.Fragment(index, baseUpdate, referenceOps);
@@ -914,7 +925,6 @@ public abstract class ModificationStatement implements CQLStatement.SingleKeyspa
                               queryStartNanoTime);
 
         return new UpdateParameters(metadata(),
-                                    updatedColumns(),
                                     state,
                                     options,
                                     getTimestamp(timestamp, options),
@@ -962,9 +972,6 @@ public abstract class ModificationStatement implements CQLStatement.SingleKeyspa
         private final boolean ifNotExists;
         private final boolean ifExists;
 
-        // TODO: Find a way to localize this to txn preparation. 
-        String txnReadName;
-
         protected Parsed(QualifiedName name,
                          StatementType type,
                          Attributes.Raw attrs,
@@ -978,16 +985,6 @@ public abstract class ModificationStatement implements CQLStatement.SingleKeyspa
             this.conditions = conditions == null ? Collections.emptyList() : conditions;
             this.ifNotExists = ifNotExists;
             this.ifExists = ifExists;
-        }
-
-        public boolean hasSelfReference()
-        {
-            return false;
-        }
-
-        public void setSelfSourceName(String name)
-        {
-
         }
 
         public ModificationStatement prepare(ClientState state)

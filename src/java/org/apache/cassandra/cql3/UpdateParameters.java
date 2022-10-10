@@ -37,7 +37,6 @@ import org.apache.cassandra.utils.TimeUUID;
 public class UpdateParameters
 {
     public final TableMetadata metadata;
-    public final RegularAndStaticColumns updatedColumns;
     public final ClientState clientState;
     public final QueryOptions options;
 
@@ -56,8 +55,8 @@ public class UpdateParameters
     // The builder currently in use. Will alias either staticBuilder or regularBuilder, which are themselves built lazily.
     private Row.Builder builder;
 
+
     public UpdateParameters(TableMetadata metadata,
-                            RegularAndStaticColumns updatedColumns,
                             ClientState clientState,
                             QueryOptions options,
                             long timestamp,
@@ -67,7 +66,6 @@ public class UpdateParameters
     throws InvalidRequestException
     {
         this.metadata = metadata;
-        this.updatedColumns = updatedColumns;
         this.clientState = clientState;
         this.options = options;
 
@@ -123,10 +121,22 @@ public class UpdateParameters
 
     public void addPrimaryKeyLivenessInfo()
     {
-        builder.addPrimaryKeyLivenessInfo(LivenessInfo.create(timestamp, ttl, nowInSec));
+        addPrimaryKeyLivenessInfo(LivenessInfo.create(timestamp, ttl, nowInSec));
+    }
+
+    //TODO hide?
+    public void addPrimaryKeyLivenessInfo(LivenessInfo info)
+    {
+        builder.addPrimaryKeyLivenessInfo(info);
     }
 
     public void addRowDeletion()
+    {
+        addRowDeletion(Row.Deletion.regular(deletionTime));
+    }
+
+    //TODO hide?
+    public void addRowDeletion(Row.Deletion deletion)
     {
         // For compact tables, at the exclusion of the static row (of static compact tables), each row ever has a single column,
         // the "compact" one. As such, deleting the row or deleting that single cell is equivalent. We favor the later
@@ -134,7 +144,7 @@ public class UpdateParameters
         if (metadata.isCompactTable() && builder.clustering() != Clustering.STATIC_CLUSTERING)
             addTombstone(((TableMetadata.CompactTableMetadata) metadata).compactValueColumn);
         else
-            builder.addRowDeletion(Row.Deletion.regular(deletionTime));
+            builder.addRowDeletion(deletion);
     }
 
     public void addTombstone(ColumnMetadata column) throws InvalidRequestException
@@ -171,6 +181,13 @@ public class UpdateParameters
         Cell<?> cell = ttl == LivenessInfo.NO_TTL
                        ? BufferCell.live(column, timestamp, value, path)
                        : BufferCell.expiring(column, timestamp, ttl, nowInSec, value, path);
+        builder.addCell(cell);
+        return cell;
+    }
+
+    //TODO hide?
+    public Cell<?> addCell(Cell<?> cell)
+    {
         builder.addCell(cell);
         return cell;
     }

@@ -23,6 +23,7 @@ import org.junit.Test;
 
 import accord.txn.Txn;
 import org.apache.cassandra.SchemaLoader;
+import org.apache.cassandra.cql3.statements.TxnDataName;
 import org.apache.cassandra.schema.KeyspaceParams;
 
 import static org.apache.cassandra.cql3.statements.schema.CreateTableStatement.parse;
@@ -45,7 +46,7 @@ public class TxnUpdateTest
         TxnBuilder txnBuilder = new TxnBuilder();
         txnBuilder.withRead("row1", "SELECT * FROM ks.tbl WHERE k=0 AND c=0");
         txnBuilder.withWrite("INSERT INTO ks.tbl (k, c, v) VALUES (0, 0, 1)");
-        txnBuilder.withIsNullCondition("row1", null);
+        txnBuilder.withIsNullCondition(TxnDataName.user("row1"), null);
         Txn txn = txnBuilder.build();
 
         TxnUpdate update = (TxnUpdate) txn.update();

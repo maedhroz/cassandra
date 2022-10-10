@@ -39,6 +39,7 @@ import org.apache.cassandra.db.Slice;
 import org.apache.cassandra.db.partitions.PartitionUpdate;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.schema.TableMetadata;
+import org.apache.cassandra.service.accord.txn.TxnReferenceOperation;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.Pair;
 import org.apache.commons.lang3.builder.ToStringBuilder;
@@ -177,18 +178,18 @@ public class UpdateStatement extends ModificationStatement
                     checkTrue(value instanceof Term.Raw, "value references can't be used with primary key columns");
                     whereClause.add(new SingleColumnRelation(columnNames.get(i), Operator.EQ, (Term.Raw) value));
                 }
+                else if (value instanceof ReferenceValue.Raw)
+                {
+                    ReferenceValue.Raw raw = (ReferenceValue.Raw) value;
+                    ReferenceValue referenceValue = raw.prepare(def, bindVariables);
+                    ReferenceOperation operation = new ReferenceOperation.Assignment(TxnReferenceOperation.Kind.Setter, def, referenceValue);
+                    operations.add(def, operation);
+                }
                 else if (value instanceof Term.Raw)
                 {
                     Operation operation = new Operation.SetValue((Term.Raw) value).prepare(metadata, def, !conditions.isEmpty());
                     operation.collectMarkerSpecification(bindVariables);
                     operations.add(operation);
-                }
-                else if (value instanceof ReferenceValue.Raw)
-                {
-                    ReferenceValue.Raw raw = (ReferenceValue.Raw) value;
-                    ReferenceValue referenceValue = raw.prepare(def, bindVariables);
-                    ReferenceOperation operation = new ReferenceOperation.Assignment(def, referenceValue);
-                    operations.add(def, operation);
                 }
                 else
                 {
@@ -394,7 +395,6 @@ public class UpdateStatement extends ModificationStatement
             {
                 ColumnMetadata def = metadata.getExistingColumn(entry.left);
                 checkFalse(def.isPrimaryKeyColumn(), UPDATING_PRIMARY_KEY_MESSAGE, def.name);
-                entry.right.setTableMetadata(metadata);
                 ReferenceOperation operation = entry.right.prepare(metadata, bindVariables);
                 operations.add(def, operation);
             }
@@ -412,20 +412,6 @@ public class UpdateStatement extends ModificationStatement
                                        restrictions,
                                        conditions,
                                        attrs);
-        }
-
-        @Override
-        public boolean hasSelfReference()
-        {
-            return super.hasSelfReference() || Iterables.any(updates.referenceOps, p -> p.right.hasSelfReference());
-        }
-
-        @Override
-        public void setSelfSourceName(String name)
-        {
-            super.setSelfSourceName(name);
-            for (Pair<ColumnIdentifier, ReferenceOperation.Raw> pair : updates.referenceOps)
-                pair.right.setSelfSourceName(name);
         }
     }
     

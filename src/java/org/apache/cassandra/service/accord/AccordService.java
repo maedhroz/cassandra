@@ -27,13 +27,16 @@ import java.util.concurrent.TimeoutException;
 import com.google.common.annotations.VisibleForTesting;
 
 import accord.api.Result;
+import accord.coordinate.Timeout;
 import accord.impl.SimpleProgressLog;
 import accord.local.Node;
 import accord.messages.Request;
 import accord.txn.Txn;
 import org.apache.cassandra.db.ConsistencyLevel;
+import org.apache.cassandra.db.WriteType;
 import org.apache.cassandra.exceptions.ReadTimeoutException;
 import org.apache.cassandra.concurrent.Shutdownable;
+import org.apache.cassandra.exceptions.WriteTimeoutException;
 import org.apache.cassandra.net.IVerbHandler;
 import org.apache.cassandra.service.accord.api.AccordAgent;
 import org.apache.cassandra.service.accord.api.AccordScheduler;
@@ -108,6 +111,9 @@ public class AccordService implements Shutdownable
         }
         catch (ExecutionException e)
         {
+            Throwable cause = e.getCause();
+            if (cause instanceof Timeout)
+                throw throwTimeout(txn);
             throw new RuntimeException(e);
         }
         catch (InterruptedException e)
@@ -116,9 +122,16 @@ public class AccordService implements Shutdownable
         }
         catch (TimeoutException e)
         {
-            throw new ReadTimeoutException(ConsistencyLevel.ANY, 0, 0, false);
+            throw throwTimeout(txn);
         }
-    };
+    }
+
+    private static RuntimeException throwTimeout(Txn txn)
+    {
+        throw txn.isWrite() ?
+              new WriteTimeoutException(WriteType.TRANSACTION, ConsistencyLevel.ANY, 0, 0) :
+              new ReadTimeoutException(ConsistencyLevel.ANY, 0, 0, false);
+    }
 
     @VisibleForTesting
     AccordMessageSink messageSink()

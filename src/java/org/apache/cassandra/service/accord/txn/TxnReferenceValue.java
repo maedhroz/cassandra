@@ -20,28 +20,24 @@ package org.apache.cassandra.service.accord.txn;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 import java.util.function.BiFunction;
 
 import com.google.common.base.Preconditions;
 
-import org.apache.cassandra.db.DeletionTime;
 import org.apache.cassandra.db.TypeSizes;
 import org.apache.cassandra.db.marshal.AbstractType;
+import org.apache.cassandra.db.marshal.CollectionType;
 import org.apache.cassandra.db.marshal.NumberType;
-import org.apache.cassandra.db.rows.BufferCell;
+import org.apache.cassandra.db.marshal.UserType;
 import org.apache.cassandra.db.rows.Cell;
 import org.apache.cassandra.db.rows.ColumnData;
 import org.apache.cassandra.db.rows.ComplexColumnData;
-import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.io.IVersionedSerializer;
 import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.DataOutputPlus;
-import org.apache.cassandra.schema.ColumnMetadata;
+import org.apache.cassandra.transport.ProtocolVersion;
 import org.apache.cassandra.utils.ByteBufferUtil;
-import org.apache.cassandra.utils.FBUtilities;
 
 public abstract class TxnReferenceValue
 {
@@ -62,16 +58,6 @@ public abstract class TxnReferenceValue
 
     public abstract Kind kind();
     public abstract ByteBuffer compute(TxnData data, AbstractType<?> receiver);
-    
-    public void applyComplex(TxnData data, ColumnMetadata receiver, Row.Builder row, long timestamp)
-    {
-        throw new UnsupportedOperationException("Complex apply not supported on type " + receiver + " for kind " + kind());
-    }
-
-    public ComplexColumnData computeComplex(TxnData data, AbstractType<?> receiver)
-    {
-        throw new UnsupportedOperationException("Complex compute not supported on type " + receiver + " for kind " + kind());
-    }
 
     /**
      * Serializer for everything except Kind
@@ -91,6 +77,11 @@ public abstract class TxnReferenceValue
         public Constant(ByteBuffer value)
         {
             this.value = value;
+        }
+
+        public ByteBuffer getValue()
+        {
+            return value;
         }
 
         @Override
@@ -131,19 +122,19 @@ public abstract class TxnReferenceValue
             @Override
             public void serialize(Constant constant, DataOutputPlus out, int version) throws IOException
             {
-                ByteBufferUtil.writeWithShortLength(constant.value, out);
+                ByteBufferUtil.writeWithVIntLength(constant.value, out);
             }
 
             @Override
             public Constant deserialize(DataInputPlus in, int version, Kind kind) throws IOException
             {
-                return new Constant(ByteBufferUtil.readWithShortLength(in));
+                return new Constant(ByteBufferUtil.readWithVIntLength(in));
             }
 
             @Override
             public long serializedSize(Constant constant, int version)
             {
-                return ByteBufferUtil.serializedSizeWithShortLength(constant.value);
+                return ByteBufferUtil.serializedSizeWithVIntLength(constant.value);
             }
         };
     }
@@ -189,37 +180,34 @@ public abstract class TxnReferenceValue
         {
             // TODO: confirm all references can be satisfied as part of the txn condition
             // TODO: if the receiver type is not the same as the column type here, we need to do the neccesary conversion
-            Preconditions.checkArgument(receiver == reference.column().type);
-            Preconditions.checkArgument(!reference.column().isComplex());
+            AbstractType<?> type = reference.column().type;
+            Preconditions.checkArgument(receiver == type);
 
             ColumnData columnData = reference.getColumnData(data);
-            return ((Cell<?>) columnData).buffer();
-        }
 
-        @Override
-        public ComplexColumnData computeComplex(TxnData data, AbstractType<?> receiver)
-        {
-            // TODO: Add messages if we keep these...
-            Preconditions.checkArgument(receiver == reference.column().type);
-            Preconditions.checkArgument(reference.column().isComplex());
-
-            ColumnData columnData = reference.getColumnData(data);
-            return (ComplexColumnData) columnData;
-        }
-
-        @Override
-        public void applyComplex(TxnData data, ColumnMetadata receiver, Row.Builder row, long timestamp)
-        {
-            // TODO: Add messages if we keep these...
-            Preconditions.checkArgument(receiver.type == reference.column().type);
-            Preconditions.checkArgument(reference.column().isComplex());
-
-            for (Cell<?> cell : computeComplex(data, receiver.type))
-                // TODO: Should we create a new Cell w/ new paths...account for TTLs?
-                row.addCell(cell.withUpdatedTimestampAndLocalDeletionTime(timestamp, cell.localDeletionTime()));
-
-            // TODO: Reconcile w/ Lists.Setter?
-            row.addComplexDeletion(receiver, new DeletionTime(timestamp - 1, FBUtilities.nowInSeconds()));
+            if (reference.column().isComplex())
+            {
+                ComplexColumnData complex = (ComplexColumnData) columnData;
+                //TODO can we do better?
+                if (type instanceof CollectionType)
+                {
+                    CollectionType col = (CollectionType) type;
+                    return col.serializeForNativeProtocol(complex.iterator(), ProtocolVersion.CURRENT);
+                }
+                else if (type instanceof UserType)
+                {
+                    UserType udt = (UserType) type;
+                    return udt.serializeForNativeProtocol(complex.iterator(), ProtocolVersion.CURRENT);
+                }
+                else
+                {
+                    throw new AssertionError("Unknown complex type: " + type);
+                }
+            }
+            else
+            {
+                return ((Cell<?>) columnData).buffer();
+            }
         }
 
         static final Serializer<Substitution> serializer = new Serializer<Substitution>()
@@ -322,14 +310,6 @@ public abstract class TxnReferenceValue
         }
 
         @Override
-        public void applyComplex(TxnData data, ColumnMetadata receiver, Row.Builder row, long timestamp)
-        {
-            for (Cell<?> cell : right.computeComplex(data, receiver.type))
-                // TODO: Should we create a new Cell w/ new paths...account for TTLs?
-                row.addCell(cell.withUpdatedTimestampAndLocalDeletionTime(timestamp, cell.localDeletionTime()));
-        }
-        
-        @Override
         public ByteBuffer compute(TxnData data, AbstractType<?> receiver)
         {
             if (receiver instanceof NumberType<?>)
@@ -377,23 +357,6 @@ public abstract class TxnReferenceValue
             {
                 throw new IllegalArgumentException("Unhandled type for addition: " + receiver);
             }
-        }
-
-        @Override
-        public void applyComplex(TxnData data, ColumnMetadata receiver, Row.Builder row, long timestamp)
-        {
-            ComplexColumnData existingCells = left.computeComplex(data, receiver.type);
-            ComplexColumnData doomedCells = right.computeComplex(data, receiver.type);
-
-            List<ByteBuffer> toDiscard = new ArrayList<>(doomedCells.cellsCount());
-            for (Cell<?> cell : doomedCells)
-                toDiscard.add(cell.buffer());
-
-            // TODO: Reuse logic in Lists.Discarder?
-            for (Cell<?> cell : existingCells)
-                if (toDiscard.contains(cell.buffer()))
-                    // TODO: Source nowInSeconds from overall txn context?
-                    row.addCell(BufferCell.tombstone(receiver, timestamp, FBUtilities.nowInSeconds(), cell.path()));
         }
 
         public static final Serializer<Difference> serializer = new BiValueSerializer<>(Difference::new);

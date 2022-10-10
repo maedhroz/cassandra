@@ -18,36 +18,25 @@
 
 package org.apache.cassandra.cql3.transactions;
 
-import com.google.common.base.Preconditions;
-
-import org.apache.cassandra.cql3.ColumnIdentifier;
 import org.apache.cassandra.cql3.ColumnReference;
+import org.apache.cassandra.cql3.ColumnSpecification;
 import org.apache.cassandra.cql3.QueryOptions;
 import org.apache.cassandra.cql3.Term;
 import org.apache.cassandra.cql3.VariableSpecifications;
+import org.apache.cassandra.db.marshal.AbstractType;
+import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.schema.ColumnMetadata;
-import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.service.accord.txn.TxnReferenceValue;
 
-import static org.apache.cassandra.cql3.statements.RequestValidations.checkNotNull;
 import static org.apache.cassandra.cql3.statements.RequestValidations.checkTrue;
 
 public abstract class ReferenceValue
 {
     public abstract TxnReferenceValue bindAndGet(QueryOptions options);
 
-    public static abstract class Raw
+    public static abstract class Raw extends Term.Raw
     {
         public abstract ReferenceValue prepare(ColumnMetadata receiver, VariableSpecifications bindVariables);
-
-        /**
-         * used by queries that implicitly require a read without explicitly defining a reference (ie: v+=3)
-         */
-        public abstract boolean hasSelfReference();
-
-        public abstract void setSelfSourceName(String name);
-
-        public abstract void setTableMetadata(TableMetadata metadata);
     }
 
     public static class Constant extends ReferenceValue
@@ -75,30 +64,38 @@ public abstract class ReferenceValue
             }
 
             @Override
-            public boolean hasSelfReference()
-            {
-                return false;
-            }
-
-            @Override
-            public void setSelfSourceName(String name)
-            {
-
-            }
-
-            @Override
-            public void setTableMetadata(TableMetadata metadata)
-            {
-
-            }
-
-            @Override
             public ReferenceValue prepare(ColumnMetadata receiver, VariableSpecifications bindVariables)
             {
                 return new Constant(term.prepare(receiver.ksName, receiver));
             }
+
+            @Override
+            public TestResult testAssignment(String keyspace, ColumnSpecification receiver)
+            {
+                return term.testAssignment(keyspace, receiver);
+            }
+
+            @Override
+            public Term prepare(String keyspace, ColumnSpecification receiver) throws InvalidRequestException
+            {
+                return term.prepare(keyspace, receiver);
+            }
+
+            @Override
+            public String getText()
+            {
+                return term.getText();
+            }
+
+            @Override
+            public AbstractType<?> getExactTypeIfKnown(String keyspace)
+            {
+                return term.getExactTypeIfKnown(keyspace);
+            }
         }
     }
+
+
 
     public static class Substitution extends ReferenceValue
     {
@@ -124,23 +121,6 @@ public abstract class ReferenceValue
                 this.reference = reference;
             }
 
-            @Override
-            public boolean hasSelfReference()
-            {
-                return false;
-            }
-
-            @Override
-            public void setSelfSourceName(String name)
-            {
-
-            }
-
-            @Override
-            public void setTableMetadata(TableMetadata metadata)
-            {
-
-            }
 
             @Override
             public ReferenceValue prepare(ColumnMetadata receiver, VariableSpecifications bindVariables)
@@ -149,157 +129,29 @@ public abstract class ReferenceValue
                 checkTrue(reference.column() != null, "substitution references must reference a column (%s)", reference);
                 return new Substitution((ColumnReference) reference.prepare("", receiver));
             }
-        }
-    }
 
-    public static class SelfReference extends Raw
-    {
-        private final ColumnIdentifier column;
-        private String sourceName = null;
-        private TableMetadata metadata = null;
-
-        public SelfReference(ColumnIdentifier column)
-        {
-            this.column = column;
-        }
-
-        @Override
-        public ReferenceValue prepare(ColumnMetadata receiver, VariableSpecifications bindVariables)
-        {
-            Preconditions.checkState(sourceName != null);
-            Preconditions.checkState(metadata != null);
-            ColumnMetadata columnMetadata = metadata.getColumn(column);
-            checkNotNull(column, "%s doesn't reference a valid column", column);
-            return new Substitution(ColumnReference.Raw.prepare("", receiver, sourceName, columnMetadata, null));
-        }
-
-        @Override
-        public boolean hasSelfReference()
-        {
-            return true;
-        }
-
-        @Override
-        public void setSelfSourceName(String sourceName)
-        {
-            this.sourceName = sourceName;
-        }
-
-        @Override
-        public void setTableMetadata(TableMetadata metadata)
-        {
-            this.metadata = metadata;
-        }
-    }
-
-    public static class Addition extends ReferenceValue
-    {
-        private final ReferenceValue left;
-        private final ReferenceValue right;
-
-        public Addition(ReferenceValue left, ReferenceValue right)
-        {
-            this.left = left;
-            this.right = right;
-        }
-
-        @Override
-        public TxnReferenceValue bindAndGet(QueryOptions options)
-        {
-            return new TxnReferenceValue.Sum(left.bindAndGet(options), right.bindAndGet(options));
-        }
-
-        public static class Raw extends ReferenceValue.Raw
-        {
-            private final ReferenceValue.Raw left;
-            private final ReferenceValue.Raw right;
-
-            public Raw(ReferenceValue.Raw left, ReferenceValue.Raw right)
+            @Override
+            public TestResult testAssignment(String keyspace, ColumnSpecification receiver)
             {
-                this.left = left;
-                this.right = right;
+                return reference.testAssignment(keyspace, receiver);
             }
 
             @Override
-            public boolean hasSelfReference()
+            public Term prepare(String keyspace, ColumnSpecification receiver) throws InvalidRequestException
             {
-                return left.hasSelfReference() || right.hasSelfReference();
+                return reference.prepare(keyspace, receiver);
             }
 
             @Override
-            public void setSelfSourceName(String name)
+            public String getText()
             {
-                left.setSelfSourceName(name);
-                right.setSelfSourceName(name);
+                return reference.getText();
             }
 
             @Override
-            public void setTableMetadata(TableMetadata metadata)
+            public AbstractType<?> getExactTypeIfKnown(String keyspace)
             {
-                left.setTableMetadata(metadata);
-                right.setTableMetadata(metadata);
-            }
-
-            @Override
-            public ReferenceValue prepare(ColumnMetadata receiver, VariableSpecifications bindVariables)
-            {
-                return new Addition(left.prepare(receiver, bindVariables), right.prepare(receiver, bindVariables));
-            }
-        }
-    }
-
-    public static class Subtraction extends ReferenceValue
-    {
-        private final ReferenceValue left;
-        private final ReferenceValue right;
-
-        public Subtraction(ReferenceValue left, ReferenceValue right)
-        {
-            this.left = left;
-            this.right = right;
-        }
-
-        @Override
-        public TxnReferenceValue bindAndGet(QueryOptions options)
-        {
-            return new TxnReferenceValue.Difference(left.bindAndGet(options), right.bindAndGet(options));
-        }
-
-        public static class Raw extends ReferenceValue.Raw
-        {
-            private final ReferenceValue.Raw left;
-            private final ReferenceValue.Raw right;
-
-            public Raw(ReferenceValue.Raw left, ReferenceValue.Raw right)
-            {
-                this.left = left;
-                this.right = right;
-            }
-
-            @Override
-            public boolean hasSelfReference()
-            {
-                return left.hasSelfReference() || right.hasSelfReference();
-            }
-
-            @Override
-            public void setSelfSourceName(String name)
-            {
-                left.setSelfSourceName(name);
-                right.setSelfSourceName(name);
-            }
-
-            @Override
-            public void setTableMetadata(TableMetadata metadata)
-            {
-                left.setTableMetadata(metadata);
-                right.setTableMetadata(metadata);
-            }
-
-            @Override
-            public ReferenceValue prepare(ColumnMetadata receiver, VariableSpecifications bindVariables)
-            {
-                return new Subtraction(left.prepare(receiver, bindVariables), right.prepare(receiver, bindVariables));
+                return reference.getExactTypeIfKnown(keyspace);
             }
         }
     }

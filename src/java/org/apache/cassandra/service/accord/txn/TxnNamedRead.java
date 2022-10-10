@@ -26,6 +26,7 @@ import accord.api.Data;
 import accord.local.CommandStore;
 import accord.primitives.Timestamp;
 import org.apache.cassandra.concurrent.Stage;
+import org.apache.cassandra.cql3.statements.TxnDataName;
 import org.apache.cassandra.db.ReadExecutionController;
 import org.apache.cassandra.db.SinglePartitionReadCommand;
 import org.apache.cassandra.db.TypeSizes;
@@ -51,18 +52,18 @@ import static org.apache.cassandra.utils.ByteBufferUtil.writeWithVIntLength;
 
 public class TxnNamedRead extends AbstractSerialized<SinglePartitionReadCommand>
 {
-    private static final long EMPTY_SIZE = ObjectSizes.measure(new TxnNamedRead("", null, null));
-    private final String name;
+    private static final long EMPTY_SIZE = ObjectSizes.measure(new TxnNamedRead(null, null, null));
+    private final TxnDataName name;
     private final PartitionKey key;
 
-    private TxnNamedRead(String name, PartitionKey key, ByteBuffer bytes)
+    private TxnNamedRead(TxnDataName name, PartitionKey key, ByteBuffer bytes)
     {
         super(bytes);
         this.name = name;
         this.key = key;
     }
 
-    public TxnNamedRead(String name, SinglePartitionReadCommand value)
+    public TxnNamedRead(TxnDataName name, SinglePartitionReadCommand value)
     {
         super(value);
         this.name = name;
@@ -71,7 +72,7 @@ public class TxnNamedRead extends AbstractSerialized<SinglePartitionReadCommand>
 
     public long estimatedSizeOnHeap()
     {
-        return EMPTY_SIZE + name.length() + key.estimatedSizeOnHeap() + ByteBufferUtil.estimatedSizeOnHeap(bytes());
+        return EMPTY_SIZE + name.estimatedSizeOnHeap() + key.estimatedSizeOnHeap() + ByteBufferUtil.estimatedSizeOnHeap(bytes());
     }
 
     @Override
@@ -106,7 +107,7 @@ public class TxnNamedRead extends AbstractSerialized<SinglePartitionReadCommand>
                '}';
     }
 
-    public String name()
+    public TxnDataName name()
     {
         return name;
     }
@@ -143,7 +144,7 @@ public class TxnNamedRead extends AbstractSerialized<SinglePartitionReadCommand>
         @Override
         public void serialize(TxnNamedRead read, DataOutputPlus out, int version) throws IOException
         {
-            out.writeUTF(read.name);
+            TxnDataName.serializer.serialize(read.name, out, version);
             PartitionKey.serializer.serialize(read.key, out, version);
             writeWithVIntLength(read.bytes(), out);
         }
@@ -151,7 +152,7 @@ public class TxnNamedRead extends AbstractSerialized<SinglePartitionReadCommand>
         @Override
         public TxnNamedRead deserialize(DataInputPlus in, int version) throws IOException
         {
-            String name = in.readUTF();
+            TxnDataName name = TxnDataName.serializer.deserialize(in, version);
             PartitionKey key = PartitionKey.serializer.deserialize(in, version);
             ByteBuffer bytes = readWithVIntLength(in);
             return new TxnNamedRead(name, key, bytes);
@@ -161,7 +162,7 @@ public class TxnNamedRead extends AbstractSerialized<SinglePartitionReadCommand>
         public long serializedSize(TxnNamedRead read, int version)
         {
             long size = 0;
-            size += TypeSizes.sizeof(read.name);
+            size += TxnDataName.serializer.serializedSize(read.name, version);
             size += PartitionKey.serializer.serializedSize(read.key, version);
             size += serializedSizeWithVIntLength(read.bytes());
             return size;

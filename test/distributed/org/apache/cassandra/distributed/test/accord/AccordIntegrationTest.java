@@ -23,6 +23,8 @@ import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -36,6 +38,13 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.Uninterruptibles;
 
+import net.bytebuddy.ByteBuddy;
+import net.bytebuddy.dynamic.loading.ClassLoadingStrategy;
+import net.bytebuddy.implementation.MethodDelegation;
+import net.bytebuddy.implementation.bind.annotation.SuperCall;
+import net.bytebuddy.implementation.bind.annotation.This;
+import org.apache.cassandra.cql3.statements.ModificationStatement;
+import org.apache.cassandra.cql3.statements.TransactionStatement;
 import org.assertj.core.api.Assertions;
 import org.awaitility.Awaitility;
 import org.junit.Test;
@@ -69,6 +78,7 @@ import org.apache.cassandra.service.accord.txn.TxnBuilder;
 import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.FailingConsumer;
 
+import static net.bytebuddy.matcher.ElementMatchers.named;
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -79,6 +89,8 @@ import static org.apache.cassandra.utils.Clock.Global.nanoTime;
 
 //TODO there are too many new clusters, this will cause Metaspace issues.  Once Schema and topology are integrated, can switch
 // to a shared cluster with isolated tables
+// Tests to write:
+// column reference to a reversed clustering column (wrapped in ReversedType)
 @SuppressWarnings("Convert2MethodRef")
 public class AccordIntegrationTest extends TestBaseImpl
 {
@@ -118,7 +130,10 @@ public class AccordIntegrationTest extends TestBaseImpl
     private static Cluster createCluster() throws IOException
     {
         // need to up the timeout else tests get flaky
-        return init(Cluster.build(2).withConfig(c -> c.with(Feature.NETWORK).set("write_request_timeout_in_ms", TimeUnit.SECONDS.toMillis(10))).start());
+        return init(Cluster.build(2)
+                           .withConfig(c -> c.with(Feature.NETWORK).set("write_request_timeout_in_ms", TimeUnit.SECONDS.toMillis(10)))
+                           .withInstanceInitializer(BB::install)
+                           .start());
     }
 
     @Test
@@ -264,6 +279,7 @@ public class AccordIntegrationTest extends TestBaseImpl
         }
     }
 
+    //TODO Failing
     @Test
     public void testLostCommitReadTriggersFallbackRead() throws Exception
     {
@@ -553,6 +569,8 @@ public class AccordIntegrationTest extends TestBaseImpl
         );
     }
 
+    //TODO Failing
+    //NOTES: prefetch didn't happen, why?
     @Test
     public void testListSubtraction() throws Exception
     {
@@ -579,6 +597,8 @@ public class AccordIntegrationTest extends TestBaseImpl
         );
     }
 
+    // TODO: Fix this in TransactionStatement preparation...
+    //TODO Failing
     @Test
     public void testSetSelection() throws Exception
     {
@@ -635,6 +655,7 @@ public class AccordIntegrationTest extends TestBaseImpl
         }
     }
 
+    //TODO Failing
     @Test
     public void additionAssignment() throws Throwable
     {
@@ -716,6 +737,7 @@ public class AccordIntegrationTest extends TestBaseImpl
         }
     }
 
+    //TODO Failing
     @Test
     public void demoTest() throws Throwable
     {
@@ -791,7 +813,7 @@ public class AccordIntegrationTest extends TestBaseImpl
     }
 
     @SuppressWarnings("UnstableApiUsage")
-    private static void awaitAsyncApply(Cluster cluster) throws TimeoutException
+    public static void awaitAsyncApply(Cluster cluster) throws TimeoutException
     {
         long deadlineNanos = nanoTime() + TimeUnit.SECONDS.toNanos(30);
         AtomicReference<TimeoutException> timeout = new AtomicReference<>(null);
@@ -843,4 +865,30 @@ public class AccordIntegrationTest extends TestBaseImpl
 //    {
 //
 //    }
+
+    public static class BB
+    {
+        public static void install(ClassLoader classLoader, Integer num)
+        {
+            new ByteBuddy().rebase(ModificationStatement.class)
+                           .method(named("readRequiredLists"))
+                           .intercept(MethodDelegation.to(BB.class))
+                           .make()
+                           .load(classLoader, ClassLoadingStrategy.Default.INJECTION);
+        }
+
+        public static Map readRequiredLists(@This ModificationStatement stmt, @SuperCall Callable<Map> fn) throws Exception
+        {
+            Map map = fn.call();
+            if (map != null)
+            {
+                // if the call tree has a TransactionStatement, then fail as this violates
+                // the query
+                for (StackTraceElement e : Thread.currentThread().getStackTrace())
+                    if (TransactionStatement.class.getCanonicalName().equals(e.getClassName()))
+                        throw new IllegalStateException("Attempted to load required partition!");
+            }
+            return map;
+        }
+    }
 }

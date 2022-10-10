@@ -33,6 +33,7 @@ import accord.txn.Txn;
 import org.apache.cassandra.cql3.*;
 import org.apache.cassandra.cql3.statements.ModificationStatement;
 import org.apache.cassandra.cql3.statements.SelectStatement;
+import org.apache.cassandra.cql3.statements.TxnDataName;
 import org.apache.cassandra.db.ReadQuery;
 import org.apache.cassandra.db.SinglePartitionReadCommand;
 import org.apache.cassandra.db.SinglePartitionReadQuery;
@@ -56,10 +57,15 @@ public class TxnBuilder
 
     public TxnBuilder withRead(String name, String query)
     {
+        return withRead(TxnDataName.user(name), query, VariableSpecifications.empty());
+    }
+
+    public TxnBuilder withRead(TxnDataName name, String query)
+    {
         return withRead(name, query, VariableSpecifications.empty());
     }
-    
-    public TxnBuilder withRead(String name, String query, VariableSpecifications bindVariables, Object... values)
+
+    public TxnBuilder withRead(TxnDataName name, String query, VariableSpecifications bindVariables, Object... values)
     {
         SelectStatement.RawStatement parsed = (SelectStatement.RawStatement) QueryProcessor.parseStatement(query);
         // the parser will only let us define a ref name if we're parsing a transaction, which we're not
@@ -94,7 +100,7 @@ public class TxnBuilder
         return withWrite(query, TxnReferenceOperations.empty(), VariableSpecifications.empty());
     }
 
-    static ValueReference reference(String name, String column)
+    static ValueReference reference(TxnDataName name, String column)
     {
         ColumnMetadata metadata = null;
         if (column != null)
@@ -115,27 +121,27 @@ public class TxnBuilder
         return this;
     }
 
-    public TxnBuilder withValueCondition(String name, String column, TxnCondition.Kind kind, ByteBuffer value)
+    public TxnBuilder withValueCondition(TxnDataName name, String column, TxnCondition.Kind kind, ByteBuffer value)
     {
         return withCondition(new TxnCondition.Value(reference(name, column), kind, value));
     }
 
     public TxnBuilder withEqualsCondition(String name, String column, ByteBuffer value)
     {
-        return withValueCondition(name, column, TxnCondition.Kind.EQUAL, value);
+        return withValueCondition(TxnDataName.user(name), column, TxnCondition.Kind.EQUAL, value);
     }
 
-    private TxnBuilder withExistenceCondition(String name, String column, TxnCondition.Kind kind)
+    private TxnBuilder withExistenceCondition(TxnDataName name, String column, TxnCondition.Kind kind)
     {
         return withCondition(new TxnCondition.Exists(reference(name, column), kind));
     }
 
-    public TxnBuilder withIsNotNullCondition(String name, String column)
+    public TxnBuilder withIsNotNullCondition(TxnDataName name, String column)
     {
         return withExistenceCondition(name, column, TxnCondition.Kind.IS_NOT_NULL);
     }
 
-    public TxnBuilder withIsNullCondition(String name, String column)
+    public TxnBuilder withIsNullCondition(TxnDataName name, String column)
     {
         return withExistenceCondition(name, column, TxnCondition.Kind.IS_NULL);
     }

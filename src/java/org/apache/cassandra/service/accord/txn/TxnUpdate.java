@@ -118,8 +118,10 @@ public class TxnUpdate implements Update
 
         List<TxnWrite.Fragment> fragments = deserialize(serializedUpdates, TxnWrite.Fragment.serializer);
         List<TxnWrite.Update> updates = new ArrayList<>(fragments.size());
+
+        AccordUpdateParameters parameters = new AccordUpdateParameters((TxnData) data, null);
         for (TxnWrite.Fragment fragment : fragments)
-            updates.add(fragment.complete((TxnData) data));
+            updates.add(fragment.complete(parameters));
 
         return new TxnWrite(updates);
     }
