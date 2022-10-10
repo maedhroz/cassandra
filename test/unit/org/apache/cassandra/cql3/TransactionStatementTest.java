@@ -128,8 +128,8 @@ public class TransactionStatementTest
                                  .withRead("row1", "SELECT * FROM ks.tbl4 WHERE k = 0")
                                  .withWrite("UPDATE ks.tbl4 SET int_list = ? WHERE k = 0",
                                             TxnReferenceOperations.empty(),
-                                            new VariableSpecifications(Collections.singletonList(new ColumnIdentifier("int_list", true))),
-                                            QueryOptions.forInternalCalls(Collections.singletonList(updatedListBytes)))
+                                            new VariableSpecifications(Collections.singletonList(null)),
+                                            updatedListBytes)
                                  .withEqualsCondition("row1", "ks.tbl4.int_list", initialListBytes)
                                  .build();
 

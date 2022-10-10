@@ -19,7 +19,10 @@
 package org.apache.cassandra.service.accord.txn;
 
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.SortedSet;
+import java.util.TreeSet;
 
 import accord.primitives.Keys;
 import com.google.common.base.Preconditions;
@@ -27,10 +30,7 @@ import com.google.common.collect.Iterables;
 
 import accord.api.Key;
 import accord.txn.Txn;
-import org.apache.cassandra.cql3.ColumnIdentifier;
-import org.apache.cassandra.cql3.QueryOptions;
-import org.apache.cassandra.cql3.QueryProcessor;
-import org.apache.cassandra.cql3.VariableSpecifications;
+import org.apache.cassandra.cql3.*;
 import org.apache.cassandra.cql3.statements.ModificationStatement;
 import org.apache.cassandra.cql3.statements.SelectStatement;
 import org.apache.cassandra.db.ReadQuery;
@@ -56,15 +56,19 @@ public class TxnBuilder
 
     public TxnBuilder withRead(String name, String query)
     {
+        return withRead(name, query, VariableSpecifications.empty());
+    }
+    
+    public TxnBuilder withRead(String name, String query, VariableSpecifications bindVariables, Object... values)
+    {
         SelectStatement.RawStatement parsed = (SelectStatement.RawStatement) QueryProcessor.parseStatement(query);
         // the parser will only let us define a ref name if we're parsing a transaction, which we're not
         // so we need to manually add it in the call, and confirm nothing got parsed
         Preconditions.checkState(parsed.parameters.refName == null);
 
-        VariableSpecifications bindVariables = VariableSpecifications.empty();
         SelectStatement statement = parsed.prepare(bindVariables);
-
-        ReadQuery readQuery = statement.getQuery(QueryOptions.DEFAULT, 0);
+        QueryOptions queryOptions = QueryProcessor.makeInternalOptions(statement, values);
+        ReadQuery readQuery = statement.getQuery(queryOptions, 0);
         SinglePartitionReadQuery.Group<SinglePartitionReadCommand> selectQuery = (SinglePartitionReadQuery.Group<SinglePartitionReadCommand>) readQuery;
         reads.add(new TxnNamedRead(name, Iterables.getOnlyElement(selectQuery.queries)));
         return this;
@@ -77,16 +81,17 @@ public class TxnBuilder
         return this;
     }
 
-    public TxnBuilder withWrite(String query, TxnReferenceOperations referenceOps, VariableSpecifications variables, QueryOptions options)
+    public TxnBuilder withWrite(String query, TxnReferenceOperations referenceOps, VariableSpecifications variables, Object... values)
     {
         ModificationStatement.Parsed parsed = (ModificationStatement.Parsed) QueryProcessor.parseStatement(query);
         ModificationStatement prepared = parsed.prepare(variables);
+        QueryOptions options = QueryProcessor.makeInternalOptions(prepared, values);
         return withWrite(prepared.getTxnUpdate(ClientState.forInternalCalls(), options), referenceOps);
     }
 
     public TxnBuilder withWrite(String query)
     {
-        return withWrite(query, TxnReferenceOperations.empty(), VariableSpecifications.empty(), QueryOptions.DEFAULT);
+        return withWrite(query, TxnReferenceOperations.empty(), VariableSpecifications.empty());
     }
 
     static ValueReference reference(String name, String column)

@@ -20,6 +20,7 @@ package org.apache.cassandra.service.accord.txn;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 
 import accord.api.Data;
@@ -29,11 +30,10 @@ import org.apache.cassandra.db.partitions.FilteredPartition;
 import org.apache.cassandra.io.IVersionedSerializer;
 import org.apache.cassandra.io.util.DataInputPlus;
 import org.apache.cassandra.io.util.DataOutputPlus;
-import org.apache.cassandra.utils.ByteBufferUtil;
 
 import static org.apache.cassandra.service.accord.SerializationUtils.filteredPartitionSerializer;
 
-public class TxnData implements Data, Result
+public class TxnData implements Data, Result, Iterable<FilteredPartition>
 {
     private final Map<String, FilteredPartition> data;
 
@@ -71,6 +71,12 @@ public class TxnData implements Data, Result
     public long estimatedSizeOnHeap()
     {
         return 0;
+    }
+
+    @Override
+    public Iterator<FilteredPartition> iterator()
+    {
+        return data.values().iterator();
     }
 
     public static final IVersionedSerializer<TxnData> serializer = new IVersionedSerializer<TxnData>()
