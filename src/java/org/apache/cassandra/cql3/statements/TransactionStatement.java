@@ -71,6 +71,7 @@ import org.apache.cassandra.service.accord.txn.TxnUpdate;
 import org.apache.cassandra.service.accord.txn.TxnWrite;
 import org.apache.cassandra.transport.messages.ResultMessage;
 import org.apache.cassandra.utils.FBUtilities;
+import org.apache.cassandra.utils.LazyToString;
 
 import static org.apache.cassandra.cql3.statements.RequestValidations.checkFalse;
 import static org.apache.cassandra.cql3.statements.RequestValidations.checkNotNull;
@@ -80,8 +81,8 @@ import static org.apache.cassandra.utils.Clock.Global.nanoTime;
 public class TransactionStatement implements CQLStatement
 {
     public static final String DUPLICATE_TUPLE_NAME_MESSAGE = "The name '%s' has already been used by a LET assignment.";
-    public static final String INCOMPLETE_PRIMARY_KEY_LET_MESSAGE = "SELECT in LET assignment without LIMIT 1 must specify all primary key elements.";
-    public static final String INCOMPLETE_PRIMARY_KEY_SELECT_MESSAGE = "Normal SELECT without LIMIT 1 must specify all primary key elements.";
+    public static final String INCOMPLETE_PRIMARY_KEY_LET_MESSAGE = "SELECT in LET assignment without LIMIT 1 must specify all primary key elements; CQL %s";
+    public static final String INCOMPLETE_PRIMARY_KEY_SELECT_MESSAGE = "Normal SELECT without LIMIT 1 must specify all primary key elements; CQL %s";
     public static final String NO_CONDITIONS_IN_UPDATES_MESSAGE = "Updates within transactions may not specify their own conditions.";
     public static final String NO_TIMESTAMPS_IN_UPDATES_MESSAGE = "Updates within transactions may not specify custom timestamps.";
     public static final String EMPTY_TRANSACTION_MESSAGE = "Transaction contains no reads or writes";
@@ -406,7 +407,7 @@ public class TransactionStatement implements CQLStatement
                 checkFalse(name.equals("returning"), "Assignments may not use the name \"returning\"");
 
                 SelectStatement prepared = select.prepare(bindVariables);
-                checkAtMostOneRowSpecified(prepared, INCOMPLETE_PRIMARY_KEY_LET_MESSAGE);
+                checkAtMostOneRowSpecified(prepared, INCOMPLETE_PRIMARY_KEY_LET_MESSAGE, LazyToString.lazy(() -> prepared.asCQL(QueryOptions.DEFAULT, state)));
 
                 NamedSelect namedSelect = new NamedSelect(name, prepared);
                 preparedAssignments.add(namedSelect);
@@ -424,7 +425,7 @@ public class TransactionStatement implements CQLStatement
             {
                 SelectStatement prepared = select.prepare(bindVariables);
                 // TODO: Accord saves the result of this read, so limit to a single row until that is no longer true.
-                checkAtMostOneRowSpecified(prepared, INCOMPLETE_PRIMARY_KEY_SELECT_MESSAGE);
+                checkAtMostOneRowSpecified(prepared, INCOMPLETE_PRIMARY_KEY_SELECT_MESSAGE, LazyToString.lazy(() -> prepared.asCQL(QueryOptions.DEFAULT, state)));
                 returningSelect = new NamedSelect(TxnDataName.returning(), prepared);
             }
 
@@ -460,14 +461,14 @@ public class TransactionStatement implements CQLStatement
             return new TransactionStatement(preparedAssignments, returningSelect, returningReferences, preparedUpdates, preparedConditions, bindVariables);
         }
 
-        private void checkAtMostOneRowSpecified(SelectStatement prepared, String failureMessage)
+        private void checkAtMostOneRowSpecified(SelectStatement prepared, String failureMessage, Object messageArg)
         {
             int limit = prepared.getLimit(QueryOptions.DEFAULT);
 
             if (limit == DataLimits.NO_LIMIT)
-                checkTrue(prepared.getRestrictions().hasAllPKColumnsRestrictedByEqualities(), failureMessage);
+                checkTrue(prepared.getRestrictions().hasAllPKColumnsRestrictedByEqualities(), failureMessage, messageArg);
             else
-                checkTrue(limit == 1, failureMessage);
+                checkTrue(limit == 1, failureMessage, messageArg);
         }
     }
 }
