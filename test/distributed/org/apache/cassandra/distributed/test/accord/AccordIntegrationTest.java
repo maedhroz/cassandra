@@ -615,6 +615,7 @@ public class AccordIntegrationTest extends TestBaseImpl
         );
     }
 
+    // TODO: Fix this in TransactionStatement preparation...
     @Test
     public void testSetSelection() throws Exception
     {

@@ -199,6 +199,15 @@ public class ClientState
     }
 
     /**
+     * Clones the ClientState object.
+     * @return a new ClientState object
+     */
+    public ClientState clone()
+    {
+        return new ClientState(this);
+    }
+
+    /**
      * Clone this ClientState object, but use the provided keyspace instead of the
      * keyspace in this ClientState object.
      *

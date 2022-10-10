@@ -20,6 +20,7 @@ package org.apache.cassandra.utils;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -31,6 +32,8 @@ import java.util.stream.Stream;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 
+import com.carrotsearch.hppc.ObjectLongHashMap;
+import com.carrotsearch.hppc.ObjectLongMap;
 import org.apache.cassandra.cql3.FieldIdentifier;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.marshal.AsciiType;
@@ -58,12 +61,14 @@ import org.quicktheories.core.RandomnessSource;
 import org.quicktheories.generators.SourceDSL;
 
 import static org.apache.cassandra.utils.Generators.IDENTIFIER_GEN;
+import static org.apache.cassandra.utils.Generators.SYMBOL_GEN;
 
 public final class AbstractTypeGenerators
 {
     private static final Gen<Integer> VERY_SMALL_POSITIVE_SIZE_GEN = SourceDSL.integers().between(1, 3);
     private static final Gen<Boolean> BOOLEAN_GEN = SourceDSL.booleans().all();
 
+    private static final int DYNAMIC_TYPE_SIZE = 1024;
     private static final Map<AbstractType<?>, TypeSupport<?>> PRIMITIVE_TYPE_DATA_GENS =
     Stream.of(TypeSupport.of(BooleanType.instance, BOOLEAN_GEN),
               TypeSupport.of(ByteType.instance, SourceDSL.integers().between(0, Byte.MAX_VALUE * 2 + 1).map(Integer::byteValue)),
@@ -72,14 +77,14 @@ public final class AbstractTypeGenerators
               TypeSupport.of(LongType.instance, SourceDSL.longs().all()),
               TypeSupport.of(FloatType.instance, SourceDSL.floats().any()),
               TypeSupport.of(DoubleType.instance, SourceDSL.doubles().any()),
-              TypeSupport.of(BytesType.instance, Generators.bytes(1, 1024)),
+              TypeSupport.of(BytesType.instance, Generators.bytes(1, DYNAMIC_TYPE_SIZE)),
               TypeSupport.of(UUIDType.instance, Generators.UUID_RANDOM_GEN),
               TypeSupport.of(InetAddressType.instance, Generators.INET_ADDRESS_UNRESOLVED_GEN), // serialization strips the hostname, only keeps the address
-              TypeSupport.of(AsciiType.instance, SourceDSL.strings().ascii().ofLengthBetween(1, 1024)),
-              TypeSupport.of(UTF8Type.instance, Generators.utf8(1, 1024)),
-              TypeSupport.of(TimestampType.instance, Generators.DATE_GEN),
+              TypeSupport.of(AsciiType.instance, SourceDSL.strings().ascii().ofLengthBetween(1, DYNAMIC_TYPE_SIZE)),
+              TypeSupport.of(UTF8Type.instance, Generators.utf8(1, DYNAMIC_TYPE_SIZE)),
+              TypeSupport.of(TimestampType.instance, Generators.DATE_GEN)
               // null is desired here as #decompose will call org.apache.cassandra.serializers.EmptySerializer.serialize which ignores the input and returns empty bytes
-              TypeSupport.of(EmptyType.instance, rnd -> null)
+//              TypeSupport.of(EmptyType.instance, rnd -> null)
               //TODO add the following
               // IntegerType.instance,
               // DecimalType.instance,
@@ -92,6 +97,13 @@ public final class AbstractTypeGenerators
     // NOTE not supporting reversed as CQL doesn't allow nested reversed types
     // when generating part of the clustering key, it would be good to allow reversed types as the top level
     private static final Gen<AbstractType<?>> PRIMITIVE_TYPE_GEN = SourceDSL.arbitrary().pick(new ArrayList<>(PRIMITIVE_TYPE_DATA_GENS.keySet()));
+    private static final Gen<AbstractType<?>> NUMERIC_TYPE_GEN = SourceDSL.arbitrary().pick(Arrays.asList(ByteType.instance,
+                                                                                                          ShortType.instance,
+                                                                                                          Int32Type.instance,
+                                                                                                          LongType.instance,
+                                                                                                          FloatType.instance,
+                                                                                                          DoubleType.instance
+    ));
 
     private AbstractTypeGenerators()
     {
@@ -101,11 +113,63 @@ public final class AbstractTypeGenerators
     public enum TypeKind
     {PRIMITIVE, SET, LIST, MAP, TUPLE, UDT}
 
+    private static final ObjectLongMap<AbstractType<?>> SIZES = new ObjectLongHashMap<>();
+
+    static
+    {
+        SIZES.put(BooleanType.instance, 1);
+        SIZES.put(ByteType.instance, 1);
+        SIZES.put(ShortType.instance, 2);
+        SIZES.put(Int32Type.instance, 4);
+        SIZES.put(LongType.instance, 8);
+        SIZES.put(FloatType.instance, 4);
+        SIZES.put(DoubleType.instance, 8);
+        SIZES.put(UUIDType.instance, 16);
+        SIZES.put(InetAddressType.instance, 16); // assume ipv6
+        SIZES.put(TimestampType.instance, 8);
+        SIZES.put(EmptyType.instance, 0);
+    }
+
+    public static long estimateSize(AbstractType<?> type)
+    {
+        int assumedElements = 42;
+        if (type instanceof ListType)
+            return (estimateSize(((ListType<?>) type).getElementsType()) + 4) * assumedElements + 4;
+        if (type instanceof SetType)
+            return (estimateSize(((SetType<?>) type).getElementsType()) + 4) * assumedElements + 4;
+        if (type instanceof MapType)
+        {
+            MapType<?, ?> map = (MapType<?, ?>) type;
+            long size = estimateSize(map.getKeysType()) + + 4 + estimateSize(map.getValuesType()) + 4;
+            return 4 + size * assumedElements;
+        }
+        if (type instanceof TupleType)
+        {
+            long size = 0;
+            for (AbstractType<?> field : type.subTypes())
+                size += estimateSize(field) + 4;
+            return size;
+        }
+        if (type instanceof AsciiType || type instanceof BytesType)
+            return DYNAMIC_TYPE_SIZE;
+        if (type instanceof UTF8Type)
+            return DYNAMIC_TYPE_SIZE * 4; // UTF-8 uses between 1-4 bytes
+
+        if (!SIZES.containsKey(type))
+            throw new IllegalArgumentException("Unknown type: " + type.getClass());
+        return SIZES.get(type);
+    }
+
     private static final Gen<TypeKind> TYPE_KIND_GEN = SourceDSL.arbitrary().enumValuesWithNoOrder(TypeKind.class);
 
     public static Gen<AbstractType<?>> primitiveTypeGen()
     {
         return PRIMITIVE_TYPE_GEN;
+    }
+
+    public static Gen<AbstractType<?>> numericTypeGen()
+    {
+        return NUMERIC_TYPE_GEN;
     }
 
     public static Gen<AbstractType<?>> typeGen()
@@ -153,7 +217,7 @@ public final class AbstractTypeGenerators
 
     public static Gen<SetType<?>> setTypeGen(Gen<AbstractType<?>> typeGen)
     {
-        return rnd -> SetType.getInstance(typeGen.generate(rnd), BOOLEAN_GEN.generate(rnd));
+        return rnd -> SetType.getInstance(maybeFreeze(typeGen.generate(rnd)), BOOLEAN_GEN.generate(rnd));
     }
 
     @SuppressWarnings("unused")
@@ -164,7 +228,7 @@ public final class AbstractTypeGenerators
 
     public static Gen<ListType<?>> listTypeGen(Gen<AbstractType<?>> typeGen)
     {
-        return rnd -> ListType.getInstance(typeGen.generate(rnd), BOOLEAN_GEN.generate(rnd));
+        return rnd -> ListType.getInstance(maybeFreeze(typeGen.generate(rnd)), BOOLEAN_GEN.generate(rnd));
     }
 
     @SuppressWarnings("unused")
@@ -180,7 +244,7 @@ public final class AbstractTypeGenerators
 
     public static Gen<MapType<?, ?>> mapTypeGen(Gen<AbstractType<?>> keyGen, Gen<AbstractType<?>> valueGen)
     {
-        return rnd -> MapType.getInstance(keyGen.generate(rnd), valueGen.generate(rnd), BOOLEAN_GEN.generate(rnd));
+        return rnd -> MapType.getInstance(maybeFreeze(keyGen.generate(rnd)), maybeFreeze(valueGen.generate(rnd)), BOOLEAN_GEN.generate(rnd));
     }
 
     public static Gen<TupleType> tupleTypeGen()
@@ -214,6 +278,8 @@ public final class AbstractTypeGenerators
         return userTypeGen(elementGen, VERY_SMALL_POSITIVE_SIZE_GEN);
     }
 
+    public static final ThreadLocal<String> UDT_KEYSPACE = new ThreadLocal<>();
+
     public static Gen<UserType> userTypeGen(Gen<AbstractType<?>> elementGen, Gen<Integer> sizeGen)
     {
         Gen<FieldIdentifier> fieldNameGen = IDENTIFIER_GEN.map(FieldIdentifier::forQuoted);
@@ -222,18 +288,38 @@ public final class AbstractTypeGenerators
             int numElements = sizeGen.generate(rnd);
             List<AbstractType<?>> fieldTypes = new ArrayList<>(numElements);
             LinkedHashSet<FieldIdentifier> fieldNames = new LinkedHashSet<>(numElements);
-            String ks = IDENTIFIER_GEN.generate(rnd);
-            ByteBuffer name = AsciiType.instance.decompose(IDENTIFIER_GEN.generate(rnd));
+            // UDT only allows types within the same keyspace
+            boolean topLevel = UDT_KEYSPACE.get() == null;
+            String ks = topLevel ? SYMBOL_GEN.generate(rnd) : UDT_KEYSPACE.get();
+            ByteBuffer name = AsciiType.instance.decompose(SYMBOL_GEN.generate(rnd));
 
             Gen<FieldIdentifier> distinctNameGen = Generators.filter(fieldNameGen, 30, e -> !fieldNames.contains(e));
             // UDTs don't allow duplicate names, so make sure all names are unique
-            for (int i = 0; i < numElements; i++)
+            if (topLevel)
+                UDT_KEYSPACE.set(ks);
+            try
             {
-                fieldTypes.add(elementGen.generate(rnd));
-                fieldNames.add(distinctNameGen.generate(rnd));
+                for (int i = 0; i < numElements; i++)
+                {
+                    fieldTypes.add(maybeFreeze(elementGen.generate(rnd)));
+                    fieldNames.add(distinctNameGen.generate(rnd));
+                }
             }
+            finally
+            {
+                if (topLevel)
+                    UDT_KEYSPACE.remove();
+            }
+
             return new UserType(ks, name, new ArrayList<>(fieldNames), fieldTypes, multiCell);
         };
+    }
+
+    private static AbstractType<?> maybeFreeze(AbstractType<?> type)
+    {
+        if (type.isMultiCell())
+            type = type.freeze();
+        return type;
     }
 
     public static Gen<AbstractType<?>> allowReversed(Gen<AbstractType<?>> gen)
@@ -255,8 +341,7 @@ public final class AbstractTypeGenerators
     public static <T> TypeSupport<T> getTypeSupport(AbstractType<T> type, Gen<Integer> sizeGen)
     {
         // this doesn't affect the data, only sort order, so drop it
-        if (type.isReversed())
-            type = ((ReversedType<T>) type).baseType;
+        type = type.unwrap();
         // cast is safe since type is a constant and was type cast while inserting into the map
         @SuppressWarnings("unchecked")
         TypeSupport<T> gen = (TypeSupport<T>) PRIMITIVE_TYPE_DATA_GENS.get(type);
