@@ -2074,7 +2074,6 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
                     }
                     logger.error(message, e);
                     progressSupport.progress("bootstrap", new ProgressEvent(ProgressEventType.ERROR, 1, 1, message));
-                    progressSupport.progress("bootstrap", new ProgressEvent(ProgressEventType.COMPLETE, 1, 1, "Resume bootstrap complete"));
                 }
             });
             return true;
