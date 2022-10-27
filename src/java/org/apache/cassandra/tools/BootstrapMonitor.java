@@ -34,7 +34,7 @@ public class BootstrapMonitor extends JMXNotificationProgressListener
     private final SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss,SSS");
     private final PrintStream out;
     private final Condition condition = newOneTimeCondition();
-    private Exception error;
+    private volatile Exception error;
 
     public BootstrapMonitor(PrintStream out)
     {
