@@ -31,14 +31,12 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
-import org.apache.cassandra.cql3.CQLTester;
 import org.apache.cassandra.db.marshal.InetAddressType;
 import org.apache.cassandra.index.sai.SAITester;
 import org.apache.cassandra.index.sai.utils.TypeUtil;
 import org.apache.cassandra.serializers.SimpleDateSerializer;
 import org.apache.cassandra.serializers.TimeSerializer;
 import org.apache.cassandra.utils.TimeUUID;
-import org.apache.cassandra.utils.UUIDGen;
 
 import static org.apache.cassandra.index.sai.cql.types.IndexingTypeSupport.NUMBER_OF_VALUES;
 

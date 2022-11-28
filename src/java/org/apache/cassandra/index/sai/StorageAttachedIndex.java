@@ -18,13 +18,9 @@
 
 package org.apache.cassandra.index.sai;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
-import java.util.Iterator;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -33,7 +29,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture; // checkstyle: permit this import
 import java.util.concurrent.Future;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -77,7 +72,6 @@ import org.apache.cassandra.io.sstable.format.SSTableReader;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.schema.IndexMetadata;
 import org.apache.cassandra.schema.TableMetadata;
-import org.apache.cassandra.service.StorageService;
 import org.apache.cassandra.utils.Pair;
 import org.apache.cassandra.utils.concurrent.OpOrder;
 
@@ -87,6 +81,7 @@ public class StorageAttachedIndex implements Index
 
     private static class StorageAttachedIndexBuildingSupport implements IndexBuildingSupport
     {
+        @Override
         public SecondaryIndexBuilder getIndexBuildTask(ColumnFamilyStore cfs,
                                                        Set<Index> indexes,
                                                        Collection<SSTableReader> sstablesToRebuild,
@@ -186,7 +181,7 @@ public class StorageAttachedIndex implements Index
             throw new InvalidRequestException("Failed to retrieve target column for: " + targetColumn);
         }
 
-        // In order to support different index target on non-frozen map, ie. KEYS, VALUE, ENTRIES, we need to put index
+        // In order to support different index targets on non-frozen map, ie. KEYS, VALUE, ENTRIES, we need to put index
         // name as part of index file name instead of column name. We only need to check that the target is different
         // between indexes. This will only allow indexes in the same column with a different IndexTarget.Type.
         //
@@ -248,42 +243,6 @@ public class StorageAttachedIndex implements Index
         }
         baseCfs.indexManager.makeIndexQueryable(this, Status.BUILD_SUCCEEDED);
         return CompletableFuture.completedFuture(null);
-    }
-
-    /**
-     * Splits SSTables into groups of similar overall size.
-     *
-     * @param toRebuild a list of SSTables to split (Note that this list will be sorted in place!)
-     * @param parallelism an upper bound on the number of groups
-     *
-     * @return a {@link List} of SSTable groups, each represented as a {@link List} of {@link SSTableReader}
-     */
-    @VisibleForTesting
-    public static List<List<SSTableReader>> groupBySize(List<SSTableReader> toRebuild, int parallelism)
-    {
-        List<List<SSTableReader>> groups = new ArrayList<>();
-
-        toRebuild.sort(Comparator.comparingLong(SSTableReader::onDiskLength).reversed());
-        Iterator<SSTableReader> sortedSSTables = toRebuild.iterator();
-        double dataPerCompactor = toRebuild.stream().mapToLong(SSTableReader::onDiskLength).sum() * 1.0 / parallelism;
-
-        while (sortedSSTables.hasNext())
-        {
-            long sum = 0;
-            List<SSTableReader> current = new ArrayList<>();
-
-            while (sortedSSTables.hasNext() && sum < dataPerCompactor)
-            {
-                SSTableReader sstable = sortedSSTables.next();
-                sum += sstable.onDiskLength();
-                current.add(sstable);
-            }
-
-            assert !current.isEmpty();
-            groups.add(current);
-        }
-
-        return groups;
     }
 
     @Override
@@ -467,6 +426,7 @@ public class StorageAttachedIndex implements Index
     @Override
     public SSTableFlushObserver getFlushObserver(Descriptor descriptor, LifecycleNewTracker tracker)
     {
+        // flush observers should be created from the index group, this is only used by the singleton index group
         throw new UnsupportedOperationException("Storage-attached index flush observers should never be created directly.");
     }
 

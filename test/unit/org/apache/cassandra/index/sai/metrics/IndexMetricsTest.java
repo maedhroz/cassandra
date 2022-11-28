@@ -17,16 +17,10 @@
  */
 package org.apache.cassandra.index.sai.metrics;
 
-import java.util.concurrent.TimeUnit;
-
 import org.junit.Test;
-
-import com.datastax.driver.core.ResultSet;
-import org.apache.cassandra.utils.Throwables;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 public class IndexMetricsTest extends AbstractMetricsTest
 {

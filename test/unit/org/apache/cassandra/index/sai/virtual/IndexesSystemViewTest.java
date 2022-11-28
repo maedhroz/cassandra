@@ -28,7 +28,6 @@ import org.apache.cassandra.db.virtual.VirtualKeyspaceRegistry;
 import org.apache.cassandra.index.sai.IndexContext;
 import org.apache.cassandra.index.sai.SAITester;
 import org.apache.cassandra.index.sai.StorageAttachedIndex;
-import org.apache.cassandra.index.sai.StorageAttachedIndexGroup;
 import org.apache.cassandra.inject.Injections;
 import org.apache.cassandra.inject.InvokePointBuilder;
 import org.apache.cassandra.schema.SchemaConstants;

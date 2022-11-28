@@ -78,7 +78,7 @@ public class StorageAttachedIndexGroup implements Index.Group, INotificationCons
     @Nullable
     public static StorageAttachedIndexGroup getIndexGroup(ColumnFamilyStore cfs)
     {
-        return (StorageAttachedIndexGroup)cfs.indexManager.getIndexGroup(StorageAttachedIndexGroup.class);
+        return (StorageAttachedIndexGroup) cfs.indexManager.getIndexGroup(StorageAttachedIndexGroup.class);
     }
 
     @Override
@@ -155,7 +155,7 @@ public class StorageAttachedIndexGroup implements Index.Group, INotificationCons
 
             private void forEach(Consumer<Index.Indexer> action)
             {
-                indexers.forEach(action::accept);
+                indexers.forEach(action);
             }
         };
     }
@@ -185,7 +185,7 @@ public class StorageAttachedIndexGroup implements Index.Group, INotificationCons
         return getComponents(indices);
     }
 
-    // Currently returns an empty set for in-memory only implementation
+    // TODO: Currently returns an empty set for in-memory only implementation
     static Set<Component> getComponents(Collection<StorageAttachedIndex> indices)
     {
         return Collections.emptySet();
@@ -209,7 +209,7 @@ public class StorageAttachedIndexGroup implements Index.Group, INotificationCons
      */
     public int totalQueryableIndexCount()
     {
-        return (int) indices.stream().filter(i -> baseCfs.indexManager.isIndexQueryable(i)).count();
+        return (int) indices.stream().filter(baseCfs.indexManager::isIndexQueryable).count();
     }
 
     /**
@@ -236,6 +236,6 @@ public class StorageAttachedIndexGroup implements Index.Group, INotificationCons
     @VisibleForTesting
     public void reset()
     {
-        indices.forEach(index -> index.makeIndexNonQueryable());
+        indices.forEach(StorageAttachedIndex::makeIndexNonQueryable);
     }
 }

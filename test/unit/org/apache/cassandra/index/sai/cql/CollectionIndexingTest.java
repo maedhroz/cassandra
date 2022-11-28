@@ -23,7 +23,6 @@ import java.util.HashMap;
 import org.junit.Before;
 import org.junit.Test;
 
-import org.apache.cassandra.cql3.restrictions.StatementRestrictions;
 import org.apache.cassandra.index.sai.SAITester;
 
 import static org.junit.Assert.assertEquals;

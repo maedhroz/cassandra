@@ -17,7 +17,6 @@
  */
 package org.apache.cassandra.index.sai.metrics;
 
-import java.util.concurrent.ThreadLocalRandom;
 import javax.management.InstanceNotFoundException;
 
 import org.junit.Rule;
@@ -26,10 +25,8 @@ import org.junit.rules.ExpectedException;
 
 import com.datastax.driver.core.ResultSet;
 
-import static org.apache.cassandra.index.sai.metrics.TableQueryMetrics.TABLE_QUERY_METRIC_TYPE;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
 
 public class QueryMetricsTest extends AbstractMetricsTest
 {

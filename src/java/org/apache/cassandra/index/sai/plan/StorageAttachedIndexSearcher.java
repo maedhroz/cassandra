@@ -169,6 +169,7 @@ public class StorageAttachedIndexSearcher implements Index.Searcher
         }
 
         @Override
+        @SuppressWarnings("resource") // The iterator produced here has a nop close operation
         public UnfilteredRowIterator computeNext()
         {
             // IMPORTANT: The correctness of the entire query pipeline relies on the fact that we consume a token

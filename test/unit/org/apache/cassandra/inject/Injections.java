@@ -40,7 +40,6 @@ import com.google.common.collect.Lists;
 import org.apache.commons.io.IOUtils;
 
 import org.apache.cassandra.utils.FBUtilities;
-import org.apache.cassandra.utils.HeapUtils;
 import org.apache.cassandra.utils.NativeLibrary;
 import org.jboss.byteman.agent.install.Install;
 import org.jboss.byteman.agent.submit.Submit;

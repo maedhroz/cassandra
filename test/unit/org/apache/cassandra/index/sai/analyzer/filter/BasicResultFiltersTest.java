@@ -22,7 +22,6 @@ import java.text.Normalizer;
 
 import org.junit.Test;
 
-import org.apache.cassandra.cql3.CQLTester;
 import org.apache.cassandra.index.sai.SAITester;
 
 import static org.junit.Assert.assertEquals;
