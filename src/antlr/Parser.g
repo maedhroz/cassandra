@@ -83,7 +83,7 @@ options {
     public RowDataReference.Raw newRowDataReference(Selectable.RawIdentifier tuple, Selectable.Raw selectable)
     {
         if (!isParsingTxn)
-            throw new IllegalStateException();
+            throw new SyntaxException("Cannot create a row data reference unless parsing a transaction");
 
         if (references == null)
             references = new ArrayList<>();
