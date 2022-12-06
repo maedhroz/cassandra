@@ -32,7 +32,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import accord.messages.Commit;
-import accord.primitives.Keys;
+import accord.primitives.Unseekables;
 import accord.topology.Topologies;
 import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.distributed.api.ConsistencyLevel;
@@ -121,7 +121,7 @@ public class AccordIntegrationTest extends AccordTestBase
 	at accord.messages.PreAccept.process(PreAccept.java:90)
 	at accord.messages.TxnRequest.process(TxnRequest.java:145)
 	at org.apache.cassandra.service.accord.AccordVerbHandler.doVerb(AccordVerbHandler.java:46)
-	at org.apache.cassandra.net.InboundSink.lambda$new$0(InboundSink.java:78)    
+	at org.apache.cassandra.net.InboundSink.lambda$new$0(InboundSink.java:78)
      */
     @Ignore
     @Test
@@ -173,8 +173,8 @@ public class AccordIntegrationTest extends AccordTestBase
             for (int i = 0; i < keyStrings.size(); i++)
                 txn.withRead("row" + i, "SELECT * FROM " + keyspace + ".tbl WHERE k=" + keyStrings.get(i) + " and c=0");
 
-            Keys keySet = txn.build().keys();
-            Topologies topology = AccordService.instance().node.topology().withUnsyncedEpochs(keySet, 1);
+            Unseekables<?, ?> routables = txn.build().keys().toUnseekables();
+            Topologies topology = AccordService.instance().node.topology().withUnsyncedEpochs(routables, 1);
             // we don't detect out-of-bounds read/write yet, so use this to validate we reach different shards
             Assertions.assertThat(topology.totalShards()).isEqualTo(2);
         });
