@@ -21,14 +21,15 @@ package org.apache.cassandra.service.accord.txn;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
-import accord.primitives.Keys;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.Iterables;
 
 import accord.api.Key;
+import accord.primitives.Keys;
 import accord.primitives.Txn;
 import org.apache.cassandra.cql3.ColumnIdentifier;
 import org.apache.cassandra.cql3.QueryOptions;
@@ -42,6 +43,7 @@ import org.apache.cassandra.db.SinglePartitionReadQuery;
 import org.apache.cassandra.db.partitions.PartitionUpdate;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.schema.Schema;
+import org.apache.cassandra.schema.TableId;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.service.ClientState;
 import org.apache.cassandra.service.accord.api.PartitionKey;
@@ -102,18 +104,20 @@ public class TxnBuilder
         return withWrite(query, TxnReferenceOperations.empty(), VariableSpecifications.empty());
     }
 
-    static TxnReference reference(TxnDataName name, String column)
+    private TxnReference reference(TxnDataName name, String column)
     {
-        ColumnMetadata metadata = null;
-        if (column != null)
-        {
-            String[] parts = column.split("\\.");
-            Preconditions.checkArgument(parts.length == 3);
-            TableMetadata table = Schema.instance.getTableMetadata(parts[0], parts[1]);
-            Preconditions.checkArgument(table != null);
-            metadata = table.getColumn(new ColumnIdentifier(parts[2], true));
-            Preconditions.checkArgument(metadata != null);
-        }
+        // do any reads match the name?
+        Optional<TxnNamedRead> match = reads.stream().filter(n -> n.name().equals(name)).findFirst();
+        if (!match.isPresent())
+            throw new IllegalArgumentException("Attempted to create a reference for " + name + " but no read exists with that name");
+        TxnNamedRead read = match.get();
+        TableId tableID = read.key().tableId();
+        TableMetadata table = Schema.instance.getTableMetadata(tableID);
+        if (table == null)
+                throw new IllegalStateException("No table exists w/ ID " + tableID);
+        ColumnMetadata metadata = column == null
+                                  ? null
+                                  : table.getColumn(new ColumnIdentifier(column, true)); //TODO support a.b.c for UDT
         return new TxnReference(name, metadata);
     }
 

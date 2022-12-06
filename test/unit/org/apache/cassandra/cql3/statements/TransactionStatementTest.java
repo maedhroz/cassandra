@@ -378,8 +378,8 @@ public class TransactionStatementTest
                                  .withRead(TxnDataName.returning(), "SELECT v FROM ks.tbl1 WHERE k=2 AND c=2")
                                  .withWrite("UPDATE ks.tbl1 SET v=1 WHERE k=1 AND c=2")
                                  .withIsNotNullCondition(user("row1"), null)
-                                 .withEqualsCondition("row1", "ks.tbl1.v", bytes(3))
-                                 .withEqualsCondition("row2", "ks.tbl2.v", bytes(4))
+                                 .withEqualsCondition("row1", "v", bytes(3))
+                                 .withEqualsCondition("row2", "v", bytes(4))
                                  .build();
 
         TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(query);
@@ -407,8 +407,8 @@ public class TransactionStatementTest
                                  .withRead("row2", "SELECT * FROM ks.tbl2 WHERE k=2 AND c=2")
                                  .withWrite("UPDATE ks.tbl1 SET v=1 WHERE k=1 AND c=2")
                                  .withIsNotNullCondition(user("row1"), null)
-                                 .withEqualsCondition("row1", "ks.tbl1.v", bytes(3))
-                                 .withEqualsCondition("row2", "ks.tbl2.v", bytes(4))
+                                 .withEqualsCondition("row1", "v", bytes(3))
+                                 .withEqualsCondition("row2", "v", bytes(4))
                                  .build();
 
         TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(query);
@@ -433,7 +433,7 @@ public class TransactionStatementTest
         Txn expected = TxnBuilder.builder()
                                  .withRead("row1", "SELECT * FROM ks.tbl3 WHERE k=1")
                                  .withWrite("INSERT INTO ks.tbl3 (k, \"with spaces\") VALUES (1, 2)")
-                                 .withIsNullCondition(user("row1"), "ks.tbl3.with spaces")
+                                 .withIsNullCondition(user("row1"), "with spaces")
                                  .build();
 
         TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(query);
@@ -467,8 +467,8 @@ public class TransactionStatementTest
                                  .withRead("row2", "SELECT * FROM ks.tbl2 WHERE k=2 AND c=2")
                                  .withRead(TxnDataName.returning(), "SELECT v FROM ks.tbl1 WHERE k=1 AND c=2")
                                  .withWrite(emptyUpdate(TABLE1, 1, 2, false), referenceOps)
-                                 .withEqualsCondition("row1", "ks.tbl1.v", bytes(3))
-                                 .withEqualsCondition("row2", "ks.tbl2.v", bytes(4))
+                                 .withEqualsCondition("row1", "v", bytes(3))
+                                 .withEqualsCondition("row2", "v", bytes(4))
                                  .build();
 
         TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(query);
@@ -497,8 +497,8 @@ public class TransactionStatementTest
                                  .withRead("row2", "SELECT * FROM ks.tbl2 WHERE k=2 AND c=2")
                                  .withRead(TxnDataName.returning(), "SELECT v FROM ks.tbl1 WHERE k=1 AND c=2")
                                  .withWrite(emptyUpdate(TABLE1, 1, 2, true), referenceOps)
-                                 .withEqualsCondition("row1", "ks.tbl1.v", bytes(3))
-                                 .withEqualsCondition("row2", "ks.tbl2.v", bytes(4))
+                                 .withEqualsCondition("row1", "v", bytes(3))
+                                 .withEqualsCondition("row2", "v", bytes(4))
                                  .build();
 
         TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(query);
@@ -531,7 +531,7 @@ public class TransactionStatementTest
                                             TxnReferenceOperations.empty(),
                                             new VariableSpecifications(Collections.singletonList(null)),
                                             updatedListBytes)
-                                 .withEqualsCondition("row1", "ks.tbl4.int_list", initialListBytes)
+                                 .withEqualsCondition("row1", "int_list", initialListBytes)
                                  .build();
 
         TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(update);
@@ -569,7 +569,7 @@ public class TransactionStatementTest
         Txn expected = TxnBuilder.builder()
                                  .withRead("row1", "SELECT * FROM ks.tbl4 WHERE k = 0")
                                  .withWrite(emptyUpdate(TABLE4, 1, Clustering.EMPTY, false), referenceOps)
-                                 .withEqualsCondition("row1", "ks.tbl4.int_list", initialListBytes)
+                                 .withEqualsCondition("row1", "int_list", initialListBytes)
                                  .build();
 
         TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(update);

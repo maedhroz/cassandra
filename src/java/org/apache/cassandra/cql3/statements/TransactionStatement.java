@@ -353,6 +353,8 @@ public class TransactionStatement implements CQLStatement
         public void setKeyspace(ClientState state)
         {
             assignments.forEach(select -> select.setKeyspace(state));
+            if (select != null)
+                select.setKeyspace(state);
             updates.forEach(update -> update.setKeyspace(state));
         }
 
