@@ -36,13 +36,13 @@ import org.apache.cassandra.cql3.VariableSpecifications;
 import org.apache.cassandra.cql3.functions.Function;
 import org.apache.cassandra.cql3.functions.types.utils.Bytes;
 import org.apache.cassandra.cql3.selection.Selectable;
+import org.apache.cassandra.db.marshal.ListType;
+import org.apache.cassandra.service.accord.txn.TxnDataName;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.marshal.CollectionType;
-import org.apache.cassandra.db.marshal.ListType;
 import org.apache.cassandra.db.marshal.MapType;
 import org.apache.cassandra.db.marshal.SetType;
 import org.apache.cassandra.db.marshal.UserType;
-import org.apache.cassandra.service.accord.txn.TxnDataName;
 import org.apache.cassandra.db.rows.CellPath;
 import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.schema.ColumnMetadata;
@@ -234,9 +234,6 @@ public class RowDataReference extends Term.NonTerminal
             tupleName = TxnDataName.user(tuple.toString());
             ReferenceSource source = sources.get(tupleName);
             checkNotNull(source, CANNOT_FIND_TUPLE_MESSAGE, tupleName.name());
-
-            if (!source.isPointSelect())
-                throw new UnsupportedOperationException("Multi-row reference sources are not allowed!");
             
             if (selected == null)
             {
@@ -378,7 +375,6 @@ public class RowDataReference extends Term.NonTerminal
 
     public interface ReferenceSource
     {
-        boolean isPointSelect();
         ColumnMetadata getColumn(String name);
     }
 }

@@ -44,19 +44,26 @@ import static org.apache.cassandra.schema.TableMetadata.UNDEFINED_COLUMN_NAME_ME
 
 public class ReferenceOperation
 {
+    private final ColumnMetadata topLevelReceiver;
     private final ColumnMetadata receiver;
     private final TxnReferenceOperation.Kind kind;
     private final FieldIdentifier field;
     private final Term key;
     private final ReferenceValue value;
 
-    public ReferenceOperation(ColumnMetadata receiver, TxnReferenceOperation.Kind kind, Term key, FieldIdentifier field, ReferenceValue value)
+    public ReferenceOperation(ColumnMetadata topLevelReceiver, ColumnMetadata receiver, TxnReferenceOperation.Kind kind, Term key, FieldIdentifier field, ReferenceValue value)
     {
+        this.topLevelReceiver = topLevelReceiver;
         this.receiver = receiver;
         this.kind = kind;
         this.key = key;
         this.field = field;
         this.value = value;
+    }
+
+    public ReferenceOperation(ColumnMetadata receiver, TxnReferenceOperation.Kind kind, Term key, FieldIdentifier field, ReferenceValue value)
+    {
+        this(null, receiver, kind, key, field, value);
     }
 
     /**
@@ -74,6 +81,16 @@ public class ReferenceOperation
         Term key = extractKeyOrIndex(operation);
         FieldIdentifier field = extractField(operation);
         return new ReferenceOperation(receiver, kind, key, field, value);
+    }
+
+    public ColumnMetadata getTopLevelReceiver()
+    {
+        return topLevelReceiver == null ? receiver : topLevelReceiver;
+    }
+
+    public ColumnMetadata getReceiver()
+    {
+        return receiver;
     }
 
     public boolean requiresRead()
@@ -106,7 +123,8 @@ public class ReferenceOperation
 
         public ReferenceOperation prepare(TableMetadata metadata, VariableSpecifications bindVariables)
         {
-            ColumnMetadata receiver = metadata.getColumn(column);
+            ColumnMetadata topLevelReceiver = metadata.getColumn(column);
+            ColumnMetadata receiver = topLevelReceiver;
             checkTrue(receiver != null, UNDEFINED_COLUMN_NAME_MESSAGE, column.toCQLString(), metadata);
             AbstractType<?> type = receiver.type;
 
@@ -141,7 +159,7 @@ public class ReferenceOperation
                 }
             }
 
-            return new ReferenceOperation(receiver, kind, key, field, value.prepare(receiver, bindVariables));
+            return new ReferenceOperation(topLevelReceiver, receiver, kind, key, field, value.prepare(receiver, bindVariables));
         }
     }
 
