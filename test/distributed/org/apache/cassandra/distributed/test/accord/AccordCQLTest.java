@@ -1330,6 +1330,68 @@ public class AccordCQLTest extends AccordTestBase
     }
 
     @Test
+    public void testRefAutoRead() throws Exception
+    {
+        test("CREATE TABLE " + currentTable + " (k int, c int, counter int, other_counter int, PRIMARY KEY (k, c))",
+             cluster ->
+             {
+                 cluster.coordinator(1).execute("INSERT INTO " + currentTable + " (k, c, counter, other_counter) VALUES (0, 0, 1, 1);", ConsistencyLevel.ALL);
+                 cluster.coordinator(1).execute("INSERT INTO " + currentTable + " (k, c, counter, other_counter) VALUES (0, 1, 1, 1);", ConsistencyLevel.ALL);
+
+                 String update = "BEGIN TRANSACTION\n" +
+                                 "  LET row0 = (SELECT * FROM " + currentTable + " WHERE k = 0 AND c = 0);\n" +
+                                 "  SELECT row0.counter, row0.other_counter;\n" +
+                                 "  UPDATE " + currentTable + " SET other_counter += 1, counter += row0.counter WHERE k = 0 AND c = 1;\n" +
+                                 "COMMIT TRANSACTION";
+                 assertRowEqualsWithPreemptedRetry(cluster, new Object[] { 1, 1 }, update);
+
+                 String check = "BEGIN TRANSACTION\n" +
+                                "  SELECT counter, other_counter FROM " + currentTable + " WHERE k = 0 AND c = 1;\n" +
+                                "COMMIT TRANSACTION";
+                 assertRowEqualsWithPreemptedRetry(cluster, new Object[] {2, 2}, check);
+             }
+        );
+    }
+
+    @Test
+    public void testMultiMutationsSameKey() throws Exception
+    {
+        test("CREATE TABLE " + currentTable + " (k int, c int, counter int, int_list list<int>, PRIMARY KEY (k, c))",
+             cluster ->
+             {
+                 cluster.coordinator(1).execute("INSERT INTO " + currentTable + " (k, c, counter, int_list) VALUES (0, 0, 0, [1, 2]);", ConsistencyLevel.ALL);
+
+                 String update = "BEGIN TRANSACTION\n" +
+                                 "  LET row0 = (SELECT * FROM " + currentTable + " WHERE k = 0 AND c = 0);\n" +
+                                 "  SELECT row0.counter, row0.int_list;\n" +
+                                 "  UPDATE " + currentTable + " SET int_list[0] = 42 WHERE k = 0 AND c = 0;\n" +
+                                 "  UPDATE " + currentTable + " SET counter += 1 WHERE k = 0 AND c = 0;\n" +
+                                 "COMMIT TRANSACTION";
+                 assertRowEqualsWithPreemptedRetry(cluster, new Object[] { 0, Arrays.asList(1, 2) }, update);
+
+                 String check = "BEGIN TRANSACTION\n" +
+                                "  SELECT counter, int_list FROM " + currentTable + " WHERE k = 0 AND c = 0;\n" +
+                                "COMMIT TRANSACTION";
+                 assertRowEqualsWithPreemptedRetry(cluster, new Object[] {1, Arrays.asList(42, 2)}, check);
+             }
+        );
+    }
+
+    @Test
+    public void testLetLimitUsingBind() throws Exception
+    {
+        test(cluster -> {
+            cluster.coordinator(1).execute("INSERT INTO " + currentTable + " (k, c, v) VALUES (0, 0, 0);", ConsistencyLevel.ALL);
+
+            String cql = "BEGIN TRANSACTION\n" +
+                         "LET row1 = (SELECT * FROM " + currentTable + " WHERE k=0 LIMIT ?);\n" +
+                         "SELECT row1.v;\n" +
+                         "COMMIT TRANSACTION";
+            assertRowEqualsWithPreemptedRetry(cluster, new Object[]{ 0 }, cql, 1);
+        });
+    }
+
+    @Test
     public void testListSetByIndexMultiRow() throws Exception
     {
         test("CREATE TABLE " + currentTable + " (k int, c int, int_list list<int>, PRIMARY KEY (k, c))",
@@ -1989,5 +2051,87 @@ public class AccordCQLTest extends AccordTestBase
                  assertEquals(ImmutableList.of("row0.customer.0x0001"), result.names());
              }
         );
+    }
+
+    @Test
+    public void testNoSelectWithAndWithoutCondition() throws Exception
+    {
+        test(cluster -> {
+            String cql = "BEGIN TRANSACTION\n" +
+                         "  LET a = (SELECT * FROM " + currentTable + " WHERE k=0 AND c=0);\n" +
+                         "  IF a IS NULL THEN\n" +
+                         "    INSERT INTO " + currentTable + " (k, c, v) VALUES (0, 0, 1);\n" +
+                         "  END IF\n" +
+                         "COMMIT TRANSACTION";
+            assertEmptyWithPreemptedRetry(cluster, cql);
+            cql = "BEGIN TRANSACTION\n" +
+                  "  LET a = (SELECT * FROM " + currentTable + " WHERE k=0 AND c=0);\n" +
+                  "  IF a IS NULL THEN\n" +
+                  "    INSERT INTO " + currentTable + " (k, c, v) VALUES (0, 0, 1);\n" +
+                  "  END IF\n" +
+                  "COMMIT TRANSACTION";
+            assertEmptyWithPreemptedRetry(cluster, cql);
+            cql = "BEGIN TRANSACTION\n" +
+                  "  UPDATE " + currentTable + " SET v += 1 WHERE k=0 AND c=0;" +
+                  "COMMIT TRANSACTION";
+            //TODO should this return "applied" even though there isn't a condition?
+            SimpleQueryResult result = cluster.coordinator(1).executeWithResult(cql, ConsistencyLevel.ANY);
+            assertFalse(result.hasNext());
+
+            cql = "BEGIN TRANSACTION\n" +
+                  "  SELECT v FROM " + currentTable + " WHERE k=0 AND c=0;" +
+                  "COMMIT TRANSACTION";
+            assertRowEqualsWithPreemptedRetry(cluster, new Object[] { 2 }, cql);
+        });
+    }
+
+    @Test
+    public void testInsertWithRef() throws Exception
+    {
+        test(cluster -> {
+            cluster.coordinator(1).execute("INSERT INTO " + currentTable + " (k, c, v) VALUES (0, 0, 0)", ConsistencyLevel.ALL);
+
+            // simple ref
+            String cql = "BEGIN TRANSACTION\n" +
+                         "  LET a = (SELECT * FROM " + currentTable + " WHERE k=0 AND c=0);\n" +
+                         "  IF a IS NOT NULL THEN\n" +
+                         "    INSERT INTO " + currentTable + " (k, c, v) VALUES (0, 0 + 1, a.v);\n" +
+                         "  END IF\n" +
+                         "COMMIT TRANSACTION";
+            assertEmptyWithPreemptedRetry(cluster, cql);
+            // ref expression
+            cql = "BEGIN TRANSACTION\n" +
+                  "  LET a = (SELECT * FROM " + currentTable + " WHERE k=0 AND c=0);\n" +
+                  "  IF a IS NOT NULL THEN\n" +
+                  "    INSERT INTO " + currentTable + " (k, c, v) VALUES (0, 1, a.v + 1);\n" +
+                  "  END IF\n" +
+                  "COMMIT TRANSACTION";
+            assertEmptyWithPreemptedRetry(cluster, cql);
+        });
+    }
+
+    /**
+     * Users are used to {@code a < 42} and {@code 42 >= a}, so should make sure this works
+     */
+    @Test
+    public void testConditionRefSideHandling() throws Exception
+    {
+        test(cluster -> {
+            String cql = "BEGIN TRANSACTION\n" +
+                         "  LET a = (SELECT * FROM "+currentTable+" WHERE k=0 AND c=0);\n" +
+                         "  IF a.v < 42 THEN\n" +
+                         "    UPDATE " + currentTable + " SET v += 1 WHERE k=0 AND c=0;\n" +
+                         "  END IF\n" +
+                         "COMMIT TRANSACTION";
+            assertEmptyWithPreemptedRetry(cluster, cql);
+
+            cql = "BEGIN TRANSACTION\n" +
+                  "  LET a = (SELECT * FROM " + currentTable + " WHERE k=0 AND c=0);\n" +
+                  "  IF 42 >= a.v THEN\n" +
+                  "    UPDATE " + currentTable + " SET v += 1 WHERE k=0 AND c=0;\n" +
+                  "  END IF\n" +
+                  "COMMIT TRANSACTION";
+            assertEmptyWithPreemptedRetry(cluster, cql);
+        });
     }
 }

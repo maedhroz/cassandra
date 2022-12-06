@@ -148,6 +148,10 @@ public class TransactionStatement implements CQLStatement
     @Override
     public void validate(ClientState state)
     {
+        for (NamedSelect statement : assignments)
+            statement.select.validate(state);
+        if (returningSelect != null)
+            returningSelect.select.validate(state);
         for (ModificationStatement statement : updates)
             statement.validate(state);
     }

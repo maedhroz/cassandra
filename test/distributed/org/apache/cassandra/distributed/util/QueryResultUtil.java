@@ -27,6 +27,7 @@ import java.util.function.Predicate;
 
 import org.apache.cassandra.distributed.api.Row;
 import org.apache.cassandra.distributed.api.SimpleQueryResult;
+import org.apache.cassandra.distributed.shared.AssertUtils;
 import org.apache.cassandra.tools.nodetool.formatter.TableBuilder;
 import org.assertj.core.api.Assertions;
 
@@ -185,6 +186,41 @@ public class QueryResultUtil
             qr.reset();
             if (!QueryResultUtil.contains(qr, fn))
                 throw new AssertionError("Row  is not present");
+            return this;
+        }
+
+        public SimpleQueryResultAssertHelper isEqualTo(SimpleQueryResult other)
+        {
+            qr.mark();
+            other.mark();
+            try
+            {
+                // org.apache.cassandra.distributed.shared.AssertUtils.assertRows has some issues with the error msg
+                // so rewrite to make sure to have a nicer msg
+                List<String> otherNames = other.names().isEmpty() ? other.names() : qr.names();
+                Assertions.assertThat(otherNames).isEqualTo(qr.names());
+                int rowId = 0;
+                while (qr.hasNext())
+                {
+                    if (!other.hasNext())
+                        throw new AssertionError("Unexpected row at index " + rowId + "; found " + Arrays.toString(qr.next().toObjectArray()));
+                    Row next = qr.next();
+                    Row expected = other.next();
+                    if (!Arrays.equals(next.toObjectArray(), expected.toObjectArray()))
+                        throw new AssertionError("Expected row " + rowId + " to be " + Arrays.toString(expected.toObjectArray()) + " but was " + Arrays.toString(next.toObjectArray()));
+
+                    rowId++;
+                }
+                if (other.hasNext())
+                    throw new AssertionError("Expected row " + rowId + " to be " + Arrays.toString(other.next().toObjectArray()) + " but was missing");
+
+                AssertUtils.assertRows(qr, other);
+            }
+            finally
+            {
+                qr.reset();
+                other.reset();
+            }
             return this;
         }
 

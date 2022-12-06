@@ -185,8 +185,8 @@ public class RowDataReference extends Term.NonTerminal
 
         public Raw(Selectable.RawIdentifier tuple, Selectable.Raw selected, Object fieldOrElement)
         {
-            Preconditions.checkArgument(tuple != null);
-            Preconditions.checkArgument(selected == null || selected instanceof Selectable.RawIdentifier);
+            Preconditions.checkArgument(tuple != null, "tuple is null");
+            Preconditions.checkArgument(selected == null || selected instanceof Selectable.RawIdentifier, "selected is not a Selectable.RawIdentifier: " + selected);
             this.tuple = tuple;
             this.selected = (Selectable.RawIdentifier) selected;
             this.fieldOrElement = fieldOrElement;
