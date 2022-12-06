@@ -69,7 +69,7 @@ public class TxnBuilder
         return withRead(name, query, VariableSpecifications.empty());
     }
 
-    public TxnBuilder withRead(TxnDataName name, String query, VariableSpecifications bindVariables, Object... values)
+    private TxnBuilder withRead(TxnDataName name, String query, VariableSpecifications bindVariables, Object... values)
     {
         SelectStatement.RawStatement parsed = (SelectStatement.RawStatement) QueryProcessor.parseStatement(query);
         // the parser will only let us define a ref name if we're parsing a transaction, which we're not
