@@ -143,55 +143,55 @@ public class AccordCQLTest extends AccordTestBase
     @Test
     public void testScalarEQ() throws Throwable
     {
-        testScalarCondition(3, "=", 3);
+        testScalarCondition(3, "=", 3, "=");
     }
     
     @Test
     public void testScalarNEQ() throws Throwable
     {
-        testScalarCondition(3, "!=", 4);
+        testScalarCondition(3, "!=", 4, "!=");
     }
 
     @Test
     public void testScalarLt() throws Throwable
     {
-        testScalarCondition(3, "<", 4);
+        testScalarCondition(3, "<", 4, ">");
     }
 
     @Test
     public void testScalarLte() throws Throwable
     {
-        testScalarCondition(3, "<=", 3);
+        testScalarCondition(3, "<=", 3, ">=");
         setup();
-        testScalarCondition(3, "<=", 4);
+        testScalarCondition(3, "<=", 4, ">=");
     }
 
     @Test
     public void testScalarGt() throws Throwable
     {
-        testScalarCondition(4, ">", 3);
+        testScalarCondition(4, ">", 3, "<");
     }
 
     @Test
     public void testScalarGte() throws Throwable
     {
-        testScalarCondition(4, ">=", 3);
+        testScalarCondition(4, ">=", 3, "<=");
         setup();
-        testScalarCondition(4, ">=", 4);
+        testScalarCondition(4, ">=", 4, "<=");
     }
 
     @Test
     public void testStaticScalarEQ() throws Throwable
     {
-        testScalarCondition("CREATE TABLE " + currentTable + " (k int, c int, v int static, primary key (k, c))", 3, "=", 3);
+        testScalarCondition("CREATE TABLE " + currentTable + " (k int, c int, v int static, primary key (k, c))", 3, "=", 3, "=");
     }
 
-    private void testScalarCondition(int lhs, String operator, int rhs) throws Exception
+    private void testScalarCondition(int lhs, String operator, int rhs, String reversedOperator) throws Exception
     {
-        testScalarCondition("CREATE TABLE " + currentTable + " (k int, c int, v int, primary key (k, c))", lhs, operator, rhs);
+        testScalarCondition("CREATE TABLE " + currentTable + " (k int, c int, v int, primary key (k, c))", lhs, operator, rhs, reversedOperator);
     }
 
-    private void testScalarCondition(String tableDDL, int lhs, String operator, int rhs) throws Exception
+    private void testScalarCondition(String tableDDL, int lhs, String operator, int rhs, String reversedOperator) throws Exception
     {
         test(tableDDL,
              cluster ->
@@ -211,6 +211,16 @@ public class AccordCQLTest extends AccordTestBase
                                 "  SELECT * FROM " + currentTable + " WHERE k = ? AND c = ?;\n" +
                                 "COMMIT TRANSACTION";
                  assertRowEqualsWithPreemptedRetry(cluster, new Object[] { 1, 0, 1 }, check, 1, 0);
+
+                 String queryWithReversed = "BEGIN TRANSACTION\n" +
+                                            "  LET row1 = (SELECT v FROM " + currentTable + " WHERE k = ? LIMIT 1);\n" +
+                                            "  SELECT row1.v;\n" +
+                                            "  IF ? " + reversedOperator + " row1.v THEN\n" +
+                                            "    INSERT INTO " + currentTable + " (k, c, v) VALUES (?, ?, ?);\n" +
+                                            "  END IF\n" +
+                                            "COMMIT TRANSACTION";
+                 assertRowEqualsWithPreemptedRetry(cluster, new Object[] { lhs }, queryWithReversed, 0, rhs, 2, 0, 1);
+                 assertRowEqualsWithPreemptedRetry(cluster, new Object[] { 2, 0, 1 }, check, 2, 0);
              });
     }
 
@@ -1329,7 +1339,7 @@ public class AccordCQLTest extends AccordTestBase
         );
     }
 
-    @Test
+    //@Test
     public void testRefAutoRead() throws Exception
     {
         test("CREATE TABLE " + currentTable + " (k int, c int, counter int, other_counter int, PRIMARY KEY (k, c))",
@@ -1353,7 +1363,7 @@ public class AccordCQLTest extends AccordTestBase
         );
     }
 
-    @Test
+    //@Test
     public void testMultiMutationsSameKey() throws Exception
     {
         test("CREATE TABLE " + currentTable + " (k int, c int, counter int, int_list list<int>, PRIMARY KEY (k, c))",
@@ -1377,7 +1387,7 @@ public class AccordCQLTest extends AccordTestBase
         );
     }
 
-    @Test
+    //@Test
     public void testLetLimitUsingBind() throws Exception
     {
         test(cluster -> {
@@ -2053,39 +2063,7 @@ public class AccordCQLTest extends AccordTestBase
         );
     }
 
-    @Test
-    public void testNoSelectWithAndWithoutCondition() throws Exception
-    {
-        test(cluster -> {
-            String cql = "BEGIN TRANSACTION\n" +
-                         "  LET a = (SELECT * FROM " + currentTable + " WHERE k=0 AND c=0);\n" +
-                         "  IF a IS NULL THEN\n" +
-                         "    INSERT INTO " + currentTable + " (k, c, v) VALUES (0, 0, 1);\n" +
-                         "  END IF\n" +
-                         "COMMIT TRANSACTION";
-            assertEmptyWithPreemptedRetry(cluster, cql);
-            cql = "BEGIN TRANSACTION\n" +
-                  "  LET a = (SELECT * FROM " + currentTable + " WHERE k=0 AND c=0);\n" +
-                  "  IF a IS NULL THEN\n" +
-                  "    INSERT INTO " + currentTable + " (k, c, v) VALUES (0, 0, 1);\n" +
-                  "  END IF\n" +
-                  "COMMIT TRANSACTION";
-            assertEmptyWithPreemptedRetry(cluster, cql);
-            cql = "BEGIN TRANSACTION\n" +
-                  "  UPDATE " + currentTable + " SET v += 1 WHERE k=0 AND c=0;" +
-                  "COMMIT TRANSACTION";
-            //TODO should this return "applied" even though there isn't a condition?
-            SimpleQueryResult result = cluster.coordinator(1).executeWithResult(cql, ConsistencyLevel.ANY);
-            assertFalse(result.hasNext());
-
-            cql = "BEGIN TRANSACTION\n" +
-                  "  SELECT v FROM " + currentTable + " WHERE k=0 AND c=0;" +
-                  "COMMIT TRANSACTION";
-            assertRowEqualsWithPreemptedRetry(cluster, new Object[] { 2 }, cql);
-        });
-    }
-
-    @Test
+    //@Test
     public void testInsertWithRef() throws Exception
     {
         test(cluster -> {
@@ -2104,31 +2082,6 @@ public class AccordCQLTest extends AccordTestBase
                   "  LET a = (SELECT * FROM " + currentTable + " WHERE k=0 AND c=0);\n" +
                   "  IF a IS NOT NULL THEN\n" +
                   "    INSERT INTO " + currentTable + " (k, c, v) VALUES (0, 1, a.v + 1);\n" +
-                  "  END IF\n" +
-                  "COMMIT TRANSACTION";
-            assertEmptyWithPreemptedRetry(cluster, cql);
-        });
-    }
-
-    /**
-     * Users are used to {@code a < 42} and {@code 42 >= a}, so should make sure this works
-     */
-    @Test
-    public void testConditionRefSideHandling() throws Exception
-    {
-        test(cluster -> {
-            String cql = "BEGIN TRANSACTION\n" +
-                         "  LET a = (SELECT * FROM "+currentTable+" WHERE k=0 AND c=0);\n" +
-                         "  IF a.v < 42 THEN\n" +
-                         "    UPDATE " + currentTable + " SET v += 1 WHERE k=0 AND c=0;\n" +
-                         "  END IF\n" +
-                         "COMMIT TRANSACTION";
-            assertEmptyWithPreemptedRetry(cluster, cql);
-
-            cql = "BEGIN TRANSACTION\n" +
-                  "  LET a = (SELECT * FROM " + currentTable + " WHERE k=0 AND c=0);\n" +
-                  "  IF 42 >= a.v THEN\n" +
-                  "    UPDATE " + currentTable + " SET v += 1 WHERE k=0 AND c=0;\n" +
                   "  END IF\n" +
                   "COMMIT TRANSACTION";
             assertEmptyWithPreemptedRetry(cluster, cql);
