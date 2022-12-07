@@ -115,11 +115,9 @@ public class TxnDataName implements Comparable<TxnDataName>
         return Collections.unmodifiableList(Arrays.asList(parts));
     }
 
-    public boolean isFor(TableMetadata metadata)
+    public boolean isAutoRead()
     {
-        if (kind != Kind.AUTO_READ)
-            return false;
-        return metadata.keyspace.equals(parts[0]) && metadata.name.equals(parts[1]);
+        return kind == Kind.AUTO_READ;
     }
 
     public DecoratedKey getDecoratedKey(TableMetadata metadata)

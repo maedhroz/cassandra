@@ -53,21 +53,21 @@ public abstract class AccordTestBase extends TestBaseImpl
 {
     protected static final AtomicInteger COUNTER = new AtomicInteger(0);
 
-    protected static Cluster sharedCluster;
+    protected static Cluster SHARED_CLUSTER;
     
     protected String currentTable;
 
     @BeforeClass
     public static void setupClass() throws IOException
     {
-        sharedCluster = createCluster();
+        SHARED_CLUSTER = createCluster();
     }
 
     @AfterClass
     public static void teardown()
     {
-        if (sharedCluster != null)
-            sharedCluster.close();
+        if (SHARED_CLUSTER != null)
+            SHARED_CLUSTER.close();
     }
     
     @Before
@@ -84,19 +84,19 @@ public abstract class AccordTestBase extends TestBaseImpl
 
     protected void test(String tableDDL, FailingConsumer<Cluster> fn) throws Exception
     {
-        sharedCluster.schemaChange(tableDDL);
-        sharedCluster.forEach(node -> node.runOnInstance(() -> AccordService.instance().createEpochFromConfigUnsafe()));
+        SHARED_CLUSTER.schemaChange(tableDDL);
+        SHARED_CLUSTER.forEach(node -> node.runOnInstance(() -> AccordService.instance().createEpochFromConfigUnsafe()));
 
         // Evict commands from the cache immediately to expose problems loading from disk.
-        sharedCluster.forEach(node -> node.runOnInstance(() -> AccordService.instance().setCacheSize(0)));
+        SHARED_CLUSTER.forEach(node -> node.runOnInstance(() -> AccordService.instance().setCacheSize(0)));
 
         try
         {
-            fn.accept(sharedCluster);
+            fn.accept(SHARED_CLUSTER);
         }
         finally
         {
-            sharedCluster.filters().reset();
+            SHARED_CLUSTER.filters().reset();
         }
     }
 
