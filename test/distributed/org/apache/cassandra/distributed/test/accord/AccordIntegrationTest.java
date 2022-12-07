@@ -41,7 +41,7 @@ import org.apache.cassandra.distributed.impl.Instance;
 import org.apache.cassandra.net.Message;
 import org.apache.cassandra.net.Verb;
 import org.apache.cassandra.service.accord.AccordService;
-import org.apache.cassandra.service.accord.txn.TxnBuilder;
+import org.apache.cassandra.service.accord.AccordTestUtils;
 import org.apache.cassandra.utils.ByteBufferUtil;
 
 @SuppressWarnings("Convert2MethodRef")
@@ -168,12 +168,12 @@ public class AccordIntegrationTest extends AccordTestBase
         assertRowEqualsWithPreemptedRetry(sharedCluster, null, query.toString());
 
         sharedCluster.get(1).runOnInstance(() -> {
-            TxnBuilder txn = new TxnBuilder();
-
+            StringBuilder sb = new StringBuilder("BEGIN TRANSACTION\n");
             for (int i = 0; i < keyStrings.size(); i++)
-                txn.withRead("row" + i, "SELECT * FROM " + keyspace + ".tbl WHERE k=" + keyStrings.get(i) + " and c=0");
+                sb.append(String.format("LET row%d = (SELECT * FROM ks.tbl WHERE k=%s AND c=0);\n", i, keyStrings.get(i)));
+            sb.append("COMMIT TRANSACTION");
 
-            Unseekables<?, ?> routables = txn.build().keys().toUnseekables();
+            Unseekables<?, ?> routables = AccordTestUtils.createTxn(sb.toString()).keys().toUnseekables();
             Topologies topology = AccordService.instance().node.topology().withUnsyncedEpochs(routables, 1);
             // we don't detect out-of-bounds read/write yet, so use this to validate we reach different shards
             Assertions.assertThat(topology.totalShards()).isEqualTo(2);
