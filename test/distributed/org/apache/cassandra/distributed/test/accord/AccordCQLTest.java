@@ -1884,18 +1884,18 @@ public class AccordCQLTest extends AccordTestBase
     }
 
     @Test
-    public void testScalarSubSimple() throws Exception
+    public void testRegularScalarInsertSubstitution() throws Exception
     {
-        testScalarSubHelper("CREATE TABLE " + currentTable + " (k int, c int, v int, PRIMARY KEY (k, c))");
+        testScalarInsertSubstitution("CREATE TABLE " + currentTable + " (k int, c int, v int, PRIMARY KEY (k, c))");
     }
 
     @Test
-    public void testStaticScalarSubSimple() throws Exception
+    public void testStaticScalarInsertSubstitution() throws Exception
     {
-        testScalarSubHelper("CREATE TABLE " + currentTable + " (k int, c int, v int static, PRIMARY KEY (k, c))");
+        testScalarInsertSubstitution("CREATE TABLE " + currentTable + " (k int, c int, v int static, PRIMARY KEY (k, c))");
     }
 
-    private void testScalarSubHelper(String tableDDL) throws Exception
+    private void testScalarInsertSubstitution(String tableDDL) throws Exception
     {
         test(tableDDL,
              cluster ->

@@ -37,6 +37,7 @@ import static org.apache.cassandra.cql3.statements.TransactionStatement.INCOMPLE
 import static org.apache.cassandra.cql3.statements.TransactionStatement.NO_CONDITIONS_IN_UPDATES_MESSAGE;
 import static org.apache.cassandra.cql3.statements.TransactionStatement.NO_TIMESTAMPS_IN_UPDATES_MESSAGE;
 import static org.apache.cassandra.cql3.statements.TransactionStatement.SELECT_REFS_NEED_COLUMN_MESSAGE;
+import static org.apache.cassandra.cql3.statements.UpdateStatement.CANNOT_SET_KEY_WITH_REFERENCE_MESSAGE;
 import static org.apache.cassandra.cql3.statements.UpdateStatement.UPDATING_PRIMARY_KEY_MESSAGE;
 import static org.apache.cassandra.cql3.statements.schema.CreateTableStatement.parse;
 import static org.apache.cassandra.cql3.transactions.RowDataReference.CANNOT_FIND_TUPLE_MESSAGE;
@@ -314,7 +315,21 @@ public class TransactionStatementTest
 
         TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(query);
         Assertions.assertThatThrownBy(() -> parsed.prepare(ClientState.forInternalCalls()))
-                .isInstanceOf(InvalidRequestException.class)
-                .hasMessageContaining(String.format(COLUMN_NOT_IN_TUPLE_MESSAGE, "q", "row1"));
+                  .isInstanceOf(InvalidRequestException.class)
+                  .hasMessageContaining(String.format(COLUMN_NOT_IN_TUPLE_MESSAGE, "q", "row1"));
+    }
+
+    @Test
+    public void shouldRejectInsertPartiitonKeyReference()
+    {
+        String query = "BEGIN TRANSACTION\n" +
+                       "  LET row0 = (SELECT * FROM ks.tbl1 WHERE k = 0 AND c = 0);\n" +
+                       "  INSERT INTO ks.tbl1 (k, c, v) VALUES (row0.k, 1, 1);\n" +
+                       "COMMIT TRANSACTION";
+
+        TransactionStatement.Parsed parsed = (TransactionStatement.Parsed) QueryProcessor.parseStatement(query);
+        Assertions.assertThatThrownBy(() -> parsed.prepare(ClientState.forInternalCalls()))
+                  .isInstanceOf(InvalidRequestException.class)
+                  .hasMessageContaining(String.format(CANNOT_SET_KEY_WITH_REFERENCE_MESSAGE, "row0.k", "k"));
     }
 }

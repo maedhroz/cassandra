@@ -232,6 +232,7 @@ public class ListSerializer<T> extends CollectionSerializer<List<T>>
         {
             ProtocolVersion version = ProtocolVersion.V3;
             int n = readCollectionSize(collection, ByteBufferAccessor.instance, version);
+            // Start the offset after the (size of) the collection size we just read
             int offset = sizeOfCollectionSize(n, version);
             int idx = ByteBufferUtil.toInt(index);
 
