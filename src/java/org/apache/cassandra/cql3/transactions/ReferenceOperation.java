@@ -124,7 +124,7 @@ public class ReferenceOperation
                     if (collectionType.kind == MAP)
                         receiver = receiver.withNewType(SetType.getInstance(((MapType<?, ?>) type).getKeysType(), true));
 
-                if (kind == TxnReferenceOperation.Kind.SetterByIndex || kind == TxnReferenceOperation.Kind.SetterByKey)
+                if (kind == TxnReferenceOperation.Kind.ListSetterByIndex || kind == TxnReferenceOperation.Kind.MapSetterByKey)
                     receiver = receiver.withNewType(collectionType.valueComparator());
             }
 
@@ -132,7 +132,7 @@ public class ReferenceOperation
 
             if (type.isUDT())
             {
-                if (kind == TxnReferenceOperation.Kind.SetterByField)
+                if (kind == TxnReferenceOperation.Kind.UserTypeSetterByField)
                 {
                     @SuppressWarnings("ConstantConditions") UserType userType = (UserType) type;
                     CellPath fieldPath = userType.cellPathForField(field);

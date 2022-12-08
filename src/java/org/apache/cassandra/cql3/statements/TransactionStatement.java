@@ -156,12 +156,6 @@ public class TransactionStatement implements CQLStatement
             statement.validate(state);
     }
 
-    @VisibleForTesting
-    public List<RowDataReference> getReturningReferences()
-    {
-        return returningReferences;
-    }
-
     TxnNamedRead createNamedRead(NamedSelect namedSelect, QueryOptions options)
     {
         SelectStatement select = namedSelect.select;
@@ -170,6 +164,9 @@ public class TransactionStatement implements CQLStatement
         // We reject reads from both LET and SELECT that do not specify a single row.
         @SuppressWarnings("unchecked")
         SinglePartitionReadQuery.Group<SinglePartitionReadCommand> selectQuery = (SinglePartitionReadQuery.Group<SinglePartitionReadCommand>) readQuery;
+
+        if (selectQuery.queries.size() != 1)
+            throw new IllegalArgumentException("Within a transaction, SELECT statements must select a single partition; found " + selectQuery.queries.size() + " partitions");
 
         return new TxnNamedRead(namedSelect.name, Iterables.getOnlyElement(selectQuery.queries));
     }
@@ -427,7 +424,7 @@ public class TransactionStatement implements CQLStatement
 
             List<ConditionStatement> preparedConditions = new ArrayList<>(conditions.size());
             for (ConditionStatement.Raw condition : conditions)
-                // TODO: Is this synthetic ks name dangerous?
+                // TODO: If we eventually support IF ks.function(ref) THEN, the keyspace will have to be provided here
                 preparedConditions.add(condition.prepare("[txn]", bindVariables));
 
             return new TransactionStatement(preparedAssignments, returningSelect, returningReferences, preparedUpdates, preparedConditions, bindVariables);
