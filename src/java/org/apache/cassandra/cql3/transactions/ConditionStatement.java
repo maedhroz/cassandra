@@ -132,7 +132,8 @@ public class ConditionStatement
 
             if (reference.isElementSelection())
             {
-                switch (((CollectionType<?>) receiver.type).kind)
+                CollectionType.Kind collectionKind = ((CollectionType<?>) receiver.type).kind;
+                switch (collectionKind)
                 {
                     case LIST:
                         receiver = Lists.valueSpecOf(receiver);
@@ -140,9 +141,9 @@ public class ConditionStatement
                     case MAP:
                         receiver = Maps.valueSpecOf(receiver);
                         break;
-                    case SET:
-                        throw new InvalidRequestException(String.format("Invalid operation %s = %s for set column %s",
-                                                                        reference.getFullyQualifiedName(), rhs, receiver.name));
+                    default:
+                        throw new InvalidRequestException(String.format("Element selection not supported for column %s of type %s" ,
+                                                                        receiver.name, collectionKind));
                 }
             }
             else if (reference.isFieldSelection())
