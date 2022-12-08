@@ -2139,4 +2139,29 @@ public class AccordCQLTest extends AccordTestBase
             assertEmptyWithPreemptedRetry(cluster, cql);
         });
     }
+
+    @Test
+    public void testUpdateWithRef() throws Exception
+    {
+        test(cluster -> {
+            cluster.coordinator(1).execute("INSERT INTO " + currentTable + " (k, c, v) VALUES (0, 0, 0)", ConsistencyLevel.ALL);
+
+            // simple ref
+            String cql = "BEGIN TRANSACTION\n" +
+                         "  LET a = (SELECT * FROM " + currentTable + " WHERE k=0 AND c=0);\n" +
+                         "  IF a IS NOT NULL THEN\n" +
+                         "    UPDATE " + currentTable + " SET v = a.v WHERE k = 0 AND c = 0 + 1;\n" +
+                         "  END IF\n" +
+                         "COMMIT TRANSACTION";
+            assertEmptyWithPreemptedRetry(cluster, cql);
+            // ref expression
+            cql = "BEGIN TRANSACTION\n" +
+                  "  LET a = (SELECT * FROM " + currentTable + " WHERE k=0 AND c=0);\n" +
+                  "  IF a IS NOT NULL THEN\n" +
+                  "    UPDATE " + currentTable + " SET v = a.v + 1 WHERE k = 0 and c = 1;\n" +
+                  "  END IF\n" +
+                  "COMMIT TRANSACTION";
+            assertEmptyWithPreemptedRetry(cluster, cql);
+        });
+    }
 }
