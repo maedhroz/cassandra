@@ -432,12 +432,11 @@ public class TransactionStatement implements CQLStatement
 
         private void checkAtMostOneRowSpecified(SelectStatement prepared, String failureMessage, Object messageArg)
         {
-            int limit = prepared.getLimit(QueryOptions.DEFAULT);
+            if (prepared.getRestrictions().hasAllPKColumnsRestrictedByEqualities())
+                return;
 
-            if (limit == DataLimits.NO_LIMIT)
-                checkTrue(prepared.getRestrictions().hasAllPKColumnsRestrictedByEqualities(), failureMessage, messageArg);
-            else
-                checkTrue(limit == 1, failureMessage, messageArg);
+            int limit = prepared.getLimit(QueryOptions.DEFAULT);
+            checkTrue(limit == 1, failureMessage, messageArg);
         }
     }
 }
