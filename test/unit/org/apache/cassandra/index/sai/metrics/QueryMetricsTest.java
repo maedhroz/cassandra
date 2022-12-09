@@ -34,9 +34,6 @@ public class QueryMetricsTest extends AbstractMetricsTest
                                                         "{'class' : 'SizeTieredCompactionStrategy', 'enabled' : false }";
     private static final String CREATE_INDEX_TEMPLATE = "CREATE CUSTOM INDEX IF NOT EXISTS %s ON %s.%s(%s) USING 'StorageAttachedIndex'";
 
-    private static final String PER_QUERY_METRIC_TYPE = "PerQuery";
-    private static final String GLOBAL_METRIC_TYPE = "ColumnQueryMetrics";
-
     @Rule
     public ExpectedException exception = ExpectedException.none();
 
@@ -104,7 +101,7 @@ public class QueryMetricsTest extends AbstractMetricsTest
         assertThatThrownBy(() -> getTableQueryMetrics(keyspace, table, "TotalQueriesCompleted")).hasCauseInstanceOf(InstanceNotFoundException.class);
     }
 
-    private long getTableQueryMetrics(String keyspace, String table, String metricsName) throws Exception
+    private long getTableQueryMetrics(String keyspace, String table, String metricsName)
     {
         return (long) getMetricValue(objectNameNoIndex(metricsName, keyspace, table, TableQueryMetrics.TABLE_QUERY_METRIC_TYPE));
     }

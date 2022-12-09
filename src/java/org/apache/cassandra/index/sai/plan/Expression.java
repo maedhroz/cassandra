@@ -71,11 +71,6 @@ public class Expression
         {
             return this == EQ || this == CONTAINS_KEY || this == CONTAINS_VALUE;
         }
-
-        public boolean isEqualityOrRange()
-        {
-            return isEquality() || this == RANGE;
-        }
     }
 
     public final AbstractAnalyzer.AnalyzerFactory analyzerFactory;
@@ -87,6 +82,10 @@ public class Expression
     protected Op operation;
 
     public Bound lower, upper;
+    // The upperInclusive and lowerInclusive flags are maintained separately to the inclusive flags
+    // in the upper and lower bounds because the upper and lower bounds have their inclusivity relaxed
+    // if the datatype being filtered is rounded in the index. These flags are used in the post-filtering
+    // process to remove values equal to the bounds.
     public boolean upperInclusive, lowerInclusive;
 
     public Expression(IndexContext indexContext)
@@ -96,6 +95,14 @@ public class Expression
         this.validator = indexContext.getValidator();
     }
 
+    /**
+     * This adds an operation to the current {@link Expression} instance and
+     * returns the current instance.
+     *
+     * @param op the CQL3 operation
+     * @param value the expression value
+     * @return the current expression with the added operation
+     */
     public Expression add(Operator op, ByteBuffer value)
     {
         boolean lowerInclusive, upperInclusive;
@@ -158,6 +165,9 @@ public class Expression
         return this;
     }
 
+    /**
+     * Used in post-filtering to determine is an indexed value matches the expression
+     */
     public boolean isSatisfiedBy(ByteBuffer columnValue)
     {
         if (!TypeUtil.isValid(columnValue, validator))
@@ -172,10 +182,7 @@ public class Expression
         {
             // suffix check
             if (TypeUtil.isLiteral(validator))
-            {
-                if (!validateStringValue(value.raw, lower.value.raw))
-                    return false;
-            }
+                return validateStringValue(value.raw, lower.value.raw);
             else
             {
                 // range or (not-)equals - (mainly) for numeric values
@@ -194,16 +201,12 @@ public class Expression
         {
             // string (prefix or suffix) check
             if (TypeUtil.isLiteral(validator))
-            {
-                if (!validateStringValue(value.raw, upper.value.raw))
-                    return false;
-            }
+                return validateStringValue(value.raw, upper.value.raw);
             else
             {
                 // range - mainly for numeric values
                 int cmp = TypeUtil.comparePostFilter(upper.value, value, validator);
-                if (cmp < 0 || (cmp == 0 && !upperInclusive))
-                    return false;
+                return (cmp > 0 || (cmp == 0 && upperInclusive));
             }
         }
 
@@ -277,6 +280,7 @@ public class Expression
         return cmp < 0 || cmp == 0 && upper.inclusive;
     }
 
+    @Override
     public String toString()
     {
         return String.format("Expression{name: %s, op: %s, lower: (%s, %s), upper: (%s, %s)}",
@@ -288,6 +292,7 @@ public class Expression
                              upper != null && upper.inclusive);
     }
 
+    @Override
     public int hashCode()
     {
         return new HashCodeBuilder().append(context.getColumnName())
@@ -296,6 +301,7 @@ public class Expression
                                     .append(lower).append(upper).build();
     }
 
+    @Override
     public boolean equals(Object other)
     {
         if (!(other instanceof Expression))
@@ -314,7 +320,7 @@ public class Expression
     }
 
     /**
-     * A representation of a column value in it's raw and encoded form.
+     * A representation of a column value in its raw and encoded form.
      */
     public static class Value
     {

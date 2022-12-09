@@ -35,38 +35,36 @@ import com.google.common.collect.Sets;
 import org.apache.cassandra.cql3.CQL3Type;
 import org.apache.cassandra.utils.Pair;
 
-public interface DataModel
+class BaseDataModel
 {
-    String KEYSPACE = "sai_query_keyspace";
+    public static String KEYSPACE = "sai_query_keyspace";
 
-    String SIMPLE_SELECT_TEMPLATE = "SELECT %s FROM %%s WHERE %s %s ? LIMIT ?";
-    String SIMPLE_SELECT_WITH_FILTERING_TEMPLATE = "SELECT %s FROM %%s WHERE %s %s ? LIMIT ? ALLOW FILTERING";
-    String TWO_CLAUSE_AND_QUERY_TEMPLATE = "SELECT %s FROM %%s WHERE %s %s ? AND %s %s ? LIMIT ? ALLOW FILTERING";
-    String TWO_CLAUSE_AND_QUERY_FILTERING_TEMPLATE = "SELECT %s FROM %%s WHERE %s %s ? AND %s %s ? LIMIT ? ALLOW FILTERING";
-    String THREE_CLAUSE_AND_QUERY_FILTERING_TEMPLATE = "SELECT %s FROM %%s WHERE %s %s ? AND %s %s ? AND %s %s ? LIMIT ? ALLOW FILTERING";
+    public static String SIMPLE_SELECT_TEMPLATE = "SELECT %s FROM %%s WHERE %s %s ? LIMIT ?";
+    public static String SIMPLE_SELECT_WITH_FILTERING_TEMPLATE = "SELECT %s FROM %%s WHERE %s %s ? LIMIT ? ALLOW FILTERING";
+    public static String TWO_CLAUSE_AND_QUERY_TEMPLATE = "SELECT %s FROM %%s WHERE %s %s ? AND %s %s ? LIMIT ? ALLOW FILTERING";
+    public static String TWO_CLAUSE_AND_QUERY_FILTERING_TEMPLATE = "SELECT %s FROM %%s WHERE %s %s ? AND %s %s ? LIMIT ? ALLOW FILTERING";
+    public static String THREE_CLAUSE_AND_QUERY_FILTERING_TEMPLATE = "SELECT %s FROM %%s WHERE %s %s ? AND %s %s ? AND %s %s ? LIMIT ? ALLOW FILTERING";
 
-    String ASCII_COLUMN = "abbreviation";
-    String BIGINT_COLUMN = "gdp";
-    String BOOLEAN_COLUMN = "active";
-    String DATE_COLUMN = "visited";
-    String DOUBLE_COLUMN = "area_sq_miles";
-    String FLOAT_COLUMN = "murder_rate";
-    String INET_COLUMN = "ip";
-    String INT_COLUMN = "population";
-    String SMALLINT_COLUMN = "murders_per_year";
-    String TINYINT_COLUMN = "tiny_murders_per_year";
-    String TEXT_COLUMN = "name";
-    String TIME_COLUMN = "avg_dmv_wait";
-    String TIMESTAMP_COLUMN = "visited_timestamp";
-    String UUID_COLUMN = "id";
-    String TIMEUUID_COLUMN = "temporal_id";
-    String NON_INDEXED_COLUMN = "non_indexed";
+    public static String ASCII_COLUMN = "abbreviation";
+    public static String BIGINT_COLUMN = "gdp";
+    public static String BOOLEAN_COLUMN = "active";
+    public static String DATE_COLUMN = "visited";
+    public static String DOUBLE_COLUMN = "area_sq_miles";
+    public static String FLOAT_COLUMN = "murder_rate";
+    public static String INET_COLUMN = "ip";
+    public static String INT_COLUMN = "population";
+    public static String SMALLINT_COLUMN = "murders_per_year";
+    public static String TINYINT_COLUMN = "tiny_murders_per_year";
+    public static String TEXT_COLUMN = "name";
+    public static String TIME_COLUMN = "avg_dmv_wait";
+    public static String TIMESTAMP_COLUMN = "visited_timestamp";
+    public static String UUID_COLUMN = "id";
+    public static String TIMEUUID_COLUMN = "temporal_id";
+    public static String NON_INDEXED_COLUMN = "non_indexed";
 
-    Set<String> skipColumns = Sets.newHashSet(NON_INDEXED_COLUMN, BOOLEAN_COLUMN);
+    public static int DEFAULT_TTL_SECONDS = 10;
 
-    int DEFAULT_TTL_SECONDS = 10;
-
-    List<Pair<String, String>> NORMAL_COLUMNS =
+    public static List<Pair<String, String>> NORMAL_COLUMNS =
             ImmutableList.<Pair<String, String>>builder()
                     .add(Pair.create(ASCII_COLUMN, CQL3Type.Native.ASCII.toString()))
                     .add(Pair.create(BIGINT_COLUMN, CQL3Type.Native.BIGINT.toString()))
@@ -86,7 +84,7 @@ public interface DataModel
                     .add(Pair.create(NON_INDEXED_COLUMN, CQL3Type.Native.INT.toString()))
                     .build();
 
-    List<String> NORMAL_COLUMN_DATA =
+    public static List<String> NORMAL_COLUMN_DATA =
             ImmutableList.<String>builder()
                     .add("'AK',   500000000,  true, '2009-07-15', 570640.95,  7.7,   '158.145.20.64',   737709,  164,  16,        'Alaska', '00:18:20', '2009-07-15T00:00:00', e37394dc-d17b-11e8-a8d5-f2801f1b9fd1, acfe5ada-d17c-11e8-a8d5-f2801f1b9fd1, 1")
                     .add("'AL',  1000000000,  true, '2011-09-13',  50645.33,  7.0,   '206.16.212.91',  4853875,   57,   5,       'Alabama', '01:04:00', '2011-09-13T00:00:00', b7373af6-d7c1-45ae-b145-5bf4b5cdd00c, c592c37e-d17c-11e8-a8d5-f2801f1b9fd1, 1")
@@ -106,13 +104,13 @@ public interface DataModel
                     .add("'WY', 10000000000, false, '2015-06-17',  97093.14,  2.7,  '192.146.215.91',   586107,   57,   5,       'Wyoming', '00:15:50', '2015-06-17T00:00:00', e8a3c287-78cf-46b5-b554-42562e7dcfb3, 2576612e-d17d-11e8-a8d5-f2801f1b9fd1, 2")
                     .build();
 
-    String STATIC_INT_COLUMN = "entered";
+    public static String STATIC_INT_COLUMN = "entered";
 
-    List<Pair<String, String>> STATIC_COLUMNS =
+    public static List<Pair<String, String>> STATIC_COLUMNS =
             ImmutableList.<Pair<String, String>>builder().add(Pair.create(STATIC_INT_COLUMN, CQL3Type.Native.INT.toString() + " static"))
                                                          .addAll(NORMAL_COLUMNS).build();
 
-    List<String> STATIC_COLUMN_DATA = ImmutableList.of("1819, " + NORMAL_COLUMN_DATA.get(0),
+    public static List<String> STATIC_COLUMN_DATA = ImmutableList.of("1819, " + NORMAL_COLUMN_DATA.get(0),
                                                        "1819, " + NORMAL_COLUMN_DATA.get(1),
                                                        "1850, " + NORMAL_COLUMN_DATA.get(2),
                                                        "1850, " + NORMAL_COLUMN_DATA.get(3),
@@ -129,164 +127,125 @@ public interface DataModel
                                                        "1845, " + NORMAL_COLUMN_DATA.get(14),
                                                        "1845, " + NORMAL_COLUMN_DATA.get(15));
 
-    static AtomicInteger seq = new AtomicInteger();
+    private static final AtomicInteger seq = new AtomicInteger();
 
-    DataModel withTableOptions(String tableOptions) throws Throwable;
+    private final String columnNames;
+    private final List<String> rows;
 
-    String indexedTable();
+    protected final Set<String> skipColumns = Sets.newHashSet(NON_INDEXED_COLUMN, BOOLEAN_COLUMN);
+    protected final List<Pair<String, String>> columns;
+    protected final String indexedTable = "table_" + seq.getAndIncrement();
+    protected final String nonIndexedTable = "table_" + seq.getAndIncrement();
+    protected String tableOptions = "";
+    protected List<Pair<String, String>> keyColumns;
+    protected String primaryKey;
+    protected List<String> keys;
 
-    String nonIndexedTable();
-
-    List<Pair<String, String>> keyColumns();
-
-    void createTables(Executor tester) throws Throwable;
-
-    void createIndexes(Executor tester) throws Throwable;
-
-    void insertRows(Executor tester) throws Throwable;
-
-    void insertRowsWithTTL(Executor tester) throws Throwable;
-
-    List<Object> executeIndexed(Executor tester, String query, int fetchSize, Object... values) throws Throwable;
-
-    List<Object> executeNonIndexed(Executor tester, String query, int fetchSize, Object... values) throws Throwable;
-
-    public class BaseDataModel implements DataModel
+    public BaseDataModel(List<Pair<String, String>> columns, List<String> rows)
     {
-        final List<Pair<String, String>> columns;
-        final String columnNames;
-        final List<String> rows;
-        final String indexedTable = "table_" + seq.getAndIncrement();
-        final String nonIndexedTable = "table_" + seq.getAndIncrement();
+        this.keyColumns = ImmutableList.of(Pair.create("p", "int"));
+        this.primaryKey = keyColumns.stream().map(pair -> pair.left).collect(Collectors.joining(", "));
 
-        String tableOptions = "";
+        this.columns = columns;
+        this.columnNames = columns.stream().map(pair -> pair.left).collect(Collectors.joining(", "));
+        this.rows = rows;
 
-        List<Pair<String, String>> keyColumns;
-        String primaryKey;
-        List<String> keys;
+        this.keys = new SimplePrimaryKeyList(rows.size());
+    }
 
-        public BaseDataModel(List<Pair<String, String>> columns, List<String> rows)
+    public List<Pair<String, String>> keyColumns()
+    {
+        return keyColumns;
+    }
+
+    public void createTables(Executor tester)
+    {
+        String keyColumnDefs = keyColumns.stream().map(column -> column.left + ' ' + column.right).collect(Collectors.joining(", "));
+        String normalColumnDefs = columns.stream().map(column -> column.left + ' ' + column.right).collect(Collectors.joining(", "));
+
+        String template = "CREATE TABLE %s (%s, %s, PRIMARY KEY (%s))" + tableOptions;
+        tester.createTable(String.format(template, KEYSPACE + "." + indexedTable, keyColumnDefs, normalColumnDefs, primaryKey));
+        tester.createTable(String.format(template, KEYSPACE + "." + nonIndexedTable, keyColumnDefs, normalColumnDefs, primaryKey));
+    }
+
+    public void createIndexes(Executor tester) throws Throwable
+    {
+        String template = "CREATE CUSTOM INDEX ndi_%s_index_%s ON %%s (%s) USING 'StorageAttachedIndex'";
+
+        for (Pair<String, String> column : columns)
         {
-            this.keyColumns = ImmutableList.of(Pair.create("p", "int"));
-            this.primaryKey = keyColumns.stream().map(pair -> pair.left).collect(Collectors.joining(", "));
-
-            this.columns = columns;
-            this.columnNames = columns.stream().map(pair -> pair.left).collect(Collectors.joining(", "));
-            this.rows = rows;
-
-            this.keys = new SimplePrimaryKeyList(rows.size());
-        }
-
-        public String indexedTable()
-        {
-            return indexedTable;
-        }
-
-        public String nonIndexedTable()
-        {
-            return nonIndexedTable;
-        }
-
-        public DataModel withTableOptions(String tableOptions)
-        {
-            this.tableOptions = tableOptions;
-            return this;
-        }
-
-        public List<Pair<String, String>> keyColumns()
-        {
-            return keyColumns;
-        }
-
-        public void createTables(Executor tester)
-        {
-            String keyColumnDefs = keyColumns.stream().map(column -> column.left + ' ' + column.right).collect(Collectors.joining(", "));
-            String normalColumnDefs = columns.stream().map(column -> column.left + ' ' + column.right).collect(Collectors.joining(", "));
-
-            String template = "CREATE TABLE %s (%s, %s, PRIMARY KEY (%s))" + tableOptions;
-            tester.createTable(String.format(template, KEYSPACE + "." + indexedTable, keyColumnDefs, normalColumnDefs, primaryKey));
-            tester.createTable(String.format(template, KEYSPACE + "." + nonIndexedTable, keyColumnDefs, normalColumnDefs, primaryKey));
-        }
-
-        public void createIndexes(Executor tester) throws Throwable
-        {
-            String template = "CREATE CUSTOM INDEX ndi_%s_index_%s ON %%s (%s) USING 'StorageAttachedIndex'";
-
-            for (Pair<String, String> column : columns)
+            if (!skipColumns.contains(column.left))
             {
-                if (!skipColumns.contains(column.left))
-                {
-                    executeLocalIndexed(tester, String.format(template, column.left, indexedTable, column.left));
-                    tester.waitForIndexQueryable(KEYSPACE, indexedTable);
-                }
+                executeLocalIndexed(tester, String.format(template, column.left, indexedTable, column.left));
+                tester.waitForIndexQueryable(KEYSPACE, indexedTable);
             }
-        }
-
-        public void insertRows(Executor tester) throws Throwable
-        {
-            String template = "INSERT INTO %%s (%s, %s) VALUES (%s, %s)";
-
-            for (int i = 0; i < keys.size(); i++)
-            {
-                executeLocal(tester, String.format(template, primaryKey, columnNames, keys.get(i), rows.get(i)));
-            }
-        }
-
-        public void insertRowsWithTTL(Executor tester) throws Throwable
-        {
-            String template = "INSERT INTO %%s (%s, %s) VALUES (%s, %s)%s";
-
-            for (int i = 0; i < keys.size(); i++)
-            {
-                String ttl = deletable().contains(i) ? " USING TTL " + DEFAULT_TTL_SECONDS : "";
-                executeLocal(tester, String.format(template, primaryKey, columnNames, keys.get(i), rows.get(i), ttl));
-            }
-        }
-
-        public void executeLocal(Executor tester, String query, Object... values) throws Throwable
-        {
-            tester.executeLocal(formatIndexedQuery(query), values);
-            tester.executeLocal(formatNonIndexedQuery(query), values);
-        }
-
-        public void executeLocalIndexed(Executor tester, String query, Object... values) throws Throwable
-        {
-            tester.executeLocal(formatIndexedQuery(query), values);
-        }
-
-        public List<Object> executeIndexed(Executor tester, String query, int fetchSize, Object... values) throws Throwable
-        {
-            return tester.executeRemote(formatIndexedQuery(query), fetchSize, values);
-        }
-
-        public List<Object> executeNonIndexed(Executor tester, String query, int fetchSize, Object... values) throws Throwable
-        {
-            return tester.executeRemote(formatNonIndexedQuery(query), fetchSize, values);
-        }
-
-        protected Set<Integer> deletable()
-        {
-            return Sets.newHashSet(3, 7, 9, 12);
-        }
-
-        private String formatIndexedQuery(String query)
-        {
-            return indexedTable == null ? query : String.format(query, KEYSPACE + "." + indexedTable);
-        }
-
-        private String formatNonIndexedQuery(String query)
-        {
-            return nonIndexedTable == null ? query : String.format(query, KEYSPACE + "." + nonIndexedTable);
-        }
-
-        @Override
-        public String toString()
-        {
-            return MoreObjects.toStringHelper(this).add("primaryKey", primaryKey).toString();
         }
     }
 
-    public class CompoundKeyWithStaticsDataModel extends CompoundKeyDataModel
+    public void insertRows(Executor tester) throws Throwable
+    {
+        String template = "INSERT INTO %%s (%s, %s) VALUES (%s, %s)";
+
+        for (int i = 0; i < keys.size(); i++)
+        {
+            executeLocal(tester, String.format(template, primaryKey, columnNames, keys.get(i), rows.get(i)));
+        }
+    }
+
+    public void insertRowsWithTTL(Executor tester) throws Throwable
+    {
+        String template = "INSERT INTO %%s (%s, %s) VALUES (%s, %s)%s";
+
+        for (int i = 0; i < keys.size(); i++)
+        {
+            String ttl = deletable().contains(i) ? " USING TTL " + DEFAULT_TTL_SECONDS : "";
+            executeLocal(tester, String.format(template, primaryKey, columnNames, keys.get(i), rows.get(i), ttl));
+        }
+    }
+
+    public void executeLocal(Executor tester, String query, Object... values) throws Throwable
+    {
+        tester.executeLocal(formatIndexedQuery(query), values);
+        tester.executeLocal(formatNonIndexedQuery(query), values);
+    }
+
+    public void executeLocalIndexed(Executor tester, String query, Object... values) throws Throwable
+    {
+        tester.executeLocal(formatIndexedQuery(query), values);
+    }
+
+    public List<Object> executeIndexed(Executor tester, String query, int fetchSize, Object... values) throws Throwable
+    {
+        return tester.executeRemote(formatIndexedQuery(query), fetchSize, values);
+    }
+
+    public List<Object> executeNonIndexed(Executor tester, String query, int fetchSize, Object... values) throws Throwable
+    {
+        return tester.executeRemote(formatNonIndexedQuery(query), fetchSize, values);
+    }
+
+    protected Set<Integer> deletable()
+    {
+        return Sets.newHashSet(3, 7, 9, 12);
+    }
+
+    private String formatIndexedQuery(String query)
+    {
+        return String.format(query, KEYSPACE + "." + indexedTable);
+    }
+
+    private String formatNonIndexedQuery(String query)
+    {
+        return String.format(query, KEYSPACE + "." + nonIndexedTable);
+    }
+
+    @Override
+    public String toString()
+    {
+        return MoreObjects.toStringHelper(this).add("primaryKey", primaryKey).toString();
+    }
+
+    static class CompoundKeyWithStaticsDataModel extends CompoundKeyDataModel
     {
         public CompoundKeyWithStaticsDataModel(List<Pair<String, String>> columns, List<String> rows)
         {
@@ -300,7 +259,7 @@ public interface DataModel
         {
             super.insertRows(tester);
 
-            executeLocal(tester, String.format("INSERT INTO %%s (p, %s) VALUES(100, 2019)", DataModel.STATIC_INT_COLUMN)); // static only
+            executeLocal(tester, String.format("INSERT INTO %%s (p, %s) VALUES(100, 2019)", STATIC_INT_COLUMN)); // static only
         }
 
         @Override
@@ -310,7 +269,7 @@ public interface DataModel
         }
     }
 
-    public class CompositePartitionKeyDataModel extends BaseDataModel
+    static class CompositePartitionKeyDataModel extends BaseDataModel
     {
         public CompositePartitionKeyDataModel(List<Pair<String, String>> columns, List<String> rows)
         {
@@ -362,7 +321,7 @@ public interface DataModel
         }
     }
 
-    public class CompoundKeyDataModel extends BaseDataModel
+    static class CompoundKeyDataModel extends BaseDataModel
     {
         public CompoundKeyDataModel(List<Pair<String, String>> columns, List<String> rows)
         {
@@ -421,7 +380,7 @@ public interface DataModel
         }
     }
 
-    public static interface Executor
+    interface Executor
     {
         void createTable(String statement);
 

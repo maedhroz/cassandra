@@ -25,7 +25,7 @@ import com.datastax.driver.core.SimpleStatement;
 import org.apache.cassandra.index.sai.SAITester;
 import org.apache.cassandra.inject.Injections;
 
-public class SingleNodeExecutor implements DataModel.Executor
+public class SingleNodeExecutor implements BaseDataModel.Executor
 {
     private final SAITester tester;
     private final Injections.Counter counter;

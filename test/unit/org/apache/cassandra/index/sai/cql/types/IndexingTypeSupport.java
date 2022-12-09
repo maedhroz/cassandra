@@ -21,17 +21,26 @@ import java.util.Arrays;
 import java.util.Collection;
 
 import org.junit.Before;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
 import org.apache.cassandra.index.sai.SAITester;
 
+@RunWith(Parameterized.class)
 public abstract class IndexingTypeSupport extends SAITester
 {
     public static final int NUMBER_OF_VALUES = 64;
 
-    protected final DataSet<?> dataset;
+    @Parameterized.Parameter
+    public DataSet<?> dataset;
 
-    private final boolean widePartitions;
-    private final Scenario scenario;
+    @Parameterized.Parameter(1)
+    public boolean widePartitions;
+
+    @Parameterized.Parameter(2)
+    public Scenario scenario;
+
     private Object[][] allRows;
 
     public enum Scenario
@@ -48,13 +57,6 @@ public abstract class IndexingTypeSupport extends SAITester
         });
     }
 
-    public IndexingTypeSupport(DataSet<?> dataset, boolean widePartitions, Scenario scenario)
-    {
-        this.dataset = dataset;
-        this.widePartitions = widePartitions;
-        this.scenario = scenario;
-    }
-
     @Before
     public void createTable()
     {
@@ -67,7 +69,8 @@ public abstract class IndexingTypeSupport extends SAITester
         allRows = generateRows(dataset, widePartitions);
     }
 
-    protected void runIndexQueryScenarios() throws Throwable
+    @Test
+    public void runIndexQueryScenarios() throws Throwable
     {
         for (String index : dataset.decorateIndexColumn("value"))
             createIndex(String.format("CREATE CUSTOM INDEX ON %%s(%s) USING 'StorageAttachedIndex'", index));

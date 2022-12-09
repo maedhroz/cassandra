@@ -93,9 +93,9 @@ public class OperationTest extends IndexingSchemaLoader
 
         IndexingSchemaLoader.createKeyspace(KS_NAME,
                                             KeyspaceParams.simpleTransient(1),
-                                            IndexingSchemaLoader.ndiCFMD(KS_NAME, CF_NAME),
-                                            IndexingSchemaLoader.clusteringNDICFMD(KS_NAME, CLUSTERING_CF_NAME),
-                                            IndexingSchemaLoader.staticNDICFMD(KS_NAME, STATIC_CF_NAME));
+                                            IndexingSchemaLoader.skinnySAITableMetadata(KS_NAME, CF_NAME),
+                                            IndexingSchemaLoader.clusteringSAITableMetadata(KS_NAME, CLUSTERING_CF_NAME),
+                                            IndexingSchemaLoader.staticSAITableMetadata(KS_NAME, STATIC_CF_NAME));
 
         BACKEND = Keyspace.open(KS_NAME).getColumnFamilyStore(CF_NAME);
         CLUSTERING_BACKEND = Keyspace.open(KS_NAME).getColumnFamilyStore(CLUSTERING_CF_NAME);

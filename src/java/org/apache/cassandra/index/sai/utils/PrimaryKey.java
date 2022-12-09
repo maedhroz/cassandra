@@ -17,61 +17,50 @@
  */
 package org.apache.cassandra.index.sai.utils;
 
+import java.util.Arrays;
+import java.util.Objects;
+import java.util.stream.Collectors;
+
 import org.apache.cassandra.db.Clustering;
 import org.apache.cassandra.db.ClusteringComparator;
 import org.apache.cassandra.db.DecoratedKey;
 import org.apache.cassandra.dht.Token;
+import org.apache.cassandra.utils.ByteBufferUtil;
 import org.apache.cassandra.utils.bytecomparable.ByteComparable;
 import org.apache.cassandra.utils.bytecomparable.ByteSource;
 
 /**
  * Representation of the primary key for a row consisting of the {@link DecoratedKey} and
  * {@link Clustering} associated with a {@link org.apache.cassandra.db.rows.Row}.
- *
- * For legacy V1 support only the {@link DecoratedKey} will ever be supported for a row.
- *
- * For the V2 on-disk format the {@link DecoratedKey} and {@link Clustering} are supported.
- *
  */
-public interface PrimaryKey extends Comparable<PrimaryKey>
+public class PrimaryKey implements Comparable<PrimaryKey>
 {
-    /**
-     * A factory for creating {@link PrimaryKey} instances
-     */
-    interface Factory
-    {
-        /**
-         * Creates a {@link PrimaryKey} that is represented by a {@link Token}.
-         *
-         * {@link Token} only primary keys are used for defining the partition range
-         * of a query.
-         *
-         * @param token the {@link Token}
-         * @return a {@link PrimaryKey} represented by a token only
-         */
-        PrimaryKey createTokenOnly(Token token);
+    private final Token token;
+    private final DecoratedKey partitionKey;
+    private final Clustering clustering;
+    private final ClusteringComparator clusteringComparator;
 
-        /**
-         * Creates a {@link PrimaryKey} that is fully represented by partition key
-         * and clustering.
-         *
-         * @param partitionKey the {@link DecoratedKey}
-         * @param clustering the {@link Clustering}
-         * @return a {@link PrimaryKey} contain the partition key and clustering
-         */
-        PrimaryKey create(DecoratedKey partitionKey, Clustering clustering);
+    public PrimaryKey(Token token,
+                      DecoratedKey partitionKey,
+                      Clustering clustering,
+                      ClusteringComparator clusteringComparator)
+    {
+        this.token = token;
+        this.partitionKey = partitionKey;
+        this.clustering = clustering;
+        this.clusteringComparator = clusteringComparator;
     }
 
     /**
-     * Returns a {@link Factory} for creating {@link PrimaryKey} instances.
+     * Returns a {@link PrimaryKeyFactory} for creating {@link PrimaryKey} instances.
      *
      * @param clusteringComparator the {@link ClusteringComparator} used by the
-     *                             {@link RowAwarePrimaryKeyFactory} for clustering comparisons
-     * @return a {@link Factory} for {@link PrimaryKey} creation
+     *                             {@link PrimaryKeyFactory} for clustering comparisons
+     * @return a {@link PrimaryKeyFactory} for {@link PrimaryKey} creation
      */
-    static Factory factory(ClusteringComparator clusteringComparator)
+    public static PrimaryKeyFactory factory(ClusteringComparator clusteringComparator)
     {
-        return new RowAwarePrimaryKeyFactory(clusteringComparator);
+        return new PrimaryKeyFactory(clusteringComparator);
     }
 
     /**
@@ -79,32 +68,29 @@ public interface PrimaryKey extends Comparable<PrimaryKey>
      *
      * @return the {@link Token}
      */
-    Token token();
+    public Token token()
+    {
+        return token;
+    }
 
     /**
      * Returns the {@link DecoratedKey} associated with this primary key.
      *
      * @return the {@link DecoratedKey}
      */
-    DecoratedKey partitionKey();
+    public DecoratedKey partitionKey()
+    {
+        return partitionKey;
+    }
 
     /**
      * Returns the {@link Clustering} associated with this primary key
      *
      * @return the {@link Clustering}
      */
-    Clustering clustering();
-
-    /**
-     * Return whether the primary key has an empty clustering or not.
-     * By default the clustering is empty if the internal clustering
-     * is null or is empty.
-     *
-     * @return {@code true} if the clustering is empty, otherwise {@code false}
-     */
-    default boolean hasEmptyClustering()
+    public Clustering clustering()
     {
-        return clustering() == null || clustering().isEmpty();
+        return clustering;
     }
 
     /**
@@ -117,5 +103,82 @@ public interface PrimaryKey extends Comparable<PrimaryKey>
      * @param version the {@link ByteComparable.Version} to use for the implementation
      * @return the {@code ByteSource} byte comparable.
      */
-    ByteSource asComparableBytes(ByteComparable.Version version);
+    public ByteSource asComparableBytes(ByteComparable.Version version)
+    {
+        ByteSource tokenComparable = token.asComparableBytes(version);
+        ByteSource keyComparable = partitionKey == null ? null
+                                                        : ByteSource.of(partitionKey.getKey(), version);
+        // It is important that the ClusteringComparator.asBytesComparable method is used
+        // to maintain the correct clustering sort order
+        ByteSource clusteringComparable = clusteringComparator.size() == 0 ||
+                                          clustering == null ||
+                                          clustering.isEmpty() ? null
+                                                               : clusteringComparator.asByteComparable(clustering)
+                                                                                     .asComparableBytes(version);
+        return ByteSource.withTerminator(version == ByteComparable.Version.LEGACY
+                                         ? ByteSource.END_OF_STREAM
+                                         : ByteSource.TERMINATOR,
+                                         tokenComparable,
+                                         keyComparable,
+                                         clusteringComparable);
+    }
+
+    @Override
+    public int compareTo(PrimaryKey o)
+    {
+        int cmp = token().compareTo(o.token());
+
+        // If the tokens don't match then we don't need to compare any more of the key.
+        // Otherwise if it's partition key is null or the other partition key is null
+        // then one or both of the keys are token only so we can only compare tokens
+        if ((cmp != 0) || (partitionKey == null) || o.partitionKey() == null)
+            return cmp;
+
+        // Next compare the partition keys. If they are not equal or
+        // this is a single row partition key or there are no
+        // clusterings then we can return the result of this without
+        // needing to compare the clusterings
+        cmp = partitionKey().compareTo(o.partitionKey());
+        if (cmp != 0 || hasEmptyClustering() || o.hasEmptyClustering())
+            return cmp;
+        return clusteringComparator.compare(clustering(), o.clustering());
+    }
+
+    /**
+     * Return whether the primary key has an empty clustering or not.
+     * By default the clustering is empty if the internal clustering
+     * is null or is empty.
+     *
+     * @return {@code true} if the clustering is empty, otherwise {@code false}
+     */
+    public boolean hasEmptyClustering()
+    {
+        return clustering() == null || clustering().isEmpty();
+    }
+
+    @Override
+    public int hashCode()
+    {
+        return Objects.hash(token, partitionKey, clustering, clusteringComparator);
+    }
+
+    @Override
+    public boolean equals(Object obj)
+    {
+        if (obj instanceof PrimaryKey)
+            return compareTo((PrimaryKey)obj) == 0;
+        return false;
+    }
+
+    @Override
+    public String toString()
+    {
+        return String.format("RowAwarePrimaryKey: { token: %s, partition: %s, clustering: %s:%s} ",
+                             token,
+                             partitionKey,
+                             clustering == null ? null : clustering.kind(),
+                             clustering == null ? null :String.join(",", Arrays.stream(clustering.getBufferArray())
+                                                                               .map(ByteBufferUtil::bytesToHex)
+                                                                               .collect(Collectors.toList())));
+    }
 }

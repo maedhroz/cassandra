@@ -23,6 +23,7 @@ import java.util.List;
 
 import com.google.common.collect.Lists;
 
+import org.apache.cassandra.cql3.statements.schema.IndexTarget;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.DataRange;
 import org.apache.cassandra.db.DecoratedKey;
@@ -112,7 +113,16 @@ public class QueryController
     {
         StorageAttachedIndex index = getBestIndexFor(expression);
 
-        return index != null ? index.getIndexContext() : new IndexContext(cfs.metadata(), expression.column());
+        if (index != null)
+            return index.getIndexContext();
+
+        return new IndexContext(cfs.metadata().keyspace,
+                                cfs.metadata().name,
+                                cfs.metadata().partitionKeyType,
+                                cfs.metadata().comparator,
+                                expression.column(),
+                                IndexTarget.Type.VALUES,
+                                null);
     }
 
     public StorageAttachedIndex getBestIndexFor(RowFilter.Expression expression)
@@ -144,15 +154,14 @@ public class QueryController
     }
 
     /**
-     * Build a {@link RangeIterator.Builder} from the given list of expressions by applying given operation (OR/AND).
+     * Build a {@link RangeIterator.Builder} from the given list of expressions by applying given operation (AND).
      * Building of such builder involves index search, results of which are persisted in the internal resources list
      *
-     * @param op The operation type to coalesce expressions with.
      * @param expressions The expressions to build range iterator from (expressions with not results are ignored).
      *
      * @return range iterator builder based on given expressions and operation type.
      */
-    public RangeIterator.Builder getIndexes(Operation.OperationType op, Collection<Expression> expressions)
+    public RangeIterator.Builder getIndexes(Collection<Expression> expressions)
     {
         RangeIterator.Builder builder = RangeIntersectionIterator.selectiveBuilder();
 

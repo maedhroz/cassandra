@@ -38,7 +38,7 @@ public class SaiRandomizedTest extends RandomizedTest
 
     @SuppressWarnings("unused")
     @BeforeClass
-    private static void saveUncaughtExceptionHandler()
+    public static void saveUncaughtExceptionHandler()
     {
         handler = Thread.getDefaultUncaughtExceptionHandler();
         DatabaseDescriptor.daemonInitialization();
@@ -46,7 +46,7 @@ public class SaiRandomizedTest extends RandomizedTest
 
     @SuppressWarnings("unused")
     @AfterClass
-    private static void restoreUncaughtExceptionHandler()
+    public static void restoreUncaughtExceptionHandler()
     {
         Thread.setDefaultUncaughtExceptionHandler(handler);
     }

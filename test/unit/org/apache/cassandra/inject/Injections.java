@@ -35,7 +35,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
-import com.google.common.base.Preconditions;
 import com.google.common.collect.Lists;
 import org.apache.commons.io.IOUtils;
 
@@ -188,9 +187,6 @@ public class Injections
          * Adds a new action to the injection. Adding a new action cause creation of a new rule because a single rule
          * can only have a single action. Do not confuse an action with a statement - an action is bundle of bindings,
          * condition under which it can be invoked and a sequence of statements.
-         *
-         * If you just need to add a statement to the existing action, see {@link #withLastActionBuilder(Consumer)} and
-         * {@link #lastActionBuilder()}.
          */
         public B add(ActionBuilder builder)
         {
@@ -209,28 +205,6 @@ public class Injections
         public B add(ActionBuilder.Builder builder)
         {
             return add(builder.toActionBuilder());
-        }
-
-        /**
-         * Allows to modify the last defined action. You can add new bindings, conditions and statements. If you need
-         * to create a new action, please see {@link #add(ActionBuilder)}.
-         */
-        public ActionBuilder lastActionBuilder()
-        {
-            Preconditions.checkState(!actionBuilders.isEmpty());
-            ActionBuilder ab = actionBuilders.getLast();
-            return ab;
-        }
-
-        /**
-         * @see #lastActionBuilder()
-         */
-        public B withLastActionBuilder(Consumer<ActionBuilder> builder)
-        {
-            Preconditions.checkState(!actionBuilders.isEmpty());
-            ActionBuilder ab = actionBuilders.getLast();
-            builder.accept(ab);
-            return (B) this;
         }
     }
 
@@ -251,7 +225,7 @@ public class Injections
      */
     public static class Counter extends Injection
     {
-        private static Map<String, AtomicLong> counters = new ConcurrentHashMap<>();
+        private static final Map<String, AtomicLong> counters = new ConcurrentHashMap<>();
         private final String name;
         private final AtomicLong internalCounter;
 
@@ -291,7 +265,7 @@ public class Injections
 
             private CounterBuilder(String name)
             {
-                super(String.format("counter/%s/%s", name, UUID.randomUUID().toString()));
+                super(String.format("counter/%s/%s", name, UUID.randomUUID()));
                 this.name = name;
                 add(newActionBuilder().actions().doAction(method(Counter.class, CallMe.class).args(quote(name))));
             }
@@ -347,7 +321,7 @@ public class Injections
      */
     public static class Barrier extends Injection
     {
-        private static Map<String, CyclicBarrier> barriers = new ConcurrentHashMap<>();
+        private static final Map<String, CyclicBarrier> barriers = new ConcurrentHashMap<>();
         private final boolean doCountDown;
         private final boolean doAwait;
         private final CyclicBarrier internalBarrier;
@@ -464,7 +438,7 @@ public class Injections
      */
     public static class Times extends Injection
     {
-        private static Map<String, AtomicLong> counters = new ConcurrentHashMap<>();
+        private static final Map<String, AtomicLong> counters = new ConcurrentHashMap<>();
         private final AtomicLong internalCounter;
         private final int defaultTimes;
 
@@ -515,7 +489,7 @@ public class Injections
 
             private TimesBuilder(String name, int defaultTimes)
             {
-                super(String.format("times/%s/%s", name, UUID.randomUUID().toString()));
+                super(String.format("times/%s/%s", name, UUID.randomUUID()));
                 this.name = name;
                 this.defaultTimes = defaultTimes;
             }
@@ -547,6 +521,7 @@ public class Injections
             actionBuilder.conditions().when(getIsEnabledExpression());
         }
 
+        @SuppressWarnings("unchecked")
         public B action(Consumer<ActionBuilder> builder)
         {
             builder.accept(actionBuilder);
@@ -579,7 +554,7 @@ public class Injections
     {
         public CustomBuilder(String name)
         {
-            super(String.format("custom/%s/%s", name, UUID.randomUUID().toString()));
+            super(String.format("custom/%s/%s", name, UUID.randomUUID()));
         }
 
         /**
@@ -607,7 +582,7 @@ public class Injections
     {
         public PauseBuilder(String name, long timeout)
         {
-            super(String.format("pause/%s/%s", name, UUID.randomUUID().toString()));
+            super(String.format("pause/%s/%s", name, UUID.randomUUID()));
             actionBuilder.actions().doAction(expr("Thread.sleep").args(timeout));
         }
 

@@ -25,14 +25,13 @@ import org.apache.cassandra.db.marshal.DoubleType;
 import org.apache.cassandra.db.marshal.Int32Type;
 import org.apache.cassandra.db.marshal.LongType;
 import org.apache.cassandra.db.marshal.UTF8Type;
-import org.apache.cassandra.db.marshal.UUIDType;
 import org.apache.cassandra.schema.IndexMetadata;
 import org.apache.cassandra.schema.Indexes;
 import org.apache.cassandra.schema.TableMetadata;
 
 public class IndexingSchemaLoader extends SchemaLoader
 {
-    public static TableMetadata.Builder ndiCFMD(String ksName, String cfName)
+    public static TableMetadata.Builder skinnySAITableMetadata(String ksName, String cfName)
     {
         TableMetadata.Builder builder =
                 TableMetadata.builder(ksName, cfName)
@@ -115,12 +114,12 @@ public class IndexingSchemaLoader extends SchemaLoader
         return builder.indexes(indexes.build());
     }
 
-    public static TableMetadata.Builder clusteringNDICFMD(String ksName, String cfName)
+    public static TableMetadata.Builder clusteringSAITableMetadata(String ksName, String cfName)
     {
-        return clusteringNDICFMD(ksName, cfName, "location", "age", "height", "score");
+        return clusteringSAITableMetadata(ksName, cfName, "location", "age", "height", "score");
     }
 
-    public static TableMetadata.Builder clusteringNDICFMD(String ksName, String cfName, String...indexedColumns)
+    public static TableMetadata.Builder clusteringSAITableMetadata(String ksName, String cfName, String...indexedColumns)
     {
         Indexes.Builder indexes = Indexes.builder();
         for (String indexedColumn : indexedColumns)
@@ -142,7 +141,7 @@ public class IndexingSchemaLoader extends SchemaLoader
                             .indexes(indexes.build());
     }
 
-    public static TableMetadata.Builder staticNDICFMD(String ksName, String cfName)
+    public static TableMetadata.Builder staticSAITableMetadata(String ksName, String cfName)
     {
         TableMetadata.Builder builder =
                 TableMetadata.builder(ksName, cfName)
@@ -171,33 +170,6 @@ public class IndexingSchemaLoader extends SchemaLoader
         {{
             put(IndexTarget.CUSTOM_INDEX_OPTION_NAME, StorageAttachedIndex.class.getName());
             put(IndexTarget.TARGET_OPTION_NAME, "variance");
-        }}));
-
-        return builder.indexes(indexes.build());
-    }
-
-    public static TableMetadata.Builder fullTextSearchNDICFMD(String ksName, String cfName)
-    {
-        TableMetadata.Builder builder =
-                TableMetadata.builder(ksName, cfName)
-                             .addPartitionKeyColumn("song_id", UUIDType.instance)
-                             .addRegularColumn("title", UTF8Type.instance)
-                             .addRegularColumn("artist", UTF8Type.instance);
-
-        Indexes.Builder indexes = Indexes.builder();
-
-        indexes.add(IndexMetadata.fromSchemaMetadata(cfName + "_title", IndexMetadata.Kind.CUSTOM, new HashMap<String, String>()
-        {{
-            put(IndexTarget.CUSTOM_INDEX_OPTION_NAME, StorageAttachedIndex.class.getName());
-            put(IndexTarget.TARGET_OPTION_NAME, "title");
-        }}));
-
-        indexes.add(IndexMetadata.fromSchemaMetadata(cfName + "_artist", IndexMetadata.Kind.CUSTOM, new HashMap<String, String>()
-        {{
-            put(IndexTarget.CUSTOM_INDEX_OPTION_NAME, StorageAttachedIndex.class.getName());
-            put(IndexTarget.TARGET_OPTION_NAME, "artist");
-            put("case_sensitive", "false");
-
         }}));
 
         return builder.indexes(indexes.build());

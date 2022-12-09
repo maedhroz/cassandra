@@ -56,7 +56,6 @@ public class Operation
     }
 
     @VisibleForTesting
-    @SuppressWarnings("resource")
     protected static ListMultimap<ColumnMetadata, Expression> analyzeGroup(QueryController controller,
                                                                            OperationType op,
                                                                            List<RowFilter.Expression> expressions)
@@ -76,8 +75,7 @@ public class Operation
             IndexContext indexContext = controller.getContext(e);
             List<Expression> perColumn = analyzed.get(e.column());
 
-            AbstractAnalyzer.AnalyzerFactory analyzerFactory = indexContext.getQueryAnalyzerFactory();
-            AbstractAnalyzer analyzer = analyzerFactory.create();
+            AbstractAnalyzer analyzer = indexContext.getQueryAnalyzerFactory().create();
             try
             {
                 analyzer.reset(e.getIndexValue().duplicate());
@@ -185,7 +183,7 @@ public class Operation
 
         boolean canFilter()
         {
-            return (expressionMap != null && !expressionMap.isEmpty()) || !children().isEmpty() ;
+            return (expressionMap != null && !expressionMap.isEmpty()) || !children().isEmpty();
         }
 
         List<Node> children()
@@ -289,7 +287,7 @@ public class Operation
         @Override
         RangeIterator rangeIterator(QueryController controller)
         {
-            RangeIterator.Builder builder = controller.getIndexes(OperationType.AND, expressionMap.values());
+            RangeIterator.Builder builder = controller.getIndexes(expressionMap.values());
             for (Node child : children)
             {
                 boolean canFilter = child.canFilter();
@@ -331,7 +329,7 @@ public class Operation
         RangeIterator rangeIterator(QueryController controller)
         {
             assert canFilter();
-            return controller.getIndexes(OperationType.AND, expressionMap.values()).build();
+            return controller.getIndexes(expressionMap.values()).build();
         }
     }
 }

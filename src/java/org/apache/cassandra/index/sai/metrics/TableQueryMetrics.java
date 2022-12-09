@@ -44,7 +44,7 @@ public class TableQueryMetrics extends AbstractMetrics
 
     public TableQueryMetrics(TableMetadata table)
     {
-        super(table, TABLE_QUERY_METRIC_TYPE);
+        super(table.keyspace, table.name, TABLE_QUERY_METRIC_TYPE);
 
         perQueryMetrics = new PerQueryMetrics(table);
 
@@ -84,7 +84,7 @@ public class TableQueryMetrics extends AbstractMetrics
 
         public PerQueryMetrics(TableMetadata table)
         {
-            super(table, "PerQuery");
+            super(table.keyspace, table.name, "PerQuery");
 
             queryLatency = Metrics.timer(createMetricName("QueryLatency"));
 

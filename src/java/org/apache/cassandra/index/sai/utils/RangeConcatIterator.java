@@ -112,16 +112,13 @@ public class RangeConcatIterator extends RangeIterator
             super(IteratorType.CONCAT);
         }
 
+        @Override
         protected RangeIterator buildIterator()
         {
-            switch (rangeCount())
-            {
-                case 1:
-                    return ranges.poll();
+            if (rangeCount() == 1)
+                return ranges.poll();
 
-                default:
-                    return new RangeConcatIterator(statistics, ranges);
-            }
+            return new RangeConcatIterator(statistics, ranges);
         }
     }
 }

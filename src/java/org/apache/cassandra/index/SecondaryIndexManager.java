@@ -50,7 +50,6 @@ import org.apache.cassandra.concurrent.ExecutorPlus;
 import org.apache.cassandra.concurrent.FutureTask;
 import org.apache.cassandra.concurrent.ImmediateExecutor;
 import org.apache.cassandra.config.DatabaseDescriptor;
-import org.apache.cassandra.cql3.statements.schema.IndexTarget;
 import org.apache.cassandra.db.*;
 import org.apache.cassandra.db.compaction.CompactionManager;
 import org.apache.cassandra.db.filter.ClusteringIndexSliceFilter;
@@ -146,7 +145,9 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
     // default page size (in rows) when rebuilding the index for a whole partition
     public static final int DEFAULT_PAGE_SIZE = 10000;
 
-    // store per-endpoint index status: the key of inner map is identifier "keyspace.index"
+    /**
+     * A map of per-endpoint index statuses: the key of inner map is the identifier "keyspace.index"
+     */
     public static final Map<InetAddressAndPort, Map<String, Index.Status>> peerIndexStatus = new ConcurrentHashMap<>();
 
     // executes index status propagation task asynchronously to avoid potential deadlock on SIM
@@ -670,8 +671,7 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
      * @param isNewCF {@code true} if this method is invoked when initializing a new table/columnfamily (i.e. loading a CF at startup),
      * {@code false} for all other cases (i.e. newly added index)
      */
-    @VisibleForTesting
-    public synchronized void markIndexesBuilding(Set<Index> indexes, boolean isFullRebuild, boolean isNewCF)
+    private synchronized void markIndexesBuilding(Set<Index> indexes, boolean isFullRebuild, boolean isNewCF)
     {
         String keyspaceName = baseCfs.keyspace.getName();
 
@@ -798,8 +798,8 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
         if (indexDef.isCustom())
         {
             assert indexDef.options != null;
-            // Find any aliases to the fully qualified index class name:
-            String className = IndexMetadata.expandAliases(indexDef.options.get(IndexTarget.CUSTOM_INDEX_OPTION_NAME));
+            // Get the fully qualified index class name from the index metadata
+            String className = indexDef.getIndexClassName();
             assert !Strings.isNullOrEmpty(className);
 
             try
@@ -1873,8 +1873,7 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
         return delta;
     }
 
-    @VisibleForTesting
-    public synchronized static void propagateLocalIndexStatus(String keyspace, String index, Index.Status status)
+    private synchronized static void propagateLocalIndexStatus(String keyspace, String index, Index.Status status)
     {
         try
         {

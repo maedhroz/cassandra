@@ -17,8 +17,6 @@
  */
 package org.apache.cassandra.index.sai.plan;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
@@ -63,7 +61,6 @@ public class StorageAttachedIndexQueryPlan implements Index.QueryPlan
                                                        RowFilter rowFilter)
     {
         ImmutableSet.Builder<Index> selectedIndexesBuilder = ImmutableSet.builder();
-        List<RowFilter.Expression> acceptedExpressions = new ArrayList<>();
 
         for (RowFilter.Expression expression : rowFilter)
         {
@@ -72,7 +69,6 @@ public class StorageAttachedIndexQueryPlan implements Index.QueryPlan
             if (expression.isUserDefined())
                 continue;
 
-            acceptedExpressions.add(expression);
             for (StorageAttachedIndex index : indexes)
             {
                 if (index.supportsExpression(expression.column(), expression.operator()))
@@ -91,7 +87,7 @@ public class StorageAttachedIndexQueryPlan implements Index.QueryPlan
          * {@link FilterTree#satisfiedBy(Unfiltered, Row, boolean)}. That includes expressions targeted
          * at {@link RowFilter.UserExpression}s like those used by RLAC.
          */
-        RowFilter postIndexFilter = rowFilter.restrict(e -> e.isUserDefined());
+        RowFilter postIndexFilter = rowFilter.restrict(RowFilter.Expression::isUserDefined);
         return new StorageAttachedIndexQueryPlan(cfs, queryMetrics, postIndexFilter, rowFilter, selectedIndexes);
     }
 

@@ -80,10 +80,10 @@ public class FilterTree
         boolean result = op == OperationType.AND;
 
         Iterator<ColumnMetadata> columnIterator = expressions.keySet().iterator();
-        while(columnIterator.hasNext())
+        while (columnIterator.hasNext())
         {
             ColumnMetadata column = columnIterator.next();
-            Row row = column.kind == Kind.STATIC ? staticRow : (Row)currentCluster;
+            Row row = column.kind == Kind.STATIC ? staticRow : (Row) currentCluster;
 
             // If there is a column with multiple expressions that can mean an OR or (in the case of map
             // collections) it can mean different map indexes.
@@ -92,7 +92,7 @@ public class FilterTree
             // We do a reverse iteration over the filters because NOT_EQ operations will be at the end
             // of the filter list and we want to check them first.
             ListIterator<Expression> filterIterator = filters.listIterator(filters.size());
-            while(filterIterator.hasPrevious())
+            while (filterIterator.hasPrevious())
             {
                 Expression filter = filterIterator.previous();
 
@@ -130,6 +130,7 @@ public class FilterTree
             ByteBuffer value = valueIterator.next();
             if (value == null)
                 continue;
+
             if (filter.isSatisfiedBy(value))
                 return true;
         }

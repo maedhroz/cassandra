@@ -33,7 +33,7 @@ import org.apache.cassandra.index.sai.cql.types.InetTest;
 public class InetAddressTypeEquivalencyTest extends SAITester
 {
     @Before
-    public void createTableAndIndex() throws Throwable
+    public void createTableAndIndex()
     {
         requireNetwork();
 

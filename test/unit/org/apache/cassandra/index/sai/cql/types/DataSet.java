@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
@@ -53,7 +54,7 @@ public abstract class DataSet<T> extends SAITester
 
     public Collection<String> decorateIndexColumn(String column)
     {
-        return Arrays.asList(column);
+        return Collections.singletonList(column);
     }
 
     public static abstract class NumericDataSet<T extends Number> extends DataSet<T>
@@ -65,14 +66,13 @@ public abstract class DataSet<T> extends SAITester
             for (int index = 0; index < values.length; index += 2)
             {
                 T value1, value2;
-                while (true)
+                do
                 {
                     value1 = nextValue();
                     value1 = getRandom().nextBoolean() ? negate(value1) : abs(value1);
                     value2 = increment(value1);
-                    if (!list.contains(value1) && !list.contains(value2))
-                        break;
                 }
+                while (list.contains(value1) || list.contains(value2));
                 values[index] = value1;
                 values[index + 1] = value2;
             }
@@ -409,12 +409,11 @@ public abstract class DataSet<T> extends SAITester
             for (int index = 0; index < values.length; index++)
             {
                 String value;
-                while (true)
+                do
                 {
                     value = getRandom().nextAsciiString(8, 256);
-                    if (!list.contains(value))
-                        break;
                 }
+                while (list.contains(value));
                 values[index] = value;
             }
         }
@@ -463,12 +462,11 @@ public abstract class DataSet<T> extends SAITester
             for (int index = 0; index < values.length; index++)
             {
                 String value;
-                while (true)
+                do
                 {
                     value = getRandom().nextTextString(8, 256);
-                    if (!list.contains(value))
-                        break;
                 }
+                while (list.contains(value));
                 values[index] = value;
             }
         }
@@ -497,13 +495,12 @@ public abstract class DataSet<T> extends SAITester
 
             for (int index = 0; index < values.length; index++)
             {
-                Integer value;
-                while (true)
+                int value;
+                do
                 {
                     value = SimpleDateSerializer.timeInMillisToDay(min + Math.round(getRandom().nextDouble() * range));
-                    if (!list.contains(value))
-                        break;
                 }
+                while (list.contains(value));
                 values[index] = value;
             }
         }
@@ -529,16 +526,15 @@ public abstract class DataSet<T> extends SAITester
             for (int index = 0; index < values.length; index++)
             {
                 Long value;
-                while (true)
+                do
                 {
                     int hours = getRandom().nextIntBetween(0, 23);
                     int minutes = getRandom().nextIntBetween(0, 59);
                     int seconds = getRandom().nextIntBetween(0, 59);
                     long nanos = getRandom().nextIntBetween(0, 1000000000);
                     value = TimeSerializer.timeStringToLong(String.format("%s:%s:%s.%s", hours, minutes, seconds, nanos));
-                    if (!list.contains(value))
-                        break;
                 }
+                while (list.contains(value));
                 values[index] = value;
             }
             Arrays.sort(values);
@@ -569,12 +565,11 @@ public abstract class DataSet<T> extends SAITester
             for (int index = 0; index < values.length; index++)
             {
                 Date value;
-                while (true)
+                do
                 {
                     value = Date.from(Instant.ofEpochSecond(min + Math.round(getRandom().nextDouble() * range)));
-                    if (!list.contains(value))
-                        break;
                 }
+                while (list.contains(value));
                 values[index] = value;
             }
         }
@@ -601,12 +596,11 @@ public abstract class DataSet<T> extends SAITester
             for (int index = 0; index < values.length; index++)
             {
                 UUID value;
-                while (true)
+                do
                 {
                     value = UUID.randomUUID();
-                    if (!list.contains(value))
-                        break;
                 }
+                while (list.contains(value));
                 values[index] = value;
             }
         }
@@ -633,12 +627,11 @@ public abstract class DataSet<T> extends SAITester
             for (int index = 0; index < values.length; index++)
             {
                 TimeUUID value;
-                while (true)
+                do
                 {
                     value = TimeUUID.Generator.nextTimeUUID();
-                    if (!list.contains(value))
-                        break;
                 }
+                while (list.contains(value));
                 values[index] = value;
             }
         }
@@ -665,7 +658,7 @@ public abstract class DataSet<T> extends SAITester
             for (int index = 0; index < values.length; index++)
             {
                 InetAddress value;
-                while (true)
+                do
                 {
                     byte[] bytes;
                     if (getRandom().nextBoolean())
@@ -681,16 +674,13 @@ public abstract class DataSet<T> extends SAITester
                     {
                         throw new RuntimeException(e);
                     }
-                    if (!list.contains(value))
-                        break;
                 }
+                while (list.contains(value));
                 values[index] = value;
             }
-            Arrays.sort(values, (o1, o2) -> {
-                return TypeUtil.compare(TypeUtil.encode(ByteBuffer.wrap(o1.getAddress()), InetAddressType.instance),
-                                        TypeUtil.encode(ByteBuffer.wrap(o2.getAddress()), InetAddressType.instance),
-                                        InetAddressType.instance);
-            });
+            Arrays.sort(values, (o1, o2) -> TypeUtil.compare(TypeUtil.encode(ByteBuffer.wrap(o1.getAddress()), InetAddressType.instance),
+                                                             TypeUtil.encode(ByteBuffer.wrap(o2.getAddress()), InetAddressType.instance),
+                                                             InetAddressType.instance));
         }
 
         @Override

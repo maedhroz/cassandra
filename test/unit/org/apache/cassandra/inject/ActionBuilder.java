@@ -207,7 +207,7 @@ public class ActionBuilder
             }
             else
             {
-                return String.format("DO %s", actions.stream().collect(Collectors.joining(";\n")));
+                return String.format("DO %s", String.join(";\n", actions));
             }
         }
     }

@@ -23,6 +23,8 @@ import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 
+import javax.annotation.Nullable;
+
 import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.cassandra.db.ConsistencyLevel;
@@ -50,7 +52,7 @@ class ReplicaPlanIterator extends AbstractIterator<ReplicaPlan.ForRangeRead>
     private final int rangeCount;
 
     ReplicaPlanIterator(AbstractBounds<PartitionPosition> keyRange,
-                        Index.QueryPlan indexQueryPlan,
+                        @Nullable Index.QueryPlan indexQueryPlan,
                         Keyspace keyspace,
                         ConsistencyLevel consistency)
     {

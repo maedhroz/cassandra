@@ -51,7 +51,7 @@ public class LuceneAnalyzerTest extends SAITester
     }
 
     @Test
-    public void testBogusAnalyzer() throws Throwable
+    public void testBogusAnalyzer()
     {
         createTable("CREATE TABLE %s (id text PRIMARY KEY, val text)");
 
@@ -61,7 +61,7 @@ public class LuceneAnalyzerTest extends SAITester
     }
 
     @Test
-    public void testStopFilter() throws Throwable
+    public void testStopFilter()
     {
         createTable("CREATE TABLE %s (id text PRIMARY KEY, val text)");
 

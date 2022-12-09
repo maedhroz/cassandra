@@ -18,7 +18,6 @@
 
 package org.apache.cassandra.index.sai.analyzer;
 
-import java.io.Closeable;
 import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.Map;
@@ -87,7 +86,7 @@ public abstract class AbstractAnalyzer implements Iterator<ByteBuffer>
        return options.containsKey(LuceneAnalyzer.QUERY_ANALYZER);
     }
 
-    public interface AnalyzerFactory extends Closeable
+    public interface AnalyzerFactory
     {
         AbstractAnalyzer create();
 

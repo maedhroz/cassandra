@@ -20,7 +20,6 @@ package org.apache.cassandra.index.sai.metrics;
 import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Timer;
 import org.apache.cassandra.index.sai.IndexContext;
-import org.apache.cassandra.schema.TableMetadata;
 
 import static org.apache.cassandra.metrics.CassandraMetricsRegistry.Metrics;
 
@@ -30,9 +29,9 @@ public class IndexMetrics extends AbstractMetrics
     public final Gauge liveMemtableIndexWriteCount;
     public final Gauge memtableIndexBytes;
 
-    public IndexMetrics(IndexContext context, TableMetadata table)
+    public IndexMetrics(IndexContext context)
     {
-        super(table, context.getIndexName(), "IndexMetrics");
+        super(context.getKeyspace(), context.getTable(), context.getIndexName(), "IndexMetrics");
 
         memtableIndexWriteLatency = Metrics.timer(createMetricName("MemtableIndexWriteLatency"));
         liveMemtableIndexWriteCount = Metrics.register(createMetricName("LiveMemtableIndexWriteCount"), context::liveMemtableWriteCount);

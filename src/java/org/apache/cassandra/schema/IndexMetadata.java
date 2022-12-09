@@ -68,7 +68,6 @@ public final class IndexMetadata
     {
         indexNameAliases.put(StorageAttachedIndex.class.getSimpleName(), StorageAttachedIndex.class.getCanonicalName());
         indexNameAliases.put(SASIIndex.class.getSimpleName(), SASIIndex.class.getCanonicalName());
-        indexNameAliases.put(StorageAttachedIndex.class.getSimpleName(), StorageAttachedIndex.class.getCanonicalName());
     }
 
     public enum Kind
@@ -139,8 +138,8 @@ public final class IndexMetadata
                 throw new ConfigurationException(String.format("Required option missing for index %s : %s",
                                                                name, IndexTarget.CUSTOM_INDEX_OPTION_NAME));
 
-            // Find any aliases to the fully qualified index class name:
-            String className = expandAliases(options.get(IndexTarget.CUSTOM_INDEX_OPTION_NAME));
+            // Get the fully qualified class name:
+            String className = getIndexClassName();
 
             Class<Index> indexerClass = FBUtilities.classForName(className, "custom indexer");
             if (!Index.class.isAssignableFrom(indexerClass))
@@ -152,13 +151,11 @@ public final class IndexMetadata
     public String getIndexClassName()
     {
         if (isCustom())
-            return expandAliases(options.get(IndexTarget.CUSTOM_INDEX_OPTION_NAME));
+        {
+            String className = options.get(IndexTarget.CUSTOM_INDEX_OPTION_NAME);
+            return indexNameAliases.getOrDefault(className, className);
+        }
         return CassandraIndex.class.getName();
-    }
-
-    public static String expandAliases(String className)
-    {
-        return indexNameAliases.getOrDefault(className, className);
     }
 
     private void validateCustomIndexOptions(TableMetadata table, Class<? extends Index> indexerClass, Map<String, String> options)
@@ -190,8 +187,6 @@ public final class IndexMetadata
         }
         catch (InvocationTargetException e)
         {
-            if (e.getTargetException() instanceof RequestValidationException)
-                throw (RequestValidationException) e.getTargetException();
             if (e.getTargetException() instanceof ConfigurationException)
                 throw (ConfigurationException) e.getTargetException();
             throw new ConfigurationException("Failed to validate custom indexer options: " + options);

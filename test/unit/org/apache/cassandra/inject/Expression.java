@@ -27,7 +27,7 @@ import com.google.common.base.Preconditions;
 
 public class Expression
 {
-    private StringBuilder expression = new StringBuilder();
+    private final StringBuilder expression = new StringBuilder();
 
     public static Expression expr()
     {
@@ -54,12 +54,6 @@ public class Expression
     public static Expression clazz(Class<?> clazz)
     {
         return expr(clazz.getName());
-    }
-
-    public Expression innerClass(String clazz)
-    {
-        expression.append("$").append(clazz);
-        return this;
     }
 
     public Expression method(String method)
@@ -108,8 +102,4 @@ public class Expression
     public static String arg(int n) { return "$" + n; }
 
     public final static String THIS = "$this";
-
-    public final static String CLASS = "$CLASS";
-
-    public final static String METHOD = "$METHOD";
 }

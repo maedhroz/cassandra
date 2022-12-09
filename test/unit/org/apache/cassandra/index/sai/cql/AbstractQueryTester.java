@@ -40,18 +40,18 @@ public class AbstractQueryTester extends SAITester
                                                                               .build();
 
     @Parameterized.Parameter(0)
-    public DataModel dataModel;
+    public BaseDataModel dataModel;
     @Parameterized.Parameter(1)
     public List<IndexQuerySupport.BaseQuerySet> sets;
 
-    protected DataModel.Executor executor;
+    protected BaseDataModel.Executor executor;
 
     @Before
     public void setup() throws Throwable
     {
         requireNetwork();
 
-        schemaChange(String.format("CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}", DataModel.KEYSPACE));
+        schemaChange(String.format("CREATE KEYSPACE IF NOT EXISTS %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'}", BaseDataModel.KEYSPACE));
 
         Injections.inject(INDEX_QUERY_COUNTER);
 
@@ -64,13 +64,13 @@ public class AbstractQueryTester extends SAITester
     {
         List<Object[]> scenarios = new LinkedList<>();
 
-        scenarios.add(new Object[]{ new DataModel.BaseDataModel(DataModel.NORMAL_COLUMNS, DataModel.NORMAL_COLUMN_DATA), IndexQuerySupport.BASE_QUERY_SETS });
+        scenarios.add(new Object[]{ new BaseDataModel(BaseDataModel.NORMAL_COLUMNS, BaseDataModel.NORMAL_COLUMN_DATA), IndexQuerySupport.BASE_QUERY_SETS });
 
-        scenarios.add(new Object[]{ new DataModel.CompoundKeyDataModel(DataModel.NORMAL_COLUMNS, DataModel.NORMAL_COLUMN_DATA), IndexQuerySupport.BASE_QUERY_SETS });
+        scenarios.add(new Object[]{ new BaseDataModel.CompoundKeyDataModel(BaseDataModel.NORMAL_COLUMNS, BaseDataModel.NORMAL_COLUMN_DATA), IndexQuerySupport.BASE_QUERY_SETS });
 
-        scenarios.add(new Object[]{ new DataModel.CompoundKeyWithStaticsDataModel(DataModel.STATIC_COLUMNS, DataModel.STATIC_COLUMN_DATA), IndexQuerySupport.STATIC_QUERY_SETS });
+        scenarios.add(new Object[]{ new BaseDataModel.CompoundKeyWithStaticsDataModel(BaseDataModel.STATIC_COLUMNS, BaseDataModel.STATIC_COLUMN_DATA), IndexQuerySupport.STATIC_QUERY_SETS });
 
-        scenarios.add(new Object[]{ new DataModel.CompositePartitionKeyDataModel(DataModel.NORMAL_COLUMNS, DataModel.NORMAL_COLUMN_DATA),
+        scenarios.add(new Object[]{ new BaseDataModel.CompositePartitionKeyDataModel(BaseDataModel.NORMAL_COLUMNS, BaseDataModel.NORMAL_COLUMN_DATA),
                                     ImmutableList.builder().addAll(IndexQuerySupport.BASE_QUERY_SETS).addAll(IndexQuerySupport.COMPOSITE_PARTITION_QUERY_SETS).build()});
 
         return scenarios;

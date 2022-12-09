@@ -121,6 +121,7 @@ public class RangeUnionIterator extends RangeIterator
             this.rangeIterators = new ArrayList<>(size);
         }
 
+        @Override
         public RangeIterator.Builder add(RangeIterator range)
         {
             if (range == null)
@@ -153,14 +154,10 @@ public class RangeUnionIterator extends RangeIterator
 
         protected RangeIterator buildIterator()
         {
-            switch (rangeCount())
-            {
-                case 1:
-                    return rangeIterators.get(0);
+            if (rangeCount() == 1)
+                return rangeIterators.get(0);
 
-                default:
-                    return new RangeUnionIterator(statistics, rangeIterators);
-            }
+            return new RangeUnionIterator(statistics, rangeIterators);
         }
     }
 }

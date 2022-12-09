@@ -18,7 +18,6 @@
 
 package org.apache.cassandra.index.sai.utils;
 
-import java.lang.annotation.Annotation;
 import java.util.List;
 
 import org.junit.rules.TestRule;
@@ -42,30 +41,26 @@ public class ResourceLeakDetector implements TestRule
     @Override
     public Statement apply(Statement statement, Description description)
     {
-        if (isResourceLeakCheckEnabled(description))
+        return new StatementAdapter(statement)
         {
-            return new StatementAdapter(statement)
+            @Override
+            protected void before() throws Throwable
             {
-                @Override
-                protected void before() throws Throwable
-                {
-                    ResourceLeakDetector.this.before();
-                }
+                ResourceLeakDetector.this.before();
+            }
 
-                @Override
-                protected void afterAlways(List<Throwable> errors) throws Throwable
-                {
-                    ResourceLeakDetector.this.afterAlways(errors);
-                }
+            @Override
+            protected void afterAlways(List<Throwable> errors)
+            {
+                ResourceLeakDetector.this.afterAlways();
+            }
 
-                @Override
-                protected void afterIfSuccessful() throws Throwable
-                {
-                    ResourceLeakDetector.this.afterIfSuccessful();
-                }
-            };
-        }
-        return statement;
+            @Override
+            protected void afterIfSuccessful()
+            {
+                ResourceLeakDetector.this.afterIfSuccessful();
+            }
+        };
     }
 
     protected void before() throws Throwable
@@ -73,25 +68,14 @@ public class ResourceLeakDetector implements TestRule
         Injections.inject(RESOURCE_LEAK_COUNTER);
     }
 
-    protected void afterIfSuccessful() throws Throwable
+    protected void afterIfSuccessful()
     {
         assertEquals("Resource leaks were detected during this test. Add -Dcassandra.debugrefcount=true to analyze the leaks", 0, RESOURCE_LEAK_COUNTER.get());
     }
 
-    protected void afterAlways(List<Throwable> errors) throws Throwable
+    protected void afterAlways()
     {
         Injections.deleteAll();
         RESOURCE_LEAK_COUNTER.reset();
-    }
-
-    private boolean isResourceLeakCheckEnabled(Description description)
-    {
-        return !hasAnnotation(description, SuppressLeakCheck.class);
-    }
-
-    private boolean hasAnnotation(Description description, Class<? extends Annotation> annotation)
-    {
-        return ((description.getAnnotation(annotation) != null) ||
-                (description.getTestClass().getAnnotation(annotation) != null));
     }
 }

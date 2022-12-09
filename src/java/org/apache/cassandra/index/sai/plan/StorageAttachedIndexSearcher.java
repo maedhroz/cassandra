@@ -51,6 +51,7 @@ import org.apache.cassandra.index.sai.QueryContext;
 import org.apache.cassandra.index.sai.analyzer.AbstractAnalyzer;
 import org.apache.cassandra.index.sai.metrics.TableQueryMetrics;
 import org.apache.cassandra.index.sai.utils.PrimaryKey;
+import org.apache.cassandra.index.sai.utils.PrimaryKeyFactory;
 import org.apache.cassandra.index.sai.utils.RangeIterator;
 import org.apache.cassandra.io.util.FileUtils;
 import org.apache.cassandra.schema.TableMetadata;
@@ -61,7 +62,7 @@ public class StorageAttachedIndexSearcher implements Index.Searcher
     private final ReadCommand command;
     private final QueryController controller;
     private final QueryContext queryContext;
-    private final PrimaryKey.Factory keyFactory;
+    private final PrimaryKeyFactory keyFactory;
 
     public StorageAttachedIndexSearcher(ColumnFamilyStore cfs,
                                         TableQueryMetrics tableQueryMetrics,
@@ -86,7 +87,7 @@ public class StorageAttachedIndexSearcher implements Index.Searcher
     {
         for (RowFilter.Expression expression : controller.filterOperation())
         {
-            AbstractAnalyzer analyzer = controller.getContext(expression).getAnalyzerFactory().create();
+            AbstractAnalyzer analyzer = controller.getContext(expression).getIndexAnalyzerFactory().create();
             try
             {
                 if (analyzer.transformValue())
@@ -144,7 +145,7 @@ public class StorageAttachedIndexSearcher implements Index.Searcher
         private final QueryController controller;
         private final ReadExecutionController executionController;
         private final QueryContext queryContext;
-        private final PrimaryKey.Factory keyFactory;
+        private final PrimaryKeyFactory keyFactory;
         private PrimaryKey lastKey;
 
         private ResultRetriever(RangeIterator operation,
@@ -152,7 +153,7 @@ public class StorageAttachedIndexSearcher implements Index.Searcher
                                 QueryController controller,
                                 ReadExecutionController executionController,
                                 QueryContext queryContext,
-                                PrimaryKey.Factory keyFactory)
+                                PrimaryKeyFactory keyFactory)
         {
             this.keyRanges = controller.dataRanges().iterator();
             this.currentKeyRange = keyRanges.next().keyRange();
@@ -228,7 +229,6 @@ public class StorageAttachedIndexSearcher implements Index.Searcher
         {
             PrimaryKey key = nextKey();
 
-            boolean inRange;
             while (key != null && !(currentKeyRange.contains(key.partitionKey())))
             {
                 if (!currentKeyRange.right.isMinimum() && currentKeyRange.right.compareTo(key.partitionKey()) <= 0)

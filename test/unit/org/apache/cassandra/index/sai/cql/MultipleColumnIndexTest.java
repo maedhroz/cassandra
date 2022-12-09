@@ -31,7 +31,7 @@ public class MultipleColumnIndexTest extends SAITester
     // types/collections/maps/MultiMap*Test tests
     // This is just testing that the indexes can be created
     @Test
-    public void canCreateMultipleMapIndexesOnSameColumn() throws Throwable
+    public void canCreateMultipleMapIndexesOnSameColumn()
     {
         createTable("CREATE TABLE %s (pk int, ck int, value map<int,int>, PRIMARY KEY(pk, ck))");
         createIndex("CREATE CUSTOM INDEX ON %s(KEYS(value)) USING 'StorageAttachedIndex'");
@@ -40,7 +40,7 @@ public class MultipleColumnIndexTest extends SAITester
     }
 
     @Test
-    public void cannotHaveMultipleLiteralIndexesWithDifferentOptions() throws Throwable
+    public void cannotHaveMultipleLiteralIndexesWithDifferentOptions()
     {
         createTable("CREATE TABLE %s (pk int, ck int, value text, PRIMARY KEY(pk, ck))");
         createIndex("CREATE CUSTOM INDEX ON %s(value) USING 'StorageAttachedIndex' WITH OPTIONS = { 'case_sensitive' : true }");

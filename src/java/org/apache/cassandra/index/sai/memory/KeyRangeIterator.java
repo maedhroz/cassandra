@@ -31,7 +31,8 @@ public class KeyRangeIterator extends RangeIterator
     private volatile PrimaryKey lastKey;
 
     /**
-     * An in-memory {@link RangeIterator} that uses a {@link SortedSet} which has no duplication as its backing store.
+     * An in-memory {@link RangeIterator} that uses a {@link PriorityQueue} built from a {@link SortedSet}
+     * which has no duplication as its backing store.
      */
     public KeyRangeIterator(SortedSet<PrimaryKey> keys)
     {
@@ -51,6 +52,7 @@ public class KeyRangeIterator extends RangeIterator
         this.uniqueKeys = false;
     }
 
+    @Override
     protected PrimaryKey computeNext()
     {
         PrimaryKey key = computeNextKey();
@@ -78,6 +80,7 @@ public class KeyRangeIterator extends RangeIterator
         return next;
     }
 
+    @Override
     protected void performSkipTo(PrimaryKey nextKey)
     {
         while (!keys.isEmpty())

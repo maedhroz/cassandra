@@ -22,14 +22,14 @@ import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
 
-import com.google.common.annotations.VisibleForTesting;
+import javax.annotation.Nullable;
+
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableSet;
 
@@ -46,24 +46,21 @@ import org.apache.cassandra.db.marshal.UTF8Type;
 import org.apache.cassandra.db.marshal.UUIDType;
 import org.apache.cassandra.db.memtable.Memtable;
 import org.apache.cassandra.db.rows.Cell;
-import org.apache.cassandra.db.rows.ComplexColumnData;
 import org.apache.cassandra.db.rows.Row;
 import org.apache.cassandra.dht.AbstractBounds;
-import org.apache.cassandra.index.TargetParser;
 import org.apache.cassandra.index.sai.analyzer.AbstractAnalyzer;
 import org.apache.cassandra.index.sai.memory.MemtableIndex;
 import org.apache.cassandra.index.sai.metrics.IndexMetrics;
 import org.apache.cassandra.index.sai.plan.Expression;
 import org.apache.cassandra.index.sai.utils.PrimaryKey;
+import org.apache.cassandra.index.sai.utils.PrimaryKeyFactory;
 import org.apache.cassandra.index.sai.utils.RangeIterator;
 import org.apache.cassandra.index.sai.utils.RangeUnionIterator;
 import org.apache.cassandra.index.sai.utils.TypeUtil;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.schema.IndexMetadata;
-import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.utils.Clock;
 import org.apache.cassandra.utils.FBUtilities;
-import org.apache.cassandra.utils.Pair;
 
 /**
  * Manage metadata for each column index.
@@ -80,7 +77,8 @@ public class IndexContext
 
     private final String keyspace;
     private final String table;
-    private final Pair<ColumnMetadata, IndexTarget.Type> target;
+    private final ColumnMetadata columnMetadata;
+    private final IndexTarget.Type indexType;
     private final AbstractType<?> validator;
 
     // Config can be null if the column context is "fake" (i.e. created for a filtering expression).
@@ -90,71 +88,44 @@ public class IndexContext
 
     private final IndexMetrics indexMetrics;
 
-    private final AbstractAnalyzer.AnalyzerFactory analyzerFactory;
+    private final AbstractAnalyzer.AnalyzerFactory indexAnalyzerFactory;
     private final AbstractAnalyzer.AnalyzerFactory queryAnalyzerFactory;
-    private final PrimaryKey.Factory primaryKeyFactory;
+    private final PrimaryKeyFactory primaryKeyFactory;
 
-    public IndexContext(TableMetadata tableMeta, IndexMetadata config)
-    {
-        assert config != null;
-
-        this.keyspace = tableMeta.keyspace;
-        this.table = tableMeta.name;
-        this.partitionKeyType = tableMeta.partitionKeyType;
-        this.clusteringComparator = tableMeta.comparator;
-        this.target = TargetParser.parse(tableMeta, config);
-        this.config = config;
-        this.indexMetrics = new IndexMetrics(this, tableMeta);
-        this.validator = TypeUtil.cellValueType(target);
-
-        this.analyzerFactory = AbstractAnalyzer.fromOptions(getValidator(), config.options);
-
-        this.queryAnalyzerFactory = AbstractAnalyzer.hasQueryAnalyzer(config.options)
-                                    ? AbstractAnalyzer.fromOptionsQueryAnalyzer(getValidator(), config.options)
-                                    : this.analyzerFactory;
-        this.primaryKeyFactory = PrimaryKey.factory(tableMeta.comparator);
-    }
-
-    @VisibleForTesting
     public IndexContext(String keyspace,
                         String table,
                         AbstractType<?> partitionKeyType,
                         ClusteringComparator clusteringComparator,
-                        ColumnMetadata column,
-                        IndexMetadata config)
+                        ColumnMetadata columnMetadata,
+                        IndexTarget.Type indexType,
+                        @Nullable IndexMetadata config)
     {
-        this.keyspace = keyspace;
-        this.table = table;
-        this.partitionKeyType = partitionKeyType;
-        this.clusteringComparator = clusteringComparator;
-        this.target = Pair.create(column, IndexTarget.Type.SIMPLE);
-        this.validator = column.type;
-        this.config = config;
-        this.indexMetrics = null;
-        Map<String, String> options = config != null ? config.options : Collections.emptyMap();
-        this.analyzerFactory = AbstractAnalyzer.fromOptions(getValidator(), options);
-        this.queryAnalyzerFactory = AbstractAnalyzer.hasQueryAnalyzer(options)
-                                    ? AbstractAnalyzer.fromOptionsQueryAnalyzer(getValidator(), options)
-                                    : this.analyzerFactory;
-        this.primaryKeyFactory = PrimaryKey.factory(clusteringComparator);
-    }
+        this.keyspace = Objects.requireNonNull(keyspace);
+        this.table = Objects.requireNonNull(table);
+        this.partitionKeyType = Objects.requireNonNull(partitionKeyType);
+        this.clusteringComparator = Objects.requireNonNull(clusteringComparator);
+        this.columnMetadata = Objects.requireNonNull(columnMetadata);
+        this.indexType = Objects.requireNonNull(indexType);
 
-    public IndexContext(TableMetadata table, ColumnMetadata column)
-    {
-        this.keyspace = table.keyspace;
-        this.table = table.name;
-        this.partitionKeyType = table.partitionKeyType;
-        this.clusteringComparator = table.comparator;
-        this.target = TargetParser.parse(table, column.name.toString());
-        this.validator = target == null ? null : TypeUtil.cellValueType(target);
-        this.indexMetrics = null;
-        this.config = null;
-        Map<String, String> options = Collections.emptyMap();
-        this.analyzerFactory = AbstractAnalyzer.fromOptions(getValidator(), options);
-        this.queryAnalyzerFactory = AbstractAnalyzer.hasQueryAnalyzer(options)
-                                    ? AbstractAnalyzer.fromOptionsQueryAnalyzer(getValidator(), options)
-                                    : this.analyzerFactory;
+        this.config = config;
+        this.indexMetrics = new IndexMetrics(this);
+        this.validator = TypeUtil.cellValueType(columnMetadata, indexType);
+
+
         this.primaryKeyFactory = PrimaryKey.factory(clusteringComparator);
+
+        if (config != null)
+        {
+            this.indexAnalyzerFactory = AbstractAnalyzer.fromOptions(getValidator(), config.options);
+            this.queryAnalyzerFactory = AbstractAnalyzer.hasQueryAnalyzer(config.options)
+                                        ? AbstractAnalyzer.fromOptionsQueryAnalyzer(getValidator(), config.options)
+                                        : this.indexAnalyzerFactory;
+        }
+        else
+        {
+            this.indexAnalyzerFactory = AbstractAnalyzer.fromOptions(getValidator(), Collections.EMPTY_MAP);
+            this.queryAnalyzerFactory = this.indexAnalyzerFactory;
+        }
     }
 
     public AbstractType<?> keyValidator()
@@ -162,7 +133,7 @@ public class IndexContext
         return partitionKeyType;
     }
 
-    public PrimaryKey.Factory keyFactory()
+    public PrimaryKeyFactory keyFactory()
     {
         return primaryKeyFactory;
     }
@@ -170,6 +141,11 @@ public class IndexContext
     public ClusteringComparator comparator()
     {
         return clusteringComparator;
+    }
+
+    public String getKeyspace()
+    {
+        return keyspace;
     }
 
     public String getTable()
@@ -260,7 +236,7 @@ public class IndexContext
 
     public ColumnMetadata getDefinition()
     {
-        return target.left;
+        return columnMetadata;
     }
 
     public AbstractType<?> getValidator()
@@ -270,17 +246,17 @@ public class IndexContext
 
     public boolean isNonFrozenCollection()
     {
-        return TypeUtil.isNonFrozenCollection(target.left.type);
+        return TypeUtil.isNonFrozenCollection(columnMetadata.type);
     }
 
     public boolean isFrozen()
     {
-        return TypeUtil.isFrozen(target.left.type);
+        return TypeUtil.isFrozen(columnMetadata.type);
     }
 
     public String getColumnName()
     {
-        return target.left.name.toString();
+        return columnMetadata.name.toString();
     }
 
     public String getIndexName()
@@ -288,11 +264,21 @@ public class IndexContext
         return this.config == null ? null : config.name;
     }
 
-    public AbstractAnalyzer.AnalyzerFactory getAnalyzerFactory()
+    /**
+     * Returns an {@code AnalyzerFactory} for use by the write path to transform incoming literal
+     * during indexing. The analyzers can be tokenising or non-tokenising. Tokenising analyzers
+     * will split the incoming terms into multiple terms in the index while non-tokenising analyzers
+     * will not split the incoming term but will transform the term (e.g. case-insensitive)
+     */
+    public AbstractAnalyzer.AnalyzerFactory getIndexAnalyzerFactory()
     {
-        return analyzerFactory;
+        return indexAnalyzerFactory;
     }
 
+    /**
+     * Return an {@code AnalyzerFactory} for use by the query path to transform query terms before
+     * searching for them in the index. This can be the same as the indexAnalyzerFactory.
+     */
     public AbstractAnalyzer.AnalyzerFactory getQueryAnalyzerFactory()
     {
         return queryAnalyzerFactory;
@@ -311,8 +297,8 @@ public class IndexContext
     {
         liveMemtables.clear();
         indexMetrics.release();
-        analyzerFactory.close();
-        if (queryAnalyzerFactory != analyzerFactory)
+        indexAnalyzerFactory.close();
+        if (queryAnalyzerFactory != indexAnalyzerFactory)
         {
             queryAnalyzerFactory.close();
         }
@@ -327,16 +313,15 @@ public class IndexContext
             op == Operator.LIKE_SUFFIX) return false;
 
         Expression.Op operator = Expression.Op.valueOf(op);
-        IndexTarget.Type type = target.right;
 
         if (isNonFrozenCollection())
         {
-            if (type == IndexTarget.Type.KEYS) return operator == Expression.Op.CONTAINS_KEY;
-            if (type == IndexTarget.Type.VALUES) return operator == Expression.Op.CONTAINS_VALUE;
-            return type == IndexTarget.Type.KEYS_AND_VALUES && operator == Expression.Op.EQ;
+            if (indexType == IndexTarget.Type.KEYS) return operator == Expression.Op.CONTAINS_KEY;
+            if (indexType == IndexTarget.Type.VALUES) return operator == Expression.Op.CONTAINS_VALUE;
+            return indexType == IndexTarget.Type.KEYS_AND_VALUES && operator == Expression.Op.EQ;
         }
 
-        if (type == IndexTarget.Type.FULL)
+        if (indexType == IndexTarget.Type.FULL)
             return operator == Expression.Op.EQ;
 
         AbstractType<?> validator = getValidator();
@@ -355,15 +340,15 @@ public class IndexContext
         if (row == null)
             return null;
 
-        switch (target.left.kind)
+        switch (columnMetadata.kind)
         {
             case PARTITION_KEY:
                 return partitionKeyType instanceof CompositeType
-                       ? CompositeType.extractComponent(key.getKey(), target.left.position())
+                       ? CompositeType.extractComponent(key.getKey(), columnMetadata.position())
                        : key.getKey();
             case CLUSTERING:
                 // skip indexing of static clustering when regular column is indexed
-                return row.isStatic() ? null : row.clustering().bufferAt(target.left.position());
+                return row.isStatic() ? null : row.clustering().bufferAt(columnMetadata.position());
 
             // treat static cell retrieval the same was as regular
             // only if row kind is STATIC otherwise return null
@@ -371,7 +356,7 @@ public class IndexContext
                 if (!row.isStatic())
                     return null;
             case REGULAR:
-                Cell cell = row.getCell(target.left);
+                Cell<?> cell = row.getCell(columnMetadata);
                 return cell == null || !cell.isLive(nowInSecs) ? null : cell.buffer();
 
             default:
@@ -384,7 +369,7 @@ public class IndexContext
         if (row == null)
             return null;
 
-        switch (target.left.kind)
+        switch (columnMetadata.kind)
         {
             // treat static cell retrieval the same was as regular
             // only if row kind is STATIC otherwise return null
@@ -392,7 +377,11 @@ public class IndexContext
                 if (!row.isStatic())
                     return null;
             case REGULAR:
-                return TypeUtil.collectionIterator(validator, (ComplexColumnData)row.getComplexColumnData(target.left), target, nowInSecs);
+                return TypeUtil.collectionIterator(validator,
+                                                   row.getComplexColumnData(columnMetadata),
+                                                   columnMetadata,
+                                                   indexType,
+                                                   nowInSecs);
 
             default:
                 return null;
@@ -413,6 +402,7 @@ public class IndexContext
         return TypeUtil.isLiteral(getValidator());
     }
 
+    @Override
     public boolean equals(Object obj)
     {
         if (obj == this)
@@ -423,15 +413,17 @@ public class IndexContext
 
         IndexContext other = (IndexContext) obj;
 
-        return Objects.equals(target, other.target) &&
-                Objects.equals(config, other.config) &&
-                Objects.equals(partitionKeyType, other.partitionKeyType) &&
-                Objects.equals(clusteringComparator, other.clusteringComparator);
+        return Objects.equals(columnMetadata, other.columnMetadata) &&
+               Objects.equals(indexType, other.indexType) &&
+               Objects.equals(config, other.config) &&
+               Objects.equals(partitionKeyType, other.partitionKeyType) &&
+               Objects.equals(clusteringComparator, other.clusteringComparator);
     }
 
+    @Override
     public int hashCode()
     {
-        return Objects.hash(target, config, partitionKeyType, clusteringComparator);
+        return Objects.hash(columnMetadata, indexType, config, partitionKeyType, clusteringComparator);
     }
 
     /**

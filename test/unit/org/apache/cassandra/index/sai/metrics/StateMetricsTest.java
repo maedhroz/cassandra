@@ -91,7 +91,7 @@ public class StateMetricsTest extends AbstractMetricsTest
         waitForEquals(objectNameNoIndex("TotalQueryableIndexCount", keyspace, table, TABLE_STATE_METRIC_TYPE), 2);
     }
 
-    private int getTableStateMetrics(String keyspace, String table, String metricsName) throws Exception
+    private int getTableStateMetrics(String keyspace, String table, String metricsName)
     {
         return (int) getMetricValue(objectNameNoIndex(metricsName, keyspace, table, TABLE_STATE_METRIC_TYPE));
     }

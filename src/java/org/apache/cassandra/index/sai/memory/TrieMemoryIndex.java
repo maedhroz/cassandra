@@ -49,18 +49,22 @@ import org.apache.cassandra.utils.bytecomparable.ByteComparable;
 import org.apache.cassandra.utils.bytecomparable.ByteSource;
 import org.apache.cassandra.utils.bytecomparable.ByteSourceInverse;
 
-public class TrieMemoryIndex extends MemoryIndex
+public class TrieMemoryIndex
 {
     private static final Logger logger = LoggerFactory.getLogger(TrieMemoryIndex.class);
     private static final int MINIMUM_QUEUE_SIZE = 128;
     private static final int MAX_RECURSIVE_KEY_LENGTH = 128;
 
+    private final IndexContext indexContext;
     private final InMemoryTrie<PrimaryKeys> data;
     private final PrimaryKeysReducer primaryKeysReducer;
     private final AbstractAnalyzer.AnalyzerFactory analyzerFactory;
     private final AbstractType<?> validator;
     private final boolean isLiteral;
     private final Object writeLock = new Object();
+
+    private ByteBuffer minTerm;
+    private ByteBuffer maxTerm;
 
     private static final FastThreadLocal<Integer> lastQueueSize = new FastThreadLocal<Integer>()
     {
@@ -73,16 +77,15 @@ public class TrieMemoryIndex extends MemoryIndex
 
     public TrieMemoryIndex(IndexContext indexContext)
     {
-        super(indexContext);
+        this.indexContext = indexContext;
         this.data = new InMemoryTrie<>(BufferType.OFF_HEAP);
         this.primaryKeysReducer = new PrimaryKeysReducer();
-        // MemoryIndex is per-core, so analyzer should be thread-safe..
-        this.analyzerFactory = indexContext.getAnalyzerFactory();
+        // The use of the analyzer is within a synchronized block so can be considered thread-safe
+        this.analyzerFactory = indexContext.getIndexAnalyzerFactory();
         this.validator = indexContext.getValidator();
         this.isLiteral = TypeUtil.isLiteral(validator);
     }
 
-    @Override
     public long add(DecoratedKey key, Clustering clustering, ByteBuffer value)
     {
         synchronized (writeLock)
@@ -131,7 +134,6 @@ public class TrieMemoryIndex extends MemoryIndex
         }
     }
 
-    @Override
     public RangeIterator search(Expression expression, AbstractBounds<PartitionPosition> keyRange)
     {
         if (logger.isTraceEnabled())
@@ -150,7 +152,6 @@ public class TrieMemoryIndex extends MemoryIndex
         }
     }
 
-    @Override
     public Iterator<Pair<ByteComparable, PrimaryKeys>> iterator()
     {
         Iterator<Map.Entry<ByteComparable, PrimaryKeys>> iterator = data.entrySet().iterator();
@@ -169,6 +170,24 @@ public class TrieMemoryIndex extends MemoryIndex
                 return Pair.create(decode(entry.getKey()), entry.getValue());
             }
         };
+    }
+
+    public ByteBuffer getMinTerm()
+    {
+        return minTerm;
+    }
+
+    public ByteBuffer getMaxTerm()
+    {
+        return maxTerm;
+    }
+
+    private void setMinMaxTerm(ByteBuffer term)
+    {
+        assert term != null;
+
+        minTerm = TypeUtil.min(term, minTerm, indexContext.getValidator());
+        maxTerm = TypeUtil.max(term, maxTerm, indexContext.getValidator());
     }
 
     private ByteComparable encode(ByteBuffer input)
@@ -266,7 +285,6 @@ public class TrieMemoryIndex extends MemoryIndex
                     maximumKey = maximumKey == null ? key : key.compareTo(maximumKey) > 0 ? key : maximumKey;
                 }
             }
-            return;
         }
     }
 
@@ -298,7 +316,9 @@ public class TrieMemoryIndex extends MemoryIndex
 
         Collector cd = new Collector(keyRange);
 
-        data.subtrie(lowerBound, lowerInclusive, upperBound, upperInclusive).values().forEach(pk -> cd.processContent(pk));
+        data.subtrie(lowerBound, lowerInclusive, upperBound, upperInclusive)
+            .values()
+            .forEach(cd::processContent);
 
         if (cd.mergedKeys.isEmpty())
         {
@@ -309,7 +329,7 @@ public class TrieMemoryIndex extends MemoryIndex
         return new KeyRangeIterator(cd.minimumKey, cd.maximumKey, cd.mergedKeys);
     }
 
-    private class PrimaryKeysReducer implements InMemoryTrie.UpsertTransformer<PrimaryKeys, PrimaryKey>
+    private static class PrimaryKeysReducer implements InMemoryTrie.UpsertTransformer<PrimaryKeys, PrimaryKey>
     {
         private final LongAdder heapAllocations = new LongAdder();
 

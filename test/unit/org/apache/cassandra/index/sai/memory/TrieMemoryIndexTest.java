@@ -34,6 +34,7 @@ import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.marshal.Int32Type;
 import org.apache.cassandra.db.marshal.UTF8Type;
 import org.apache.cassandra.dht.Murmur3Partitioner;
+import org.apache.cassandra.index.TargetParser;
 import org.apache.cassandra.index.sai.IndexContext;
 import org.apache.cassandra.index.sai.StorageAttachedIndex;
 import org.apache.cassandra.index.sai.utils.PrimaryKeys;
@@ -55,7 +56,7 @@ public class TrieMemoryIndexTest
     private static final String PART_KEY_COL = "key";
     private static final String REG_COL = "col";
 
-    private static DecoratedKey key = Murmur3Partitioner.instance.decorateKey(ByteBufferUtil.bytes("key"));
+    private static final DecoratedKey key = Murmur3Partitioner.instance.decorateKey(ByteBufferUtil.bytes("key"));
 
     @Before
     public void setup()
@@ -99,20 +100,26 @@ public class TrieMemoryIndexTest
 
     private TrieMemoryIndex newTrieMemoryIndex(AbstractType<?> columnType)
     {
-        ColumnMetadata column = ColumnMetadata.regularColumn(KEYSPACE, TABLE, REG_COL, columnType);
-        TableMetadata metadata = TableMetadata.builder(KEYSPACE, TABLE)
-                                              .addPartitionKeyColumn(PART_KEY_COL, UTF8Type.instance)
-                                              .addRegularColumn(REG_COL, columnType)
-                                              .partitioner(Murmur3Partitioner.instance)
-                                              .caching(CachingParams.CACHE_NOTHING)
-                                              .build();
+        TableMetadata table = TableMetadata.builder(KEYSPACE, TABLE)
+                                           .addPartitionKeyColumn(PART_KEY_COL, UTF8Type.instance)
+                                           .addRegularColumn(REG_COL, columnType)
+                                           .partitioner(Murmur3Partitioner.instance)
+                                           .caching(CachingParams.CACHE_NOTHING)
+                                           .build();
 
         Map<String, String> options = new HashMap<>();
         options.put(IndexTarget.CUSTOM_INDEX_OPTION_NAME, StorageAttachedIndex.class.getCanonicalName());
         options.put("target", REG_COL);
 
         IndexMetadata indexMetadata = IndexMetadata.fromSchemaMetadata("col_index", IndexMetadata.Kind.CUSTOM, options);
-        IndexContext ci = new IndexContext(metadata, indexMetadata);
-        return new TrieMemoryIndex(ci);
+        Pair<ColumnMetadata, IndexTarget.Type> target = TargetParser.parse(table, indexMetadata);
+        IndexContext indexContext = new IndexContext(table.keyspace,
+                                                     table.name,
+                                                     table.partitionKeyType,
+                                                     table.comparator,
+                                                     target.left,
+                                                     target.right,
+                                                     indexMetadata);
+        return new TrieMemoryIndex(indexContext);
     }
 }

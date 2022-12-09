@@ -133,7 +133,15 @@ public class StorageAttachedIndex implements Index
     {
         this.baseCfs = baseCfs;
         this.config = config;
-        this.indexContext = new IndexContext(baseCfs.metadata(), config);
+        TableMetadata tableMetadata = baseCfs.metadata();
+        Pair<ColumnMetadata, IndexTarget.Type> target = TargetParser.parse(tableMetadata, config);
+        this.indexContext = new IndexContext(tableMetadata.keyspace,
+                                             tableMetadata.name,
+                                             tableMetadata.partitionKeyType,
+                                             tableMetadata.comparator,
+                                             target.left,
+                                             target.right,
+                                             config);
     }
 
     /**
@@ -193,7 +201,7 @@ public class StorageAttachedIndex implements Index
             throw new InvalidRequestException("Cannot create more than one storage-attached index on the same column: " + target.left);
         }
 
-        AbstractType<?> type = TypeUtil.cellValueType(target);
+        AbstractType<?> type = TypeUtil.cellValueType(target.left, target.right);
 
         // If we are indexing map entries we need to validate the sub-types
         if (TypeUtil.isComposite(type))

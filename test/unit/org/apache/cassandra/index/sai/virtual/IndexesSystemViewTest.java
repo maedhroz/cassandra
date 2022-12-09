@@ -50,10 +50,11 @@ public class IndexesSystemViewTest extends SAITester
                                                        IndexesSystemView.KEYSPACE_NAME,
                                                        KEYSPACE);
 
-    private Injections.Barrier blockIndexBuild = Injections.newBarrier("block_index_build", 2, false)
-                                                           .add(InvokePointBuilder.newInvokePoint().onClass(StorageAttachedIndex.class)
-                                                                                  .onMethod("startInitialBuild"))
-                                                           .build();
+    private static final Injections.Barrier blockIndexBuild = Injections.newBarrier("block_index_build", 2, false)
+                                                                        .add(InvokePointBuilder.newInvokePoint()
+                                                                                               .onClass(StorageAttachedIndex.class)
+                                                                                               .onMethod("startInitialBuild"))
+                                                                        .build();
 
     @BeforeClass
     public static void setup() throws Exception
@@ -115,8 +116,6 @@ public class IndexesSystemViewTest extends SAITester
         compact();
         waitForCompactionsFinished();
 
-        System.out.println(makeRowStrings(execute("SELECT * FROM %s")));
-
         assertRowsIgnoringOrderAndExtra(execute(SELECT),
                                         row(v1IndexName, "v1", true, false, false),
                                         row(v2IndexName, "v2", true, false, true));
@@ -140,7 +139,7 @@ public class IndexesSystemViewTest extends SAITester
                          String columnName,
                          boolean isQueryable,
                          boolean isBuilding,
-                         boolean isString) throws Exception
+                         boolean isString)
     {
             ColumnFamilyStore cfs = getCurrentColumnFamilyStore();
             StorageAttachedIndex sai = (StorageAttachedIndex) cfs.indexManager.getIndexByName(indexName);
@@ -152,6 +151,6 @@ public class IndexesSystemViewTest extends SAITester
                        isQueryable,
                        isBuilding,
                        isString,
-                       context.getAnalyzerFactory().toString());
+                       context.getIndexAnalyzerFactory().toString());
     }
 }

@@ -20,7 +20,6 @@ package org.apache.cassandra.index.sai.utils;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
-import java.util.function.LongFunction;
 
 import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.index.sai.SAITester;
@@ -38,16 +37,11 @@ public class LongIterator extends RangeIterator
 
     public LongIterator(long[] tokens)
     {
-        this(tokens, t -> t);
-    }
-
-    public LongIterator(long[] tokens, LongFunction<Long> toOffset)
-    {
         super(tokens.length == 0 ? null : fromToken(tokens[0]), tokens.length == 0 ? null : fromToken(tokens[tokens.length - 1]), tokens.length);
 
         this.keys = new ArrayList<>(tokens.length);
         for (long token : tokens)
-            this.keys.add(fromTokenAndRowId(token, toOffset.apply(token)));
+            this.keys.add(fromToken(token));
     }
 
     public LongIterator throwsException()
@@ -109,10 +103,5 @@ public class LongIterator extends RangeIterator
             for (long n : nums)
                 add(n);
         }};
-    }
-
-    private PrimaryKey fromTokenAndRowId(long token, long rowId)
-    {
-        return SAITester.TEST_FACTORY.createTokenOnly(new Murmur3Partitioner.LongToken(token));
     }
 }
