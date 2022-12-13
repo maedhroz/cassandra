@@ -37,12 +37,12 @@ public class PrimaryKey implements Comparable<PrimaryKey>
 {
     private final Token token;
     private final DecoratedKey partitionKey;
-    private final Clustering clustering;
+    private final Clustering<?> clustering;
     private final ClusteringComparator clusteringComparator;
 
     public PrimaryKey(Token token,
                       DecoratedKey partitionKey,
-                      Clustering clustering,
+                      Clustering<?> clustering,
                       ClusteringComparator clusteringComparator)
     {
         this.token = token;
@@ -177,8 +177,8 @@ public class PrimaryKey implements Comparable<PrimaryKey>
                              token,
                              partitionKey,
                              clustering == null ? null : clustering.kind(),
-                             clustering == null ? null :String.join(",", Arrays.stream(clustering.getBufferArray())
-                                                                               .map(ByteBufferUtil::bytesToHex)
-                                                                               .collect(Collectors.toList())));
+                             clustering == null ? null : Arrays.stream(clustering.getBufferArray())
+                                                               .map(ByteBufferUtil::bytesToHex)
+                                                               .collect(Collectors.joining(",")));
     }
 }

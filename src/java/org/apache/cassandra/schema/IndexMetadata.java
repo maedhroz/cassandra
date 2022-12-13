@@ -36,6 +36,7 @@ import org.apache.cassandra.cql3.ColumnIdentifier;
 import org.apache.cassandra.cql3.CqlBuilder;
 import org.apache.cassandra.cql3.statements.schema.IndexTarget;
 import org.apache.cassandra.exceptions.ConfigurationException;
+import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.exceptions.UnknownIndexException;
 import org.apache.cassandra.index.Index;
 import org.apache.cassandra.index.internal.CassandraIndex;
@@ -187,6 +188,8 @@ public final class IndexMetadata
         }
         catch (InvocationTargetException e)
         {
+            if (e.getTargetException() instanceof InvalidRequestException)
+                throw (InvalidRequestException) e.getTargetException();
             if (e.getTargetException() instanceof ConfigurationException)
                 throw (ConfigurationException) e.getTargetException();
             throw new ConfigurationException("Failed to validate custom indexer options: " + options);

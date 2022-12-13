@@ -33,6 +33,7 @@ import org.apache.cassandra.db.Clustering;
 import org.apache.cassandra.db.DecoratedKey;
 import org.apache.cassandra.db.PartitionPosition;
 import org.apache.cassandra.db.marshal.AbstractType;
+import org.apache.cassandra.db.memtable.TrieMemtable;
 import org.apache.cassandra.db.tries.InMemoryTrie;
 import org.apache.cassandra.db.tries.Trie;
 import org.apache.cassandra.dht.AbstractBounds;
@@ -49,6 +50,13 @@ import org.apache.cassandra.utils.bytecomparable.ByteComparable;
 import org.apache.cassandra.utils.bytecomparable.ByteSource;
 import org.apache.cassandra.utils.bytecomparable.ByteSourceInverse;
 
+/**
+ * This is an in-memory index using the {@link InMemoryTrie} to store a {@link ByteComparable}
+ * representation of the indexed values. Data is stored on-heap or off-heap and follows the
+ * settings of the {@link TrieMemtable} to determine where.
+ *
+ *
+ */
 public class TrieMemoryIndex
 {
     private static final Logger logger = LoggerFactory.getLogger(TrieMemoryIndex.class);
@@ -78,7 +86,7 @@ public class TrieMemoryIndex
     public TrieMemoryIndex(IndexContext indexContext)
     {
         this.indexContext = indexContext;
-        this.data = new InMemoryTrie<>(BufferType.OFF_HEAP);
+        this.data = new InMemoryTrie<>(TrieMemtable.BUFFER_TYPE);
         this.primaryKeysReducer = new PrimaryKeysReducer();
         // The use of the analyzer is within a synchronized block so can be considered thread-safe
         this.analyzerFactory = indexContext.getIndexAnalyzerFactory();
@@ -86,6 +94,14 @@ public class TrieMemoryIndex
         this.isLiteral = TypeUtil.isLiteral(validator);
     }
 
+    /**
+     * Adds a index value to the in-memory index
+     *
+     * @param key partition key for the indexed value
+     * @param clustering clustering for the indexed value
+     * @param value indexed value
+     * @return amount of heap allocated by the new value
+     */
     public long add(DecoratedKey key, Clustering clustering, ByteBuffer value)
     {
         synchronized (writeLock)
@@ -134,6 +150,14 @@ public class TrieMemoryIndex
         }
     }
 
+    /**
+     * Search for an expression in the in-memory index within the {@link AbstractBounds} defined
+     * by keyRange. This can either be a exact match or a range match.
+
+     * @param expression the {@link Expression} to search for
+     * @param keyRange the {@link AbstractBounds} containing the key range to restrict the search to
+     * @return a {@link RangeIterator} containing the search results
+     */
     public RangeIterator search(Expression expression, AbstractBounds<PartitionPosition> keyRange)
     {
         if (logger.isTraceEnabled())
@@ -152,6 +176,12 @@ public class TrieMemoryIndex
         }
     }
 
+    /**
+     * Returns an {@link Iterator} over the entire dataset contained in the trie. This is used
+     * when the index is flushed to disk.
+     *
+     * @return the iterator containing the trie data
+     */
     public Iterator<Pair<ByteComparable, PrimaryKeys>> iterator()
     {
         Iterator<Map.Entry<ByteComparable, PrimaryKeys>> iterator = data.entrySet().iterator();

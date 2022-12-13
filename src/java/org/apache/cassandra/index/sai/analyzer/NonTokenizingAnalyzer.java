@@ -42,9 +42,9 @@ public class NonTokenizingAnalyzer extends AbstractAnalyzer
 {
     private static final Logger logger = LoggerFactory.getLogger(NonTokenizingAnalyzer.class);
 
-    private AbstractType<?> type;
-    private NonTokenizingOptions options;
-    private FilterPipelineTask filterPipeline;
+    private final AbstractType<?> type;
+    private final NonTokenizingOptions options;
+    private final FilterPipelineTask filterPipeline;
 
     private ByteBuffer input;
     private boolean hasNext = false;

@@ -41,7 +41,7 @@ public class LuceneAnalyzer extends AbstractAnalyzer
 {
     public static final String INDEX_ANALYZER = "index_analyzer";
     public static final String QUERY_ANALYZER = "query_analyzer";
-    private AbstractType<?> type;
+    private final AbstractType<?> type;
     private boolean hasNext = false;
 
     private final Analyzer analyzer;

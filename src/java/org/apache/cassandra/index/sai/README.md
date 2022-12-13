@@ -107,7 +107,7 @@ Follow the instructions to build and start Cassandra in README.asc in root folde
 - Zhao Yang
 - Jason Rutherglen
 - Maciej Zasada
-- Andrew de la Peña
+- Andres de la Peña
 - Mike Adamson
 - Zahir Patni
 - Tomek Lasica

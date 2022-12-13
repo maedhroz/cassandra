@@ -123,7 +123,7 @@ public class IndexContext
         }
         else
         {
-            this.indexAnalyzerFactory = AbstractAnalyzer.fromOptions(getValidator(), Collections.EMPTY_MAP);
+            this.indexAnalyzerFactory = AbstractAnalyzer.fromOptions(getValidator(), Collections.emptyMap());
             this.queryAnalyzerFactory = this.indexAnalyzerFactory;
         }
     }
@@ -414,7 +414,7 @@ public class IndexContext
         IndexContext other = (IndexContext) obj;
 
         return Objects.equals(columnMetadata, other.columnMetadata) &&
-               Objects.equals(indexType, other.indexType) &&
+               (indexType == other.indexType) &&
                Objects.equals(config, other.config) &&
                Objects.equals(partitionKeyType, other.partitionKeyType) &&
                Objects.equals(clusteringComparator, other.clusteringComparator);

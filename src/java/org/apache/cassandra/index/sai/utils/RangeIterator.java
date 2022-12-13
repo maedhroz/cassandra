@@ -34,8 +34,6 @@ import org.apache.cassandra.io.util.FileUtils;
  */
 public abstract class RangeIterator extends AbstractIterator<PrimaryKey> implements Closeable
 {
-    private static final Builder.EmptyRangeIterator EMPTY = new Builder.EmptyRangeIterator();
-
     private final PrimaryKey min, max;
     private final long count;
     private PrimaryKey current;
@@ -130,7 +128,16 @@ public abstract class RangeIterator extends AbstractIterator<PrimaryKey> impleme
 
     public static RangeIterator empty()
     {
-        return EMPTY;
+        return EmptyRangeIterator.instance;
+    }
+
+    public static class EmptyRangeIterator extends RangeIterator
+    {
+        static final RangeIterator instance = new EmptyRangeIterator();
+        EmptyRangeIterator() { super(null, null, 0); }
+        public PrimaryKey computeNext() { return endOfData(); }
+        protected void performSkipTo(PrimaryKey nextToken) { }
+        public void close() { }
     }
 
     public static abstract class Builder
@@ -208,14 +215,6 @@ public abstract class RangeIterator extends AbstractIterator<PrimaryKey> impleme
                 return empty();
             else
                 return buildIterator();
-        }
-
-        public static class EmptyRangeIterator extends RangeIterator
-        {
-            EmptyRangeIterator() { super(null, null, 0); }
-            public PrimaryKey computeNext() { return endOfData(); }
-            protected void performSkipTo(PrimaryKey nextToken) { }
-            public void close() { }
         }
 
         protected abstract RangeIterator buildIterator();
@@ -349,8 +348,8 @@ public abstract class RangeIterator extends AbstractIterator<PrimaryKey> impleme
                (min.compareTo(b.getMaximum()) <= 0 && b.getCurrent().compareTo(max) <= 0);
     }
 
-    @SuppressWarnings("unchecked")
-    private static <T extends Comparable> T nullSafeMin(T a, T b)
+//    @SuppressWarnings("unchecked")
+    private static <T extends Comparable<T>> T nullSafeMin(T a, T b)
     {
         if (a == null) return b;
         if (b == null) return a;
@@ -358,8 +357,8 @@ public abstract class RangeIterator extends AbstractIterator<PrimaryKey> impleme
         return a.compareTo(b) > 0 ? b : a;
     }
 
-    @SuppressWarnings("unchecked")
-    private static <T extends Comparable> T nullSafeMax(T a, T b)
+//    @SuppressWarnings("unchecked")
+    private static <T extends Comparable<T>> T nullSafeMax(T a, T b)
     {
         if (a == null) return b;
         if (b == null) return a;
