@@ -81,11 +81,6 @@ public abstract class AbstractAnalyzer implements Iterator<ByteBuffer>
         resetInternal(input);
     }
 
-    public static boolean hasQueryAnalyzer(Map<String, String> options)
-    {
-       return options.containsKey(LuceneAnalyzer.QUERY_ANALYZER);
-    }
-
     public interface AnalyzerFactory
     {
         AbstractAnalyzer create();
@@ -95,79 +90,8 @@ public abstract class AbstractAnalyzer implements Iterator<ByteBuffer>
         }
     }
 
-    public static AnalyzerFactory fromOptionsQueryAnalyzer(final AbstractType<?> type, final Map<String, String> options)
-    {
-        final String json = options.get(LuceneAnalyzer.QUERY_ANALYZER);
-        try
-        {
-            return toAnalyzerFactory(json, type, options);
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidRequestException("CQL type " + type.asCQL3Type() + " cannot be analyzed json="+json, ex);
-        }
-    }
-
-    @SuppressWarnings("resource")
-    public static AnalyzerFactory toAnalyzerFactory(String json, final AbstractType<?> type, final Map<String, String> options) //throws Exception
-    {
-        try
-        {
-            final Analyzer analyzer = JSONAnalyzerParser.parse(json);
-            return new AnalyzerFactory()
-            {
-                @Override
-                public void close()
-                {
-                    analyzer.close();
-                }
-
-                public AbstractAnalyzer create()
-                {
-                    return new LuceneAnalyzer(type, analyzer, options);
-                }
-            };
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidRequestException("CQL type " + type.asCQL3Type() + " cannot be analyzed options="+options, ex);
-        }
-    }
-
     public static AnalyzerFactory fromOptions(AbstractType<?> type, Map<String, String> options)
     {
-        if (options.containsKey(LuceneAnalyzer.INDEX_ANALYZER))
-        {
-            String json = options.get(LuceneAnalyzer.INDEX_ANALYZER);
-            try
-            {
-                return toAnalyzerFactory(json, type, options);
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidRequestException("CQL type " + type.asCQL3Type() + " cannot be analyzed json="+json, ex);
-            }
-        }
-
-        if (hasNonTokenizingOptions(options))
-        {
-            if (TypeUtil.isIn(type, ANALYZABLE_TYPES))
-            {
-                // load NonTokenizingAnalyzer so it'll validate options
-                NonTokenizingAnalyzer a = new NonTokenizingAnalyzer(type, options);
-                a.end();
-                return () -> new NonTokenizingAnalyzer(type, options);
-            }
-            else
-            {
-                throw new InvalidRequestException("CQL type " + type.asCQL3Type() + " cannot be analyzed.");
-            }
-        }
         return NoOpAnalyzer::new;
-    }
-
-    private static boolean hasNonTokenizingOptions(Map<String, String> options)
-    {
-        return options.get(NonTokenizingOptions.ASCII) != null || options.containsKey(NonTokenizingOptions.CASE_SENSITIVE) || options.containsKey(NonTokenizingOptions.NORMALIZE);
     }
 }

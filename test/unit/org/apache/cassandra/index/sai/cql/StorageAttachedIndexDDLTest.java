@@ -235,34 +235,6 @@ public class StorageAttachedIndexDDLTest extends SAITester
     }
 
     @Test
-    public void shouldEnableCaseSensitiveSearch() throws Throwable
-    {
-        createTable("CREATE TABLE %s (id text PRIMARY KEY, val text)");
-
-        createIndex("CREATE CUSTOM INDEX ON %s(val) USING 'StorageAttachedIndex' WITH OPTIONS = { 'case_sensitive' : true }");
-        waitForIndexQueryable();
-
-        execute("INSERT INTO %s (id, val) VALUES ('1', 'Camel')");
-
-        assertEquals(1, execute("SELECT id FROM %s WHERE val = 'Camel'").size());
-
-        assertEquals(0, execute("SELECT id FROM %s WHERE val = 'camel'").size());
-    }
-
-    @Test
-    public void shouldEnableCaseInsensitiveSearch() throws Throwable
-    {
-        createTable("CREATE TABLE %s (id text PRIMARY KEY, val text)");
-
-        createIndex("CREATE CUSTOM INDEX ON %s(val) USING 'StorageAttachedIndex' WITH OPTIONS = { 'case_sensitive' : false }");
-        waitForIndexQueryable();
-
-        execute("INSERT INTO %s (id, val) VALUES ('1', 'Camel')");
-
-        assertEquals(1, execute("SELECT id FROM %s WHERE val = 'camel'").size());
-    }
-
-    @Test
     public void shouldBeNonNormalizedByDefault() throws Throwable
     {
         createTable("CREATE TABLE %s (id text PRIMARY KEY, val text)");
@@ -276,61 +248,6 @@ public class StorageAttachedIndexDDLTest extends SAITester
 
         // Both \u00E1 and \u0061\u0301 are visible as the character á, but without NFC normalization, they won't match.
         assertEquals(0, execute("SELECT id FROM %s WHERE val = 'Cam\u0061\u0301l'").size());
-    }
-
-    @Test
-    public void shouldEnableNonNormalizedSearch() throws Throwable
-    {
-        createTable("CREATE TABLE %s (id text PRIMARY KEY, val text)");
-
-        createIndex("CREATE CUSTOM INDEX ON %s(val) USING 'StorageAttachedIndex' WITH OPTIONS = { 'normalize' : false }");
-        waitForIndexQueryable();
-
-        execute("INSERT INTO %s (id, val) VALUES ('1', 'Cam\u00E1l')");
-
-        assertEquals(1, execute("SELECT id FROM %s WHERE val = 'Cam\u00E1l'").size());
-
-        // Both \u00E1 and \u0061\u0301 are visible as the character á, but without NFC normalization, they won't match.
-        assertEquals(0, execute("SELECT id FROM %s WHERE val = 'Cam\u0061\u0301l'").size());
-    }
-
-    @Test
-    public void shouldEnableNormalizedSearch() throws Throwable
-    {
-        createTable("CREATE TABLE %s (id text PRIMARY KEY, val text)");
-
-        createIndex("CREATE CUSTOM INDEX ON %s(val) USING 'StorageAttachedIndex' WITH OPTIONS = { 'normalize' : true }");
-        waitForIndexQueryable();
-
-        execute("INSERT INTO %s (id, val) VALUES ('1', 'Cam\u00E1l')");
-
-        assertEquals(1, execute("SELECT id FROM %s WHERE val = 'Cam\u0061\u0301l'").size());
-    }
-
-    @Test
-    public void shouldEnableNormalizedCaseInsensitiveSearch() throws Throwable
-    {
-        createTable("CREATE TABLE %s (id text PRIMARY KEY, val text)");
-
-        createIndex("CREATE CUSTOM INDEX ON %s(val) USING 'StorageAttachedIndex' WITH OPTIONS = { 'normalize' : true, 'case_sensitive' : false}");
-        waitForIndexQueryable();
-
-        execute("INSERT INTO %s (id, val) VALUES ('1', 'Cam\u00E1l')");
-
-        assertEquals(1, execute("SELECT id FROM %s WHERE val = 'cam\u0061\u0301l'").size());
-    }
-
-    @Test
-    public void shouldEnableAsciiSearch() throws Throwable
-    {
-        createTable("CREATE TABLE %s (id text PRIMARY KEY, val text)");
-
-        createIndex("CREATE CUSTOM INDEX ON %s(val) USING 'StorageAttachedIndex' WITH OPTIONS = { 'ascii' : true, 'case_sensitive' : false}");
-        waitForIndexQueryable();
-
-        execute("INSERT INTO %s (id, val) VALUES ('1', 'Éppinger')");
-
-        assertEquals(1, execute("SELECT id FROM %s WHERE val = 'eppinger'").size());
     }
 
     @Test

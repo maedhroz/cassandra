@@ -26,7 +26,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture; // checkstyle: permit this import
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Future;
 
 import com.google.common.collect.ImmutableSet;
@@ -62,8 +62,6 @@ import org.apache.cassandra.index.IndexRegistry;
 import org.apache.cassandra.index.SecondaryIndexBuilder;
 import org.apache.cassandra.index.TargetParser;
 import org.apache.cassandra.index.sai.analyzer.AbstractAnalyzer;
-import org.apache.cassandra.index.sai.analyzer.LuceneAnalyzer;
-import org.apache.cassandra.index.sai.analyzer.NonTokenizingOptions;
 import org.apache.cassandra.index.sai.utils.TypeUtil;
 import org.apache.cassandra.index.transactions.IndexTransaction;
 import org.apache.cassandra.io.sstable.Descriptor;
@@ -107,13 +105,8 @@ public class StorageAttachedIndex implements Index
     // Used to build indexes on newly added SSTables:
     private static final StorageAttachedIndexBuildingSupport INDEX_BUILDER_SUPPORT = new StorageAttachedIndexBuildingSupport();
 
-    private static final Set<String> VALID_OPTIONS = ImmutableSet.of(NonTokenizingOptions.CASE_SENSITIVE,
-                                                                     NonTokenizingOptions.NORMALIZE,
-                                                                     NonTokenizingOptions.ASCII,
-                                                                     IndexTarget.TARGET_OPTION_NAME,
-                                                                     IndexTarget.CUSTOM_INDEX_OPTION_NAME,
-                                                                     LuceneAnalyzer.INDEX_ANALYZER,
-                                                                     LuceneAnalyzer.QUERY_ANALYZER);
+    private static final Set<String> VALID_OPTIONS = ImmutableSet.of(IndexTarget.TARGET_OPTION_NAME,
+                                                                     IndexTarget.CUSTOM_INDEX_OPTION_NAME);
 
     public static final Set<CQL3Type> SUPPORTED_TYPES = ImmutableSet.of(CQL3Type.Native.ASCII, CQL3Type.Native.BIGINT, CQL3Type.Native.DATE,
                                                                         CQL3Type.Native.DOUBLE, CQL3Type.Native.FLOAT, CQL3Type.Native.INT,

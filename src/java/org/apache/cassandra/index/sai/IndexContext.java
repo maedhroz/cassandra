@@ -27,7 +27,6 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.TimeUnit;
-
 import javax.annotation.Nullable;
 
 import com.google.common.base.MoreObjects;
@@ -111,21 +110,11 @@ public class IndexContext
         this.indexMetrics = new IndexMetrics(this);
         this.validator = TypeUtil.cellValueType(columnMetadata, indexType);
 
-
         this.primaryKeyFactory = PrimaryKey.factory(clusteringComparator);
 
-        if (config != null)
-        {
-            this.indexAnalyzerFactory = AbstractAnalyzer.fromOptions(getValidator(), config.options);
-            this.queryAnalyzerFactory = AbstractAnalyzer.hasQueryAnalyzer(config.options)
-                                        ? AbstractAnalyzer.fromOptionsQueryAnalyzer(getValidator(), config.options)
-                                        : this.indexAnalyzerFactory;
-        }
-        else
-        {
-            this.indexAnalyzerFactory = AbstractAnalyzer.fromOptions(getValidator(), Collections.emptyMap());
-            this.queryAnalyzerFactory = this.indexAnalyzerFactory;
-        }
+        // We currently only support the NoOpAnalyzer
+        this.indexAnalyzerFactory = AbstractAnalyzer.fromOptions(getValidator(), Collections.emptyMap());
+        this.queryAnalyzerFactory = AbstractAnalyzer.fromOptions(getValidator(), Collections.emptyMap());
     }
 
     public AbstractType<?> keyValidator()
