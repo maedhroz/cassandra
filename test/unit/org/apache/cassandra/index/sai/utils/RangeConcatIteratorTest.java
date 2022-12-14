@@ -26,6 +26,12 @@ import static org.apache.cassandra.index.sai.utils.LongIterator.convert;
 import static org.apache.cassandra.index.sai.utils.RangeIterator.Builder.IteratorType.CONCAT;
 import static org.apache.cassandra.index.sai.utils.RangeIterator.Builder.IteratorType.INTERSECTION;
 import static org.apache.cassandra.index.sai.utils.RangeIterator.Builder.IteratorType.UNION;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 public class RangeConcatIteratorTest extends AbstractRangeIteratorTest
 {

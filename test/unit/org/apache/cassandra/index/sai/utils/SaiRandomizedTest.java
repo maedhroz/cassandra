@@ -17,50 +17,28 @@
  */
 package org.apache.cassandra.index.sai.utils;
 
-import java.util.Random;
-
-import com.google.common.base.Preconditions;
-import org.junit.AfterClass;
 import org.junit.BeforeClass;
 import org.junit.ClassRule;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.TestRule;
 
-import com.carrotsearch.randomizedtesting.RandomizedTest;
-import com.carrotsearch.randomizedtesting.annotations.ThreadLeakScope;
 import org.apache.cassandra.config.DatabaseDescriptor;
+import org.apache.cassandra.index.sai.SAITester;
 
-@ThreadLeakScope(ThreadLeakScope.Scope.NONE)
-public class SaiRandomizedTest extends RandomizedTest
+public class SaiRandomizedTest extends SAITester
 {
-    private static Thread.UncaughtExceptionHandler handler;
-
     @SuppressWarnings("unused")
     @BeforeClass
     public static void saveUncaughtExceptionHandler()
     {
-        handler = Thread.getDefaultUncaughtExceptionHandler();
         DatabaseDescriptor.daemonInitialization();
-    }
-
-    @SuppressWarnings("unused")
-    @AfterClass
-    public static void restoreUncaughtExceptionHandler()
-    {
-        Thread.setDefaultUncaughtExceptionHandler(handler);
     }
 
     protected static TemporaryFolder temporaryFolder;
 
     @ClassRule
     public static TestRule classRules = RuleChain.outerRule(temporaryFolder = new TemporaryFolder());
-
-
-    public String newIndex()
-    {
-        return randomSimpleString(2, 29);
-    }
 
     /**
      * Load a byte array with random bytes. Shortcut for getRandom() method
@@ -90,7 +68,7 @@ public class SaiRandomizedTest extends RandomizedTest
 
     public static int nextInt(int min, int max)
     {
-        return between(min, max - 1);
+        return getRandom().nextIntBetween(min, max - 1);
     }
 
     public static long nextLong(long min, long max)
@@ -101,13 +79,6 @@ public class SaiRandomizedTest extends RandomizedTest
     public static long between(long min, long max)
     {
         return randomLongBetween(min, max);
-    }
-
-    public static int randomIntBetween(int min, int max)
-    {
-        if (min < 0) throw new IllegalArgumentException("min must be >= 0: " + min);
-        if (min > max) throw new IllegalArgumentException("max must be >= min: " + min + ", " + max);
-        return min == max ? min : (int) randomDoubleBetween((double) min, (double) max);
     }
 
     public static long randomLongBetween(long min, long max)
@@ -122,50 +93,6 @@ public class SaiRandomizedTest extends RandomizedTest
         if (min < 0) throw new IllegalArgumentException("min must be >= 0: " + min);
         if (min > max) throw new IllegalArgumentException("max must be >= min: " + min + ", " + max);
 
-        return min == max ? min : min + (max - min) * randomDouble();
-    }
-
-    public static long scaledRandomLongBetween(long min, long max)
-    {
-        if (min < 0) throw new IllegalArgumentException("min must be >= 0: " + min);
-        if (min > max) throw new IllegalArgumentException("max must be >= min: " + min + ", " + max);
-
-        double point = Math.min(1, Math.abs(randomGaussian()) * 0.3) * multiplier();
-        double range = max - min;
-        long scaled = Math.round(Math.min(point * range, range));
-        return isNightly() ? max - scaled : min + scaled;
-    }
-
-    public static String randomSimpleString(int minLength, int maxLength)
-    {
-        Preconditions.checkArgument(minLength >= 0);
-        Preconditions.checkArgument(maxLength >= 0);
-        final int end = nextInt(minLength, maxLength);
-        if (end == 0)
-        {
-            // allow 0 length
-            return "";
-        }
-        final char[] buffer = new char[end];
-        for (int i = 0; i < end; i++)
-        {
-            buffer[i] = (char) nextInt('a', 'z');
-        }
-        return new String(buffer, 0, end);
-    }
-
-    public static int[] shuffle(int[] array)
-    {
-        Random rgen = new Random();
-
-        for (int i=0; i< array.length; i++)
-        {
-            int randomPosition = rgen.nextInt(array.length);
-            int temp = array[i];
-            array[i] = array[randomPosition];
-            array[randomPosition] = temp;
-        }
-
-        return array;
+        return min == max ? min : min + (max - min) * getRandom().nextDouble();
     }
 }
