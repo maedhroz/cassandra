@@ -34,7 +34,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
 
-public class AbstractPrimaryKeyTest extends SaiRandomizedTest
+public class AbstractPrimaryKeyTester extends SAIRandomizedTester
 {
     static TableMetadata simplePartition = TableMetadata.builder("test", "test")
                                                         .partitioner(Murmur3Partitioner.instance)

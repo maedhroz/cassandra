@@ -24,7 +24,7 @@ import org.junit.Test;
 
 import org.apache.cassandra.db.Clustering;
 
-public class PrimaryKeyTest extends AbstractPrimaryKeyTest
+public class PrimaryKeyTest extends AbstractPrimaryKeyTester
 {
     @Test
     public void singlePartitionTest()

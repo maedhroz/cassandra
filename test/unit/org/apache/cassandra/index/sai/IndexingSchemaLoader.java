@@ -76,7 +76,6 @@ public class IndexingSchemaLoader extends SchemaLoader
                 {{
                     put(IndexTarget.CUSTOM_INDEX_OPTION_NAME, StorageAttachedIndex.class.getName());
                     put(IndexTarget.TARGET_OPTION_NAME, "address");
-                    put("case_sensitive", "false");
                 }}))
                 .add(IndexMetadata.fromSchemaMetadata(cfName + "_score", IndexMetadata.Kind.CUSTOM, new HashMap<String, String>()
                 {{
@@ -87,7 +86,6 @@ public class IndexingSchemaLoader extends SchemaLoader
                 {{
                     put(IndexTarget.CUSTOM_INDEX_OPTION_NAME, StorageAttachedIndex.class.getName());
                     put(IndexTarget.TARGET_OPTION_NAME, "comment");
-                    put("case_sensitive", "true");
                 }}))
                 .add(IndexMetadata.fromSchemaMetadata(cfName + "_comment_suffix_split", IndexMetadata.Kind.CUSTOM, new HashMap<String, String>()
                 {{
@@ -98,7 +96,6 @@ public class IndexingSchemaLoader extends SchemaLoader
                 {{
                     put(IndexTarget.CUSTOM_INDEX_OPTION_NAME, StorageAttachedIndex.class.getName());
                     put(IndexTarget.TARGET_OPTION_NAME, "/output/full-name/");
-                    put("case_sensitive", "false");
                 }}))
                 .add(IndexMetadata.fromSchemaMetadata(cfName + "_data_output_id", IndexMetadata.Kind.CUSTOM, new HashMap<String, String>()
                 {{
@@ -157,7 +154,6 @@ public class IndexingSchemaLoader extends SchemaLoader
         {{
             put(IndexTarget.CUSTOM_INDEX_OPTION_NAME, StorageAttachedIndex.class.getName());
             put(IndexTarget.TARGET_OPTION_NAME, "sensor_type");
-            put("case_sensitive", "false");
         }}));
 
         indexes.add(IndexMetadata.fromSchemaMetadata(cfName + "_value", IndexMetadata.Kind.CUSTOM, new HashMap<String, String>()

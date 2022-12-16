@@ -33,7 +33,7 @@ import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-public class RangeConcatIteratorTest extends AbstractRangeIteratorTest
+public class RangeConcatIteratorTest extends AbstractRangeIteratorTester
 {
     @Test
     public void testValidation()

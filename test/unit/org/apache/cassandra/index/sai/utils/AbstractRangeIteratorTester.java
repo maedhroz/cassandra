@@ -21,7 +21,7 @@ import java.util.Arrays;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-public class AbstractRangeIteratorTest extends SaiRandomizedTest
+public class AbstractRangeIteratorTester extends SAIRandomizedTester
 {
     protected long[] arr(long... longArray)
     {

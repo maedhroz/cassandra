@@ -131,47 +131,6 @@ public class StorageAttachedIndexDDLTest extends SAITester
     }
 
     @Test
-    public void shouldFailCreateSpecifyingAnalyzerClass()
-    {
-        createTable("CREATE TABLE %s (id text PRIMARY KEY, val text)");
-
-        assertThatThrownBy(() -> executeNet("CREATE CUSTOM INDEX ON %s(val) " +
-                                            "USING 'StorageAttachedIndex' " +
-                                            "WITH OPTIONS = { 'analyzer_class' : 'org.apache.cassandra.index.sai.analyzer.NonTokenizingAnalyzer' }"))
-                .isInstanceOf(InvalidConfigurationInQueryException.class);
-    }
-
-    @Test
-    public void shouldFailCreateWithMisspelledOption()
-    {
-        createTable("CREATE TABLE %s (id text PRIMARY KEY, val text)");
-
-        assertThatThrownBy(() -> executeNet("CREATE CUSTOM INDEX ON %s(val) " +
-                                            "USING 'StorageAttachedIndex' " +
-                                            "WITH OPTIONS = { 'case-sensitive' : true }")).isInstanceOf(InvalidConfigurationInQueryException.class);
-    }
-
-    @Test
-    public void shouldFailCaseSensitiveWithNonText()
-    {
-        createTable("CREATE TABLE %s (id text PRIMARY KEY, val int)");
-
-        assertThatThrownBy(() -> executeNet("CREATE CUSTOM INDEX ON %s(val) " +
-                                            "USING 'StorageAttachedIndex' " +
-                                            "WITH OPTIONS = { 'case_sensitive' : true }")).isInstanceOf(InvalidQueryException.class);
-    }
-
-    @Test
-    public void shouldFailOnNormalizeWithNonText()
-    {
-        createTable("CREATE TABLE %s (id text PRIMARY KEY, val int)");
-
-        assertThatThrownBy(() -> executeNet("CREATE CUSTOM INDEX ON %s(val) " +
-                                            "USING 'StorageAttachedIndex' " +
-                                            "WITH OPTIONS = { 'normalize' : true }")).isInstanceOf(InvalidQueryException.class);
-    }
-
-    @Test
     public void shouldFailCreateWithUserType()
     {
         String typeName = createType("CREATE TYPE %s (a text, b int, c double)");
@@ -314,24 +273,6 @@ public class StorageAttachedIndexDDLTest extends SAITester
     }
 
     @Test
-    public void shouldFailToCreateInvalidBooleanOption() throws Throwable
-    {
-        createTable("CREATE TABLE %s (id text PRIMARY KEY, val text)");
-
-        assertThatThrownBy(() -> executeNet("CREATE CUSTOM INDEX ON %s(val) USING 'StorageAttachedIndex' " +
-                                            "WITH OPTIONS = {'case_sensitive': 'NOTVALID'}")).isInstanceOf(InvalidQueryException.class);
-    }
-
-    @Test
-    public void shouldFailToCreateEmptyBooleanOption() throws Throwable
-    {
-        createTable("CREATE TABLE %s (id text PRIMARY KEY, val text)");
-
-        assertThatThrownBy(() -> executeNet("CREATE CUSTOM INDEX ON %s(val) USING 'StorageAttachedIndex' " +
-                                            "WITH OPTIONS = {'case_sensitive': ''}")).isInstanceOf(InvalidQueryException.class);
-    }
-
-    @Test
     public void shouldFailCreationOnMultipleColumns() throws Throwable
     {
         createTable("CREATE TABLE %s (id text PRIMARY KEY, val1 text, val2 text)");
@@ -358,11 +299,6 @@ public class StorageAttachedIndexDDLTest extends SAITester
         assertThatThrownBy(() -> executeNet("CREATE CUSTOM INDEX index_2 ON %s(v1) USING 'StorageAttachedIndex'"))
                 .isInstanceOf(InvalidQueryException.class)
                 .hasMessageContaining("Index index_2 is a duplicate of existing index index_1");
-
-        // different name, different option, same target.
-        assertThatThrownBy(() -> executeNet("CREATE CUSTOM INDEX ON %s(v1) USING 'StorageAttachedIndex' WITH OPTIONS = { 'case_sensitive' : true }"))
-                .isInstanceOf(InvalidQueryException.class)
-                .hasMessageContaining("Cannot create more than one storage-attached index on the same column: v1" );
 
         execute("INSERT INTO %s (id, v1) VALUES(1, '1')");
 

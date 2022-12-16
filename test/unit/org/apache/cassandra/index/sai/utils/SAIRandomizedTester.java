@@ -26,7 +26,7 @@ import org.junit.rules.TestRule;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.index.sai.SAITester;
 
-public class SaiRandomizedTest extends SAITester
+public class SAIRandomizedTester extends SAITester
 {
     @SuppressWarnings("unused")
     @BeforeClass

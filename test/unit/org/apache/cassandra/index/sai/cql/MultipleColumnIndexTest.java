@@ -19,10 +19,8 @@ package org.apache.cassandra.index.sai.cql;
 
 import org.junit.Test;
 
-import org.apache.cassandra.exceptions.InvalidRequestException;
 import org.apache.cassandra.index.sai.SAITester;
 
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.Assert.assertEquals;
 
 public class MultipleColumnIndexTest extends SAITester
@@ -37,15 +35,6 @@ public class MultipleColumnIndexTest extends SAITester
         createIndex("CREATE CUSTOM INDEX ON %s(KEYS(value)) USING 'StorageAttachedIndex'");
         createIndex("CREATE CUSTOM INDEX ON %s(VALUES(value)) USING 'StorageAttachedIndex'");
         createIndex("CREATE CUSTOM INDEX ON %s(ENTRIES(value)) USING 'StorageAttachedIndex'");
-    }
-
-    @Test
-    public void cannotHaveMultipleLiteralIndexesWithDifferentOptions()
-    {
-        createTable("CREATE TABLE %s (pk int, ck int, value text, PRIMARY KEY(pk, ck))");
-        createIndex("CREATE CUSTOM INDEX ON %s(value) USING 'StorageAttachedIndex' WITH OPTIONS = { 'case_sensitive' : true }");
-        assertThatThrownBy(() -> createIndex("CREATE CUSTOM INDEX ON %s(value) USING 'StorageAttachedIndex' WITH OPTIONS = { 'case_sensitive' : false }"))
-                .isInstanceOf(RuntimeException.class).hasCauseInstanceOf(InvalidRequestException.class);
     }
 
     @Test

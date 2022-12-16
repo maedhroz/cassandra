@@ -34,7 +34,7 @@ import static org.apache.cassandra.index.sai.utils.RangeIterator.Builder.Iterato
 import static org.apache.cassandra.index.sai.utils.RangeIterator.Builder.IteratorType.UNION;
 import static org.junit.Assert.assertEquals;
 
-public class RangeIntersectionIteratorTest extends AbstractRangeIteratorTest
+public class RangeIntersectionIteratorTest extends AbstractRangeIteratorTester
 {
     @Test
     public void testNoOverlappingValues()

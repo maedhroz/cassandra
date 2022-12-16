@@ -21,8 +21,6 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
-import com.google.common.base.Preconditions;
-
 import org.apache.cassandra.db.Clustering;
 import org.apache.cassandra.db.ClusteringComparator;
 import org.apache.cassandra.db.DecoratedKey;
@@ -52,12 +50,6 @@ public class PrimaryKey implements Comparable<PrimaryKey>
                Clustering<?> clustering,
                ClusteringComparator clusteringComparator)
     {
-        Preconditions.checkArgument(token != null,
-                                    "Can't have a PrimaryKey with no token");
-        Preconditions.checkArgument((partitionKey == null) || ((partitionKey != null) && (clustering != null)),
-                                    "A token only PrimaryKey can't have a clustering component");
-        Preconditions.checkArgument((clustering == null) || ((clustering != null) && (clusteringComparator != null)),
-                                    "A PrimaryKey without a clustering component can't have a clustering comparator");
         this.token = token;
         this.partitionKey = partitionKey;
         this.clustering = clustering;
