@@ -65,7 +65,6 @@ public abstract class RowFilter implements Iterable<RowFilter.Expression>
     private static final Logger logger = LoggerFactory.getLogger(RowFilter.class);
 
     public static final Serializer serializer = new Serializer();
-    public static final RowFilter NONE = new CQLFilter(Collections.emptyList());
 
     protected final List<Expression> expressions;
 
@@ -82,6 +81,11 @@ public abstract class RowFilter implements Iterable<RowFilter.Expression>
     public static RowFilter create(int capacity)
     {
         return new CQLFilter(new ArrayList<>(capacity));
+    }
+
+    public static RowFilter none()
+    {
+        return CQLFilter.NONE;
     }
 
     public SimpleExpression add(ColumnMetadata def, Operator op, ByteBuffer value)
@@ -231,7 +235,7 @@ public abstract class RowFilter implements Iterable<RowFilter.Expression>
     {
         assert expressions.contains(expression);
         if (expressions.size() == 1)
-            return RowFilter.NONE;
+            return RowFilter.none();
 
         List<Expression> newExpressions = new ArrayList<>(expressions.size() - 1);
         for (Expression e : expressions)
@@ -310,6 +314,8 @@ public abstract class RowFilter implements Iterable<RowFilter.Expression>
 
     private static class CQLFilter extends RowFilter
     {
+        static CQLFilter NONE = new CQLFilter(Collections.emptyList());
+
         private CQLFilter(List<Expression> expressions)
         {
             super(expressions);

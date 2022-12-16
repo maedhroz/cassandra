@@ -26,8 +26,8 @@ import static org.apache.cassandra.metrics.CassandraMetricsRegistry.Metrics;
 public class IndexMetrics extends AbstractMetrics
 {
     public final Timer memtableIndexWriteLatency;
-    public final Gauge liveMemtableIndexWriteCount;
-    public final Gauge memtableIndexBytes;
+    public final Gauge<Long> liveMemtableIndexWriteCount;
+    public final Gauge<Long> memtableIndexBytes;
 
     public IndexMetrics(IndexContext context)
     {

@@ -71,7 +71,7 @@ public class StorageAttachedIndexSearcher implements Index.Searcher
                                         long executionQuotaMs)
     {
         this.command = command;
-        this.queryContext = new QueryContext(executionQuotaMs);
+        this.queryContext = new QueryContext(command, executionQuotaMs);
         this.controller = new QueryController(cfs, command, filterOperation, queryContext, tableQueryMetrics);
         this.keyFactory = PrimaryKey.factory(cfs.metadata().comparator);
     }

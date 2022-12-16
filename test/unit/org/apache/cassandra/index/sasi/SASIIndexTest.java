@@ -2432,7 +2432,7 @@ public class SASIIndexTest
             PartitionRangeReadCommand.create(store.metadata(),
                                              FBUtilities.nowInSeconds(),
                                              ColumnFilter.all(store.metadata()),
-                                             RowFilter.NONE,
+                                             RowFilter.none(),
                                              DataLimits.NONE,
                                              DataRange.allData(store.getPartitioner()));
 

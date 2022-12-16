@@ -24,7 +24,8 @@ import javax.annotation.concurrent.NotThreadSafe;
 import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.cassandra.config.DatabaseDescriptor;
-import org.apache.cassandra.index.sai.utils.AbortedOperationException;
+import org.apache.cassandra.db.ReadCommand;
+import org.apache.cassandra.exceptions.QueryCancelledException;
 import org.apache.cassandra.utils.Clock;
 
 /**
@@ -37,6 +38,7 @@ public class QueryContext
 {
     private static final boolean DISABLE_TIMEOUT = Boolean.getBoolean("cassandra.sai.test.disable.timeout");
 
+    private final ReadCommand readCommand;
     private final long queryStartTimeNanos;
 
     public final long executionQuotaNano;
@@ -49,11 +51,12 @@ public class QueryContext
     @VisibleForTesting
     public QueryContext()
     {
-        this(DatabaseDescriptor.getRangeRpcTimeout(TimeUnit.MILLISECONDS));
+        this(null, DatabaseDescriptor.getRangeRpcTimeout(TimeUnit.MILLISECONDS));
     }
 
-    public QueryContext(long executionQuotaMs)
+    public QueryContext(ReadCommand readCommand, long executionQuotaMs)
     {
+        this.readCommand = readCommand;
         this.executionQuotaNano = TimeUnit.MILLISECONDS.toNanos(executionQuotaMs);
         queryStartTimeNanos = Clock.Global.nanoTime();
     }
@@ -68,7 +71,7 @@ public class QueryContext
         if (totalQueryTimeNs() >= executionQuotaNano && !DISABLE_TIMEOUT)
         {
             queryTimeouts++;
-            throw new AbortedOperationException();
+            throw new QueryCancelledException(readCommand);
         }
     }
 }

@@ -27,8 +27,8 @@ public class TableStateMetrics extends AbstractMetrics
 {
     public static final String TABLE_STATE_METRIC_TYPE = "TableStateMetrics";
 
-    private final Gauge totalIndexCount;
-    private final Gauge totalQueryableIndexCount;
+    public final Gauge<Integer> totalIndexCount;
+    public final Gauge<Integer> totalQueryableIndexCount;
 
     public TableStateMetrics(TableMetadata table, StorageAttachedIndexGroup group)
     {

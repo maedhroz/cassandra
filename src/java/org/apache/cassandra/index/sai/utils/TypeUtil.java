@@ -272,7 +272,7 @@ public class TypeUtil
         return type;
     }
 
-    private static ByteBuffer cellValue(ColumnMetadata columnMetadata, IndexTarget.Type indexType, Cell cell)
+    private static ByteBuffer cellValue(ColumnMetadata columnMetadata, IndexTarget.Type indexType, Cell<?> cell)
     {
         if (columnMetadata.type.isCollection() && columnMetadata.type.isMultiCell())
         {
@@ -327,7 +327,7 @@ public class TypeUtil
             int position = value.hasArray() ? value.arrayOffset() + value.position() : value.position();
             ByteBuffer mapped = ByteBuffer.allocate(16);
             System.arraycopy(IPV4_PREFIX, 0, mapped.array(), 0, IPV4_PREFIX.length);
-            ByteBufferUtil.arrayCopy(value, position, mapped, IPV4_PREFIX.length, value.remaining());
+            ByteBufferUtil.copyBytes(value, position, mapped, IPV4_PREFIX.length, value.remaining());
             return mapped;
         }
         return value;
@@ -356,7 +356,7 @@ public class TypeUtil
         byte[] bytes = new byte[20];
         if (size < 16)
         {
-            ByteBufferUtil.arrayCopy(value, position, bytes, bytes.length - size, size);
+            ByteBufferUtil.copyBytes(value, position, bytes, bytes.length - size, size);
             if ((bytes[bytes.length - size] & 0x80) != 0)
                 Arrays.fill(bytes, 4, bytes.length - size, (byte)0xff);
             else
@@ -364,7 +364,7 @@ public class TypeUtil
         }
         else
         {
-            ByteBufferUtil.arrayCopy(value, position, bytes, 4, 16);
+            ByteBufferUtil.copyBytes(value, position, bytes, 4, 16);
         }
         if ((bytes[4] & 0x80) != 0)
         {

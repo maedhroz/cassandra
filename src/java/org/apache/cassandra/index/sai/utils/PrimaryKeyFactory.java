@@ -40,24 +40,17 @@ public class PrimaryKeyFactory
      *
      * {@link Token} only primary keys are used for defining the partition range
      * of a query.
-     *
-     * @param token the {@link Token}
-     * @return a {@link PrimaryKey} represented by a token only
      */
     public PrimaryKey createTokenOnly(Token token)
     {
-        return new PrimaryKey(token, null, null, clusteringComparator);
+        return new PrimaryKey(token);
     }
 
     /**
      * Creates a {@link PrimaryKey} that is fully represented by partition key
      * and clustering.
-     *
-     * @param partitionKey the {@link DecoratedKey}
-     * @param clustering the {@link Clustering}
-     * @return a {@link PrimaryKey} contain the partition key and clustering
      */
-    public PrimaryKey create(DecoratedKey partitionKey, Clustering clustering)
+    public PrimaryKey create(DecoratedKey partitionKey, Clustering<?> clustering)
     {
         return new PrimaryKey(partitionKey.getToken(), partitionKey, clustering, clusteringComparator);
     }

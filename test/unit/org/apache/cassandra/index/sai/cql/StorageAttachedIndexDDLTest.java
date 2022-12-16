@@ -45,6 +45,7 @@ import org.apache.cassandra.inject.InvokePointBuilder;
 import org.apache.cassandra.schema.SchemaConstants;
 import org.apache.cassandra.schema.TableMetadata;
 
+import static org.apache.cassandra.cql3.statements.schema.CreateIndexStatement.INVALID_CUSTOM_INDEX_TARGET;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -203,8 +204,7 @@ public class StorageAttachedIndexDDLTest extends SAITester
         assertThatThrownBy(() -> executeNet(String.format("CREATE CUSTOM INDEX ON %%s(\"%s\")" +
                                                           " USING 'StorageAttachedIndex'", invalidColumn)))
                 .isInstanceOf(InvalidQueryException.class)
-                .hasMessage(String.format("Column '%s' is longer than the permissible name length of %d characters or" +
-                                          " contains non-alphanumeric-underscore characters", invalidColumn, SchemaConstants.NAME_LENGTH));
+                .hasMessage(String.format(INVALID_CUSTOM_INDEX_TARGET, invalidColumn, SchemaConstants.NAME_LENGTH));
     }
 
     @Test

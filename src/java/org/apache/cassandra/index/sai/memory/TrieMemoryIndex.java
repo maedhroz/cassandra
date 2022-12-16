@@ -101,7 +101,7 @@ public class TrieMemoryIndex
      * @param value indexed value
      * @return amount of heap allocated by the new value
      */
-    public long add(DecoratedKey key, Clustering clustering, ByteBuffer value)
+    public long add(DecoratedKey key, Clustering<?> clustering, ByteBuffer value)
     {
         synchronized (writeLock)
         {

@@ -16,20 +16,20 @@
  * limitations under the License.
  */
 
-package org.apache.cassandra.index.sai.utils;
+package org.apache.cassandra.index.sai.virtual;
 
+import java.util.Arrays;
+import java.util.Collection;
 
-/**
- * This exception indicates that a request was aborted, normally because it was taking too much time.
- *
- * It is handled in a special way by the verb handlers and the request execute method: it is simply
- * passed to the onAborted callback without logging any message. Therefore if any logging is required,
- * it is up to the code raising this exception to log anything.
- */
-public class AbortedOperationException extends RuntimeException
+import org.apache.cassandra.db.virtual.VirtualTable;
+
+public class StorageAttachedIndexTables
 {
-    public AbortedOperationException()
+    private StorageAttachedIndexTables()
+    {}
+
+    public static Collection<VirtualTable> getAll(String keyspace)
     {
-        super();
+        return Arrays.asList(new IndexesSystemView(keyspace));
     }
 }

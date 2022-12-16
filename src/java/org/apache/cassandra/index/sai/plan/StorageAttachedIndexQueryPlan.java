@@ -84,8 +84,8 @@ public class StorageAttachedIndexQueryPlan implements Index.QueryPlan
 
         /*
          * postIndexFilter comprised by those expressions in the read command row filter that can't be handled by
-         * {@link FilterTree#satisfiedBy(Unfiltered, Row, boolean)}. That includes expressions targeted
-         * at {@link RowFilter.UserExpression}s like those used by RLAC.
+         * {@link FilterTree#satisfiedBy(Unfiltered, Row, boolean)}. This includes expressions targeted
+         * at {@link RowFilter.UserExpression}s.
          */
         RowFilter postIndexFilter = rowFilter.restrict(RowFilter.Expression::isUserDefined);
         return new StorageAttachedIndexQueryPlan(cfs, queryMetrics, postIndexFilter, rowFilter, selectedIndexes);

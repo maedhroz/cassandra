@@ -962,7 +962,7 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
             SinglePartitionReadCommand cmd = SinglePartitionReadCommand.create(baseCfs.metadata(),
                                                                                FBUtilities.nowInSeconds(),
                                                                                ColumnFilter.selection(columns),
-                                                                               RowFilter.NONE,
+                                                                               RowFilter.none(),
                                                                                DataLimits.NONE,
                                                                                key,
                                                                                new ClusteringIndexSliceFilter(Slices.ALL, false));

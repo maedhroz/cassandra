@@ -22,21 +22,11 @@ import java.nio.ByteBuffer;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Set;
-
-import com.google.common.collect.ImmutableSet;
 
 import org.apache.cassandra.db.marshal.AbstractType;
-import org.apache.cassandra.db.marshal.AsciiType;
-import org.apache.cassandra.db.marshal.UTF8Type;
-import org.apache.cassandra.exceptions.InvalidRequestException;
-import org.apache.cassandra.index.sai.utils.TypeUtil;
-import org.apache.lucene.analysis.Analyzer;
 
 public abstract class AbstractAnalyzer implements Iterator<ByteBuffer>
 {
-    public static final Set<AbstractType<?>> ANALYZABLE_TYPES = ImmutableSet.of(UTF8Type.instance, AsciiType.instance);
-
     protected ByteBuffer next = null;
     String nextLiteral = null;
 

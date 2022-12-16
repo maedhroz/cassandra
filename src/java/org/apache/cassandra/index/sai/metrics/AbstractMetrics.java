@@ -62,12 +62,12 @@ public abstract class AbstractMetrics
 
     protected CassandraMetricsRegistry.MetricName createMetricName(String name, String scope)
     {
-        String metricScope = keyspace + "." + table;
+        String metricScope = keyspace + '.' + table;
         if (index != null)
         {
-            metricScope += "." + index;
+            metricScope += '.' + index;
         }
-        metricScope += "." + scope + "." + name;
+        metricScope += '.' + scope + '.' + name;
 
         CassandraMetricsRegistry.MetricName metricName = new CassandraMetricsRegistry.MetricName(DefaultNameFactory.GROUP_NAME,
                                                                                                  TYPE, name, metricScope, createMBeanName(name, scope));

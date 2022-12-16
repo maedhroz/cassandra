@@ -19,7 +19,7 @@ package org.apache.cassandra.db.virtual;
 
 import com.google.common.collect.ImmutableList;
 
-import org.apache.cassandra.index.sai.virtual.IndexesSystemView;
+import org.apache.cassandra.index.sai.virtual.StorageAttachedIndexTables;
 
 import static org.apache.cassandra.schema.SchemaConstants.VIRTUAL_VIEWS;
 
@@ -52,7 +52,7 @@ public final class SystemViewsKeyspace extends VirtualKeyspace
                     .add(new QueriesTable(VIRTUAL_VIEWS))
                     .add(new LogMessagesTable(VIRTUAL_VIEWS))
                     .addAll(LocalRepairTables.getAll(VIRTUAL_VIEWS))
-                    .add(new IndexesSystemView(VIRTUAL_VIEWS))
+                    .addAll(StorageAttachedIndexTables.getAll(VIRTUAL_VIEWS))
                     .build());
     }
 }

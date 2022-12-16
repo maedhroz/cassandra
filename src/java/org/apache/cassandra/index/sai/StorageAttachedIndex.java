@@ -26,7 +26,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletableFuture; // checkstyle: permit this import
 import java.util.concurrent.Future;
 
 import com.google.common.collect.ImmutableSet;

@@ -21,6 +21,8 @@ import java.util.Iterator;
 import java.util.SortedSet;
 import java.util.concurrent.ConcurrentSkipListSet;
 
+import javax.annotation.concurrent.ThreadSafe;
+
 import org.apache.cassandra.utils.ObjectSizes;
 
 /**
@@ -28,19 +30,17 @@ import org.apache.cassandra.utils.ObjectSizes;
  *
  * The primary keys are sorted first by token, then by partition key value, and then by clustering.
  */
+@ThreadSafe
 public class PrimaryKeys implements Iterable<PrimaryKey>
 {
     private static final long EMPTY_SIZE = ObjectSizes.measure(new PrimaryKeys());
-
     // from https://github.com/gaul/java-collection-overhead
-    long SET_ENTRY_OVERHEAD = 36;
+    private static final long SET_ENTRY_OVERHEAD = 36;
 
     private final ConcurrentSkipListSet<PrimaryKey> keys = new ConcurrentSkipListSet<>();
 
     /**
-     * Adds the specified {@link PrimaryKey}.
-     *
-     * @param key a primary key
+     * Adds a {@link PrimaryKey} and returns the on-heap memory used if the key was added
      */
     public long add(PrimaryKey key)
     {

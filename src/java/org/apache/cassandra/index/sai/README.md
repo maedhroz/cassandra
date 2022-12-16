@@ -30,7 +30,6 @@ architectural character (and even some actual code), but makes significant impro
 - While indexes continue to be managed at the column level from the user's perspective, the storage design at the column
   index level is row-based, with related offset and token information stored only once at the SSTable level. This
   drastically reduces our on-disk footprint when several columns are indexed on the same table.
-- The query path is synchronous and index searches run on IO threads.
 - Tracing, metrics, virtual table-based metadata and snapshot-based backup/restore are supported out of the box.
 
 Many similarities with standard secondary indexes remain:

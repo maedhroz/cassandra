@@ -24,15 +24,16 @@ import java.util.List;
 import java.util.PriorityQueue;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 
 import org.apache.cassandra.io.util.FileUtils;
+import org.apache.cassandra.utils.AbstractGuavaIterator;
 
 /**
- * Modified from {@link org.apache.cassandra.index.sasi.utils.RangeIterator} to support:
- * 1. no generic type to reduce allocation
- * 2. CONCAT iterator type
+ * An abstract implementation of {@link AbstractGuavaIterator} that supports the building and management of
+ * concatanation, union and intersection iterators.
  */
-public abstract class RangeIterator extends AbstractIterator<PrimaryKey> implements Closeable
+public abstract class RangeIterator extends AbstractGuavaIterator<PrimaryKey> implements Closeable
 {
     private final PrimaryKey min, max;
     private final long count;
@@ -43,15 +44,11 @@ public abstract class RangeIterator extends AbstractIterator<PrimaryKey> impleme
         this(statistics.min, statistics.max, statistics.tokenCount);
     }
 
-    public RangeIterator(RangeIterator range)
-    {
-        this(range == null ? null : range.min, range == null ? null : range.max, range == null ? -1 : range.count);
-    }
-
     public RangeIterator(PrimaryKey min, PrimaryKey max, long count)
     {
-        if (min == null || max == null || count == 0)
-            assert min == null && max == null && (count == 0 || count == -1) : min + " - " + max + " " + count;
+        boolean isComplete = min != null && max != null && count != 0;
+        boolean isEmpty = min == null && max == null && (count == 0 || count == -1);
+        Preconditions.checkArgument(isComplete || isEmpty, "Range: [" + min + ',' + max + "], Count: " + count);
 
         this.min = min;
         this.current = min;
@@ -146,7 +143,7 @@ public abstract class RangeIterator extends AbstractIterator<PrimaryKey> impleme
         {
             CONCAT,
             UNION,
-            INTERSECTION;
+            INTERSECTION
         }
 
         @VisibleForTesting

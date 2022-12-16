@@ -140,7 +140,7 @@ public class QueryController
             SinglePartitionReadCommand partition = SinglePartitionReadCommand.create(cfs.metadata(),
                                                                                      command.nowInSec(),
                                                                                      command.columnFilter(),
-                                                                                     RowFilter.NONE,
+                                                                                     RowFilter.none(),
                                                                                      DataLimits.NONE,
                                                                                      key.partitionKey(),
                                                                                      makeFilter(key));

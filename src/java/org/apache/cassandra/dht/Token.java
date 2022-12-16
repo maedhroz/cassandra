@@ -125,7 +125,7 @@ public abstract class Token implements RingPosition<Token>, Serializable
     abstract public Object getTokenValue();
 
     /**
-     * This methods exists so that callers can access the primitive {@code long} value for this {@link Token}, if
+     * This method exists so that callers can access the primitive {@code long} value for this {@link Token}, if
      * one exits. It is especially useful when the auto-boxing induced by a call to {@link #getTokenValue()} would
      * be unacceptable for reasons of performance.
      *

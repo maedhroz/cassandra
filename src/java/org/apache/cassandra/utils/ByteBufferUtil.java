@@ -277,6 +277,15 @@ public class ByteBufferUtil
         return clone;
     }
 
+    /**
+     * Transfer bytes from a ByteBuffer to byte array.
+     *
+     * @param src the source ByteBuffer
+     * @param srcPos starting position in the source ByteBuffer
+     * @param dst the destination byte array
+     * @param dstPos starting position in the destination byte array
+     * @param length the number of bytes to copy
+     */
     public static void copyBytes(ByteBuffer src, int srcPos, byte[] dst, int dstPos, int length)
     {
         FastByteOperations.copy(src, srcPos, dst, dstPos, length);
@@ -293,35 +302,6 @@ public class ByteBufferUtil
      * @param length the number of bytes to copy
      */
     public static void copyBytes(ByteBuffer src, int srcPos, ByteBuffer dst, int dstPos, int length)
-    {
-        FastByteOperations.copy(src, srcPos, dst, dstPos, length);
-    }
-
-    /**
-     * Transfer bytes from one ByteBuffer to another.
-     * This function acts as System.arrayCopy() but for ByteBuffers.
-     *
-     * @param src the source ByteBuffer
-     * @param srcPos starting position in the source ByteBuffer
-     * @param dst the destination ByteBuffer
-     * @param dstPos starting position in the destination ByteBuffer
-     * @param length the number of bytes to copy
-     */
-    public static void arrayCopy(ByteBuffer src, int srcPos, ByteBuffer dst, int dstPos, int length)
-    {
-        FastByteOperations.copy(src, srcPos, dst, dstPos, length);
-    }
-
-    /**
-     * Transfer bytes from a ByteBuffer to byte array.
-     *
-     * @param src the source ByteBuffer
-     * @param srcPos starting position in the source ByteBuffer
-     * @param dst the destination byte array
-     * @param dstPos starting position in the destination byte array
-     * @param length the number of bytes to copy
-     */
-    public static void arrayCopy(ByteBuffer src, int srcPos, byte[] dst, int dstPos, int length)
     {
         FastByteOperations.copy(src, srcPos, dst, dstPos, length);
     }

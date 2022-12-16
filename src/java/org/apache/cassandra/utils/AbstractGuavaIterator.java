@@ -1,11 +1,13 @@
 /*
- * Copyright (C) 2007 The Guava Authors
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,7 +16,7 @@
  * limitations under the License.
  */
 
-package org.apache.cassandra.index.sai.utils;
+package org.apache.cassandra.utils;
 
 import java.util.NoSuchElementException;
 
@@ -22,15 +24,17 @@ import com.google.common.collect.PeekingIterator;
 
 import static com.google.common.base.Preconditions.checkState;
 
-// This is fork of the Guava AbstractIterator, the only difference
-// is that state & next variables are now protected, this was required
-// for SkippableIterator.skipTo(..) to void all previous state.
-public abstract class AbstractIterator<T> implements PeekingIterator<T>
+/**
+ * This is fork of the Guava AbstractIterator, the only difference
+ * is that state & next variables are now protected, this was required
+ * for SkippableIterator.skipTo(..) to void all previous state.
+ */
+public abstract class AbstractGuavaIterator<T> implements PeekingIterator<T>
 {
     protected State state = State.NOT_READY;
 
     /** Constructor for use by subclasses. */
-    protected AbstractIterator() {}
+    protected AbstractGuavaIterator() {}
 
     protected enum State
     {

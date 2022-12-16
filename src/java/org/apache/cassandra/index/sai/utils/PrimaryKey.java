@@ -21,6 +21,8 @@ import java.util.Arrays;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
+import com.google.common.base.Preconditions;
+
 import org.apache.cassandra.db.Clustering;
 import org.apache.cassandra.db.ClusteringComparator;
 import org.apache.cassandra.db.DecoratedKey;
@@ -40,11 +42,22 @@ public class PrimaryKey implements Comparable<PrimaryKey>
     private final Clustering<?> clustering;
     private final ClusteringComparator clusteringComparator;
 
-    public PrimaryKey(Token token,
-                      DecoratedKey partitionKey,
-                      Clustering<?> clustering,
-                      ClusteringComparator clusteringComparator)
+    PrimaryKey(Token token)
     {
+        this(token, null, null, null);
+    }
+
+    PrimaryKey(Token token,
+               DecoratedKey partitionKey,
+               Clustering<?> clustering,
+               ClusteringComparator clusteringComparator)
+    {
+        Preconditions.checkArgument(token != null,
+                                    "Can't have a PrimaryKey with no token");
+        Preconditions.checkArgument((partitionKey == null) || ((partitionKey != null) && (clustering != null)),
+                                    "A token only PrimaryKey can't have a clustering component");
+        Preconditions.checkArgument((clustering == null) || ((clustering != null) && (clusteringComparator != null)),
+                                    "A PrimaryKey without a clustering component can't have a clustering comparator");
         this.token = token;
         this.partitionKey = partitionKey;
         this.clustering = clustering;
@@ -64,9 +77,7 @@ public class PrimaryKey implements Comparable<PrimaryKey>
     }
 
     /**
-     * Returns the {@link Token} associated with this primary key.
-     *
-     * @return the {@link Token}
+     * @return the {@link Token} associated with this primary key.
      */
     public Token token()
     {
@@ -74,9 +85,7 @@ public class PrimaryKey implements Comparable<PrimaryKey>
     }
 
     /**
-     * Returns the {@link DecoratedKey} associated with this primary key.
-     *
-     * @return the {@link DecoratedKey}
+     * @return the {@link DecoratedKey} associated with this primary key.
      */
     public DecoratedKey partitionKey()
     {
@@ -84,11 +93,9 @@ public class PrimaryKey implements Comparable<PrimaryKey>
     }
 
     /**
-     * Returns the {@link Clustering} associated with this primary key
-     *
-     * @return the {@link Clustering}
+     * @return the {@link Clustering} associated with this primary key.
      */
-    public Clustering clustering()
+    public Clustering<?> clustering()
     {
         return clustering;
     }
@@ -106,8 +113,13 @@ public class PrimaryKey implements Comparable<PrimaryKey>
     public ByteSource asComparableBytes(ByteComparable.Version version)
     {
         ByteSource tokenComparable = token.asComparableBytes(version);
-        ByteSource keyComparable = partitionKey == null ? null
-                                                        : ByteSource.of(partitionKey.getKey(), version);
+        if (partitionKey == null)
+            return ByteSource.withTerminator(version == ByteComparable.Version.LEGACY ? ByteSource.END_OF_STREAM
+                                                                                      : ByteSource.TERMINATOR,
+                                             tokenComparable,
+                                             null,
+                                             null);
+        ByteSource keyComparable = ByteSource.of(partitionKey.getKey(), version);
         // It is important that the ClusteringComparator.asBytesComparable method is used
         // to maintain the correct clustering sort order
         ByteSource clusteringComparable = clusteringComparator.size() == 0 ||
@@ -115,9 +127,8 @@ public class PrimaryKey implements Comparable<PrimaryKey>
                                           clustering.isEmpty() ? null
                                                                : clusteringComparator.asByteComparable(clustering)
                                                                                      .asComparableBytes(version);
-        return ByteSource.withTerminator(version == ByteComparable.Version.LEGACY
-                                         ? ByteSource.END_OF_STREAM
-                                         : ByteSource.TERMINATOR,
+        return ByteSource.withTerminator(version == ByteComparable.Version.LEGACY ? ByteSource.END_OF_STREAM
+                                                                                  : ByteSource.TERMINATOR,
                                          tokenComparable,
                                          keyComparable,
                                          clusteringComparable);
@@ -173,7 +184,7 @@ public class PrimaryKey implements Comparable<PrimaryKey>
     @Override
     public String toString()
     {
-        return String.format("RowAwarePrimaryKey: { token: %s, partition: %s, clustering: %s:%s} ",
+        return String.format("PrimaryKey: { token: %s, partition: %s, clustering: %s:%s} ",
                              token,
                              partitionKey,
                              clustering == null ? null : clustering.kind(),
