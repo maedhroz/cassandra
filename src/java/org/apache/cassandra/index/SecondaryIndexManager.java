@@ -46,6 +46,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.cassandra.concurrent.ExecutorPlus;
 import org.apache.cassandra.concurrent.FutureTask;
 import org.apache.cassandra.concurrent.ImmediateExecutor;
@@ -88,6 +89,7 @@ import org.apache.cassandra.utils.FBUtilities;
 import org.apache.cassandra.utils.JVMStabilityInspector;
 import org.apache.cassandra.utils.concurrent.*;
 import org.json.simple.JSONValue;
+import org.json.simple.parser.ParseException;
 
 import static org.apache.cassandra.concurrent.ExecutorFactory.Global.executorFactory;
 import static org.apache.cassandra.utils.ExecutorUtils.awaitTermination;
@@ -671,7 +673,8 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
      * @param isNewCF {@code true} if this method is invoked when initializing a new table/columnfamily (i.e. loading a CF at startup),
      * {@code false} for all other cases (i.e. newly added index)
      */
-    private synchronized void markIndexesBuilding(Set<Index> indexes, boolean isFullRebuild, boolean isNewCF)
+    @VisibleForTesting
+    public synchronized void markIndexesBuilding(Set<Index> indexes, boolean isFullRebuild, boolean isNewCF)
     {
         String keyspaceName = baseCfs.keyspace.getName();
 
@@ -1781,6 +1784,8 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
 
     public void makeIndexNonQueryable(Index index, Index.Status status)
     {
+        assert status != Index.Status.BUILD_SUCCEEDED : "Index cannot be marked non-queryable with status " + status;
+
         String name = index.getIndexMetadata().name;
         if (indexes.get(name) == index)
         {
@@ -1792,6 +1797,8 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
 
     public void makeIndexQueryable(Index index, Index.Status status)
     {
+        assert status == Index.Status.BUILD_SUCCEEDED : "Index cannot be marked queryable with status " + status;
+
         String name = index.getIndexMetadata().name;
         if (indexes.get(name) == index)
         {
@@ -1839,7 +1846,7 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
                 logger.debug("Received index status for peer {}:\n    Updated: {}\n    Removed: {}",
                              endpoint, updated, removed);
         }
-        catch (Throwable e)
+        catch (ParseException | IllegalArgumentException e)
         {
             logger.warn("Unable to parse index status: {}", e.getMessage());
         }
@@ -1860,9 +1867,8 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
     /**
      * Returns a new map containing only the entries from newStatus that differ from corresponding entries in oldStatus.
      */
-    private static @Nonnull Map<String, Index.Status> updatedIndexStatuses(
-    @Nullable Map<String, Index.Status> oldStatus,
-    @Nonnull Map<String, Index.Status> newStatus)
+    private static @Nonnull Map<String, Index.Status> updatedIndexStatuses(@Nullable Map<String, Index.Status> oldStatus,
+                                                                           @Nonnull Map<String, Index.Status> newStatus)
     {
         Map<String, Index.Status> delta = new HashMap<>();
         for (Map.Entry<String, Index.Status> e : newStatus.entrySet())
@@ -1872,6 +1878,8 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
         }
         return delta;
     }
+
+    private static ObjectMapper objectMapper = new ObjectMapper();
 
     private synchronized static void propagateLocalIndexStatus(String keyspace, String index, Index.Status status)
     {
@@ -1891,8 +1899,7 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
             // logged and this causes a number of dtests to fail.
             if (Gossiper.instance.isEnabled())
             {
-                String newStatus = JSONValue.toJSONString(states.entrySet().stream()
-                                                                .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().toString())));
+                String newStatus = objectMapper.writeValueAsString(states);
                 statusPropagationExecutor.submit(() -> {
                     // schedule gossiper update asynchronously to avoid potential deadlock when another thread is holding
                     // gossiper taskLock.
@@ -1909,6 +1916,6 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
 
     private static String identifier(String keyspace, String index)
     {
-        return new StringBuilder().append(keyspace).append('.').append(index).toString();
+        return keyspace + '.' + index;
     }
 }

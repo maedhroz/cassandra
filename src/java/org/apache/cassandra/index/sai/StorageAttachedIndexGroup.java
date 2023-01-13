@@ -21,15 +21,14 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.ThreadSafe;
 
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
+import com.google.common.primitives.Ints;
 
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.DecoratedKey;
@@ -58,7 +57,7 @@ import org.apache.cassandra.schema.TableMetadata;
  * Orchestrates building of storage-attached indices, and manages lifecycle of resources shared between them.
  */
 @ThreadSafe
-public class StorageAttachedIndexGroup implements Index.Group, INotificationConsumer
+public class StorageAttachedIndexGroup implements Index.Group<StorageAttachedIndex>, INotificationConsumer
 {
     private final TableQueryMetrics queryMetrics;
     private final TableStateMetrics stateMetrics;
@@ -82,22 +81,20 @@ public class StorageAttachedIndexGroup implements Index.Group, INotificationCons
     }
 
     @Override
-    public Set<Index> getIndexes()
+    public Set<StorageAttachedIndex> getIndexes()
     {
-        return ImmutableSet.copyOf(indices);
+        return indices;
     }
 
     @Override
-    public void addIndex(Index index)
+    public void addIndex(StorageAttachedIndex index)
     {
-        assert index instanceof StorageAttachedIndex;
-        indices.add((StorageAttachedIndex) index);
+        indices.add(index);
     }
 
     @Override
-    public void removeIndex(Index index)
+    public void removeIndex(StorageAttachedIndex index)
     {
-        assert index instanceof StorageAttachedIndex;
         boolean removed = indices.remove(index);
         assert removed : "Cannot remove non-existing index " + index;
         /*
@@ -119,13 +116,13 @@ public class StorageAttachedIndexGroup implements Index.Group, INotificationCons
     }
 
     @Override
-    public boolean containsIndex(Index index)
+    public boolean containsIndex(StorageAttachedIndex index)
     {
-        return index instanceof StorageAttachedIndex && indices.contains(index);
+        return indices.contains(index);
     }
 
     @Override
-    public Index.Indexer indexerFor(Predicate<Index> indexSelector,
+    public Index.Indexer indexerFor(Predicate<StorageAttachedIndex> indexSelector,
                                     DecoratedKey key,
                                     RegularAndStaticColumns columns,
                                     int nowInSec,
@@ -139,23 +136,20 @@ public class StorageAttachedIndexGroup implements Index.Group, INotificationCons
                                 .filter(Objects::nonNull)
                                 .collect(Collectors.toSet());
 
-        return indexers.isEmpty() ? null : new StorageAttachedIndex.IndexerAdapter()
+        return indexers.isEmpty() ? null : new Index.Indexer()
         {
             @Override
             public void insertRow(Row row)
             {
-                forEach(indexer -> indexer.insertRow(row));
+                for (Index.Indexer indexer : indexers)
+                    indexer.insertRow(row);
             }
 
             @Override
             public void updateRow(Row oldRow, Row newRow)
             {
-                forEach(indexer -> indexer.updateRow(oldRow, newRow));
-            }
-
-            private void forEach(Consumer<Index.Indexer> action)
-            {
-                indexers.forEach(action);
+                for (Index.Indexer indexer : indexers)
+                    indexer.updateRow(oldRow, newRow);
             }
         };
     }
@@ -209,7 +203,7 @@ public class StorageAttachedIndexGroup implements Index.Group, INotificationCons
      */
     public int totalQueryableIndexCount()
     {
-        return (int) indices.stream().filter(baseCfs.indexManager::isIndexQueryable).count();
+        return Ints.checkedCast(indices.stream().filter(baseCfs.indexManager::isIndexQueryable).count());
     }
 
     /**

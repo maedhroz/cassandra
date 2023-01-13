@@ -17,9 +17,10 @@
  */
 package org.apache.cassandra.index.sai.utils;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+
+import com.google.common.annotations.VisibleForTesting;
 
 import org.apache.cassandra.io.util.FileUtils;
 
@@ -27,25 +28,24 @@ import org.apache.cassandra.io.util.FileUtils;
  * Range Union Iterator is used to return sorted stream of elements from multiple RangeIterator instances.
  */
 @SuppressWarnings("resource")
-public class RangeUnionIterator extends RangeIterator
+public class KeyRangeUnionIterator extends KeyRangeIterator
 {
-    private final List<RangeIterator> ranges;
+    private final List<KeyRangeIterator> ranges;
+    private final List<KeyRangeIterator> candidates;
 
-    private final List<RangeIterator> toRelease;
-    private final List<RangeIterator> candidates = new ArrayList<>();
-
-    private RangeUnionIterator(Builder.Statistics statistics, List<RangeIterator> ranges)
+    private KeyRangeUnionIterator(Builder.Statistics statistics, List<KeyRangeIterator> ranges)
     {
         super(statistics);
         this.ranges = ranges;
-        this.toRelease = new ArrayList<>(ranges);
+        this.candidates = new ArrayList<>(ranges.size());
     }
 
+    @Override
     public PrimaryKey computeNext()
     {
         candidates.clear();
         PrimaryKey candidate = null;
-        for (RangeIterator range : ranges)
+        for (KeyRangeIterator range : ranges)
         {
             if (range.hasNext())
             {
@@ -75,54 +75,50 @@ public class RangeUnionIterator extends RangeIterator
         }
         if (candidates.isEmpty())
             return endOfData();
-        candidates.forEach(RangeIterator::next);
+        candidates.forEach(KeyRangeIterator::next);
         return candidate;
     }
 
+    @Override
     protected void performSkipTo(PrimaryKey nextKey)
     {
-        for (RangeIterator range : ranges)
+        for (KeyRangeIterator range : ranges)
         {
             if (range.hasNext())
                 range.skipTo(nextKey);
         }
     }
 
-    public void close() throws IOException
+    @Override
+    public void close()
     {
         // Due to lazy key fetching, we cannot close iterator immediately
-        toRelease.forEach(FileUtils::closeQuietly);
-        ranges.forEach(FileUtils::closeQuietly);
+        FileUtils.closeQuietly(ranges);
     }
 
-    public static Builder builder()
+    public static Builder builder(int size)
     {
-        return new Builder();
+        return new Builder(size);
     }
 
-    public static RangeIterator build(List<RangeIterator> tokens)
+    public static KeyRangeIterator build(List<KeyRangeIterator> keys)
     {
-        return new Builder(tokens.size()).add(tokens).build();
+        return new Builder(keys.size()).add(keys).build();
     }
 
-    public static class Builder extends RangeIterator.Builder
+    @VisibleForTesting
+    public static class Builder extends KeyRangeIterator.Builder
     {
-        protected List<RangeIterator> rangeIterators;
+        protected List<KeyRangeIterator> rangeIterators;
 
-        public Builder()
+        Builder(int size)
         {
-            super(IteratorType.UNION);
-            this.rangeIterators = new ArrayList<>();
-        }
-
-        public Builder(int size)
-        {
-            super(IteratorType.UNION);
+            super(new UnionStatistics());
             this.rangeIterators = new ArrayList<>(size);
         }
 
         @Override
-        public RangeIterator.Builder add(RangeIterator range)
+        public KeyRangeIterator.Builder add(KeyRangeIterator range)
         {
             if (range == null)
                 return this;
@@ -138,26 +134,36 @@ public class RangeUnionIterator extends RangeIterator
             return this;
         }
 
-        public RangeIterator.Builder add(List<RangeIterator> ranges)
-        {
-            if (ranges == null || ranges.isEmpty())
-                return this;
-
-            ranges.forEach(this::add);
-            return this;
-        }
-
+        @Override
         public int rangeCount()
         {
             return rangeIterators.size();
         }
 
-        protected RangeIterator buildIterator()
+        @Override
+        public void cleanup()
+        {
+            FileUtils.closeQuietly(rangeIterators);
+        }
+
+        @Override
+        protected KeyRangeIterator buildIterator()
         {
             if (rangeCount() == 1)
                 return rangeIterators.get(0);
 
-            return new RangeUnionIterator(statistics, rangeIterators);
+            return new KeyRangeUnionIterator(statistics, rangeIterators);
+        }
+    }
+
+    private static class UnionStatistics extends KeyRangeIterator.Builder.Statistics
+    {
+        @Override
+        public void update(KeyRangeIterator range)
+        {
+            min = nullSafeMin(min, range.getMinimum());
+            max = nullSafeMax(max, range.getMaximum());
+            count += range.getCount();
         }
     }
 }

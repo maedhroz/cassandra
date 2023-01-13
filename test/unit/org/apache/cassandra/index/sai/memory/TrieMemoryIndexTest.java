@@ -18,26 +18,40 @@
 package org.apache.cassandra.index.sai.memory;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.IntFunction;
+import java.util.stream.Collectors;
 
-import org.junit.Before;
 import org.junit.Test;
 
-import org.apache.cassandra.config.DatabaseDescriptor;
+import org.apache.cassandra.cql3.Operator;
 import org.apache.cassandra.cql3.statements.schema.IndexTarget;
 import org.apache.cassandra.db.Clustering;
 import org.apache.cassandra.db.DecoratedKey;
+import org.apache.cassandra.db.PartitionPosition;
 import org.apache.cassandra.db.marshal.AbstractType;
 import org.apache.cassandra.db.marshal.Int32Type;
 import org.apache.cassandra.db.marshal.UTF8Type;
+import org.apache.cassandra.dht.AbstractBounds;
+import org.apache.cassandra.dht.Bounds;
+import org.apache.cassandra.dht.ExcludingBounds;
+import org.apache.cassandra.dht.IncludingExcludingBounds;
 import org.apache.cassandra.dht.Murmur3Partitioner;
+import org.apache.cassandra.dht.Range;
 import org.apache.cassandra.index.TargetParser;
 import org.apache.cassandra.index.sai.IndexContext;
 import org.apache.cassandra.index.sai.StorageAttachedIndex;
+import org.apache.cassandra.index.sai.plan.Expression;
+import org.apache.cassandra.index.sai.utils.KeyRangeIterator;
 import org.apache.cassandra.index.sai.utils.PrimaryKeys;
+import org.apache.cassandra.index.sai.utils.SAIRandomizedTester;
 import org.apache.cassandra.index.sai.utils.TypeUtil;
 import org.apache.cassandra.schema.CachingParams;
 import org.apache.cassandra.schema.ColumnMetadata;
@@ -48,8 +62,10 @@ import org.apache.cassandra.utils.Pair;
 import org.apache.cassandra.utils.bytecomparable.ByteComparable;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
 
-public class TrieMemoryIndexTest
+public class TrieMemoryIndexTest extends SAIRandomizedTester
 {
     private static final String KEYSPACE = "test_keyspace";
     private static final String TABLE = "test_table";
@@ -58,14 +74,127 @@ public class TrieMemoryIndexTest
 
     private static final DecoratedKey key = Murmur3Partitioner.instance.decorateKey(ByteBufferUtil.bytes("key"));
 
-    @Before
-    public void setup()
+    private IndexContext indexContext;
+
+    @Test
+    public void heapGrowsAsDataIsAddedTest()
     {
-        DatabaseDescriptor.daemonInitialization();
+        TrieMemoryIndex index = newTrieMemoryIndex(Int32Type.instance);
+        for (int i = 0; i < 99; i++)
+        {
+            assertTrue(index.add(key, Clustering.EMPTY, Int32Type.instance.decompose(i)) > 0);
+        }
     }
 
     @Test
-    public void shouldAcceptPrefixValues()
+    public void randomQueryTest() throws Exception
+    {
+        TrieMemoryIndex index = newTrieMemoryIndex(Int32Type.instance);
+
+        Map<DecoratedKey, Integer> keyMap = new TreeMap<>();
+        Map<Integer, Integer> rowMap = new HashMap<>();
+
+        for (int row = 0; row < getRandom().nextIntBetween(1000, 5000); row++)
+        {
+            int pk = getRandom().nextIntBetween(0, 10000);
+            while (rowMap.containsKey(pk))
+                pk = getRandom().nextIntBetween(0, 10000);
+            int value = getRandom().nextIntBetween(0, 100);
+            rowMap.put(pk, value);
+            DecoratedKey key = Murmur3Partitioner.instance.decorateKey(Int32Type.instance.decompose(pk));
+            index.add(key, Clustering.EMPTY, Int32Type.instance.decompose(value));
+            keyMap.put(key, pk);
+        }
+
+        List<DecoratedKey> keys = new ArrayList<>(keyMap.keySet());
+
+        for (int executionCount = 0; executionCount < 1000; executionCount++)
+        {
+            Expression expression = generateRandomExpression();
+
+            AbstractBounds<PartitionPosition> keyRange = generateRandomBounds(keys);
+
+            Set<Integer> expectedKeys = keyMap.keySet()
+                                              .stream()
+                                              .filter(keyRange::contains)
+                                              .map(keyMap::get)
+                                              .filter(pk -> expression.isSatisfiedBy(Int32Type.instance.decompose(rowMap.get(pk))))
+                                              .collect(Collectors.toSet());
+
+            Set<Integer> foundKeys = new HashSet<>();
+
+            try (KeyRangeIterator iterator = index.search(expression, keyRange))
+            {
+                while (iterator.hasNext())
+                {
+                    int key = Int32Type.instance.compose(iterator.next().partitionKey().getKey());
+                    assertFalse(foundKeys.contains(key));
+                    foundKeys.add(key);
+                }
+            }
+
+            assertEquals(expectedKeys, foundKeys);
+        }
+    }
+
+    private AbstractBounds<PartitionPosition> generateRandomBounds(List<DecoratedKey> keys)
+    {
+        PartitionPosition leftBound = getRandom().nextBoolean() ? Murmur3Partitioner.instance.getMinimumToken().minKeyBound()
+                                                                : keys.get(getRandom().nextIntBetween(0, keys.size() - 1)).getToken().minKeyBound();
+
+        PartitionPosition rightBound = getRandom().nextBoolean() ? Murmur3Partitioner.instance.getMinimumToken().minKeyBound()
+                                                                 : keys.get(getRandom().nextIntBetween(0, keys.size() - 1)).getToken().maxKeyBound();
+
+        AbstractBounds<PartitionPosition> keyRange;
+
+        if (leftBound.isMinimum() && rightBound.isMinimum())
+            keyRange = new Range<>(leftBound, rightBound);
+        else
+        {
+            if (AbstractBounds.strictlyWrapsAround(leftBound, rightBound))
+            {
+                PartitionPosition temp = leftBound;
+                leftBound = rightBound;
+                rightBound = temp;
+            }
+            if (getRandom().nextBoolean())
+                keyRange = new Bounds<>(leftBound, rightBound);
+            else if (getRandom().nextBoolean())
+                keyRange = new ExcludingBounds<>(leftBound, rightBound);
+            else
+                keyRange = new IncludingExcludingBounds<>(leftBound, rightBound);
+        }
+        return keyRange;
+    }
+
+    private Expression generateRandomExpression()
+    {
+        Expression expression = new Expression(indexContext);
+
+        int equality = getRandom().nextIntBetween(0, 100);
+        int lower = getRandom().nextIntBetween(0, 75);
+        int upper = getRandom().nextIntBetween(25, 100);
+        while (upper <= lower)
+            upper = getRandom().nextIntBetween(0, 100);
+
+        if (getRandom().nextBoolean())
+            expression.add(Operator.EQ, Int32Type.instance.decompose(equality));
+        else
+        {
+            boolean useLower = getRandom().nextBoolean();
+            boolean useUpper = getRandom().nextBoolean();
+            if (!useLower && !useUpper)
+                useLower = useUpper = true;
+            if (useLower)
+                expression.add(getRandom().nextBoolean() ? Operator.GT : Operator.GTE, Int32Type.instance.decompose(lower));
+            if (useUpper)
+                expression.add(getRandom().nextBoolean() ? Operator.LT : Operator.LTE, Int32Type.instance.decompose(upper));
+        }
+        return expression;
+    }
+
+    @Test
+    public void shouldAcceptPrefixValuesTest()
     {
         shouldAcceptPrefixValuesForType(UTF8Type.instance, i -> UTF8Type.instance.decompose(String.format("%03d", i)));
         shouldAcceptPrefixValuesForType(Int32Type.instance, Int32Type.instance::decompose);
@@ -73,7 +202,7 @@ public class TrieMemoryIndexTest
 
     private void shouldAcceptPrefixValuesForType(AbstractType<?> type, IntFunction<ByteBuffer> decompose)
     {
-        final TrieMemoryIndex index = newTrieMemoryIndex(type);
+        TrieMemoryIndex index = newTrieMemoryIndex(type);
         for (int i = 0; i < 99; ++i)
         {
             index.add(key, Clustering.EMPTY, decompose.apply(i));
@@ -113,13 +242,13 @@ public class TrieMemoryIndexTest
 
         IndexMetadata indexMetadata = IndexMetadata.fromSchemaMetadata("col_index", IndexMetadata.Kind.CUSTOM, options);
         Pair<ColumnMetadata, IndexTarget.Type> target = TargetParser.parse(table, indexMetadata);
-        IndexContext indexContext = new IndexContext(table.keyspace,
-                                                     table.name,
-                                                     table.partitionKeyType,
-                                                     table.comparator,
-                                                     target.left,
-                                                     target.right,
-                                                     indexMetadata);
+        indexContext = new IndexContext(table.keyspace,
+                                        table.name,
+                                        table.partitionKeyType,
+                                        table.comparator,
+                                        target.left,
+                                        target.right,
+                                        indexMetadata);
         return new TrieMemoryIndex(indexContext);
     }
 }

@@ -20,7 +20,7 @@ package org.apache.cassandra.index.sai.plan;
 
 import java.nio.ByteBuffer;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.EnumMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -78,11 +78,9 @@ public class OperationTest extends IndexingSchemaLoader
     private static ColumnFamilyStore CLUSTERING_BACKEND;
     private static ColumnFamilyStore STATIC_BACKEND;
 
-
     private QueryController controller;
     private QueryController controllerClustering;
     private QueryController controllerStatic;
-
 
     @BeforeClass
     public static void loadSchema() throws ConfigurationException
@@ -127,17 +125,17 @@ public class OperationTest extends IndexingSchemaLoader
         final ColumnMetadata age = getColumn(UTF8Type.instance.decompose("age"));
 
         // age > 1 AND age < 7
-        Map<Expression.Op, Expression> expressions = convert(Operation.analyzeGroup(controller, Operation.OperationType.AND,
-                                                             Arrays.asList(new SimpleExpression(age, Operator.GT, Int32Type.instance.decompose(1)),
+        Map<Expression.IndexOperator, Expression> expressions = convert(Operation.buildIndexExpressions(controller, Operation.BooleanOperator.AND,
+                                                                                                        Arrays.asList(new SimpleExpression(age, Operator.GT, Int32Type.instance.decompose(1)),
                                                              new SimpleExpression(age, Operator.LT, Int32Type.instance.decompose(7)))));
 
         Assert.assertEquals(1, expressions.size());
         Assert.assertEquals(new Expression(SAITester.createIndexContext("age", Int32Type.instance))
                             {{
-                                    operation = Op.RANGE;
+                                operator = IndexOperator.RANGE;
                                     lower = new Bound(Int32Type.instance.decompose(1), Int32Type.instance, false);
                                     upper = new Bound(Int32Type.instance.decompose(7), Int32Type.instance, false);
-                            }}, expressions.get(Expression.Op.RANGE));
+                            }}, expressions.get(Expression.IndexOperator.RANGE));
     }
 
     @Test
@@ -186,13 +184,12 @@ public class OperationTest extends IndexingSchemaLoader
 
         filterTree = node.buildFilter(controller);
 
-        exclusions = Sets.newHashSet();
         for (int i = 0; i < 10; i++)
         {
             row = buildRow(buildCell(age, instance.decompose(i), System.currentTimeMillis()));
 
             boolean result = filterTree.isSatisfiedBy(key, row, staticRow);
-            Assert.assertTrue(exclusions.contains(i) != result);
+            Assert.assertTrue(result);
         }
 
         // multiple analyzed expressions in the Operation timestamp >= 10 AND age = 5
@@ -226,15 +223,15 @@ public class OperationTest extends IndexingSchemaLoader
         final ColumnMetadata height = getColumn(UTF8Type.instance.decompose("height"));
 
         // first_name = 'a' AND height > 5
-        Map<Expression.Op, Expression> expressions;
-        expressions = convert(Operation.analyzeGroup(controller, Operation.OperationType.AND,
-                                                     Arrays.asList(new SimpleExpression(firstName, Operator.EQ, UTF8Type.instance.decompose("a")),
+        Map<Expression.IndexOperator, Expression> expressions;
+        expressions = convert(Operation.buildIndexExpressions(controller, Operation.BooleanOperator.AND,
+                                                              Arrays.asList(new SimpleExpression(firstName, Operator.EQ, UTF8Type.instance.decompose("a")),
                                                                    new SimpleExpression(height, Operator.GT, Int32Type.instance.decompose(5)))));
 
         Assert.assertEquals(2, expressions.size());
 
-        expressions = convert(Operation.analyzeGroup(controller, Operation.OperationType.AND,
-                                                     Arrays.asList(new SimpleExpression(firstName, Operator.EQ, UTF8Type.instance.decompose("a")),
+        expressions = convert(Operation.buildIndexExpressions(controller, Operation.BooleanOperator.AND,
+                                                              Arrays.asList(new SimpleExpression(firstName, Operator.EQ, UTF8Type.instance.decompose("a")),
                                                                    new SimpleExpression(height, Operator.GT, Int32Type.instance.decompose(0)),
                                                                    new SimpleExpression(height, Operator.EQ, Int32Type.instance.decompose(5)))));
 
@@ -242,13 +239,13 @@ public class OperationTest extends IndexingSchemaLoader
 
         Assert.assertEquals(new Expression(SAITester.createIndexContext("height", Int32Type.instance))
         {{
-            operation = Op.RANGE;
+            operator = IndexOperator.RANGE;
             lower = new Bound(Int32Type.instance.decompose(0), Int32Type.instance, false);
             upper = new Bound(Int32Type.instance.decompose(5), Int32Type.instance, true);
-        }}, expressions.get(Expression.Op.RANGE));
+        }}, expressions.get(Expression.IndexOperator.RANGE));
 
-        expressions = convert(Operation.analyzeGroup(controller, Operation.OperationType.AND,
-                                                     Arrays.asList(new SimpleExpression(firstName, Operator.EQ, UTF8Type.instance.decompose("a")),
+        expressions = convert(Operation.buildIndexExpressions(controller, Operation.BooleanOperator.AND,
+                                                              Arrays.asList(new SimpleExpression(firstName, Operator.EQ, UTF8Type.instance.decompose("a")),
                                                                    new SimpleExpression(height, Operator.GTE, Int32Type.instance.decompose(0)),
                                                                    new SimpleExpression(height, Operator.LT, Int32Type.instance.decompose(10)))));
 
@@ -256,10 +253,10 @@ public class OperationTest extends IndexingSchemaLoader
 
         Assert.assertEquals(new Expression(SAITester.createIndexContext("height", Int32Type.instance))
         {{
-                operation = Op.RANGE;
+            operator = IndexOperator.RANGE;
                 lower = new Bound(Int32Type.instance.decompose(0), Int32Type.instance, true);
                 upper = new Bound(Int32Type.instance.decompose(10), Int32Type.instance, false);
-        }}, expressions.get(Expression.Op.RANGE));
+        }}, expressions.get(Expression.IndexOperator.RANGE));
     }
 
     @Test
@@ -322,9 +319,9 @@ public class OperationTest extends IndexingSchemaLoader
         Assert.assertTrue(node.buildFilter(controllerClustering).isSatisfiedBy(key, row, staticRow));
     }
 
-    private Map<Expression.Op, Expression> convert(Multimap<ColumnMetadata, Expression> expressions)
+    private Map<Expression.IndexOperator, Expression> convert(Multimap<ColumnMetadata, Expression> expressions)
     {
-        Map<Expression.Op, Expression> converted = new HashMap<>();
+        Map<Expression.IndexOperator, Expression> converted = new EnumMap<>(Expression.IndexOperator.class);
         for (Expression expression : expressions.values())
         {
             Expression column = converted.get(expression.getOp());
@@ -428,42 +425,24 @@ public class OperationTest extends IndexingSchemaLoader
         return Murmur3Partitioner.instance.decorateKey(decomposed);
     }
 
-    private static Unfiltered buildRow(Cell... cells)
+    private static Unfiltered buildRow(Cell<?>... cells)
     {
-        return buildRow(Clustering.EMPTY, null, cells);
+        return buildRow(Clustering.EMPTY, cells);
     }
 
-    private static Row buildRow(Row.Deletion deletion, Cell... cells)
-    {
-        return buildRow(Clustering.EMPTY, deletion, cells);
-    }
-
-    private static Row buildRow(Clustering clustering, Cell... cells)
-    {
-        return buildRow(clustering, null, cells);
-    }
-
-    private static Row buildRow(Clustering clustering, Row.Deletion deletion, Cell... cells)
+    private static Row buildRow(Clustering<?> clustering, Cell<?>... cells)
     {
         Row.Builder rowBuilder = BTreeRow.sortedBuilder();
         rowBuilder.newRow(clustering);
-        for (Cell c : cells)
+        for (Cell<?> c : cells)
             rowBuilder.addCell(c);
-
-        if (deletion != null)
-            rowBuilder.addRowDeletion(deletion);
 
         return rowBuilder.build();
     }
 
-    private static Cell buildCell(ColumnMetadata column, ByteBuffer value, long timestamp)
+    private static Cell<?> buildCell(ColumnMetadata column, ByteBuffer value, long timestamp)
     {
         return BufferCell.live(column, timestamp, value);
-    }
-
-    private static Cell deletedCell(ColumnMetadata column, long timestamp, int nowInSeconds)
-    {
-        return BufferCell.tombstone(column, timestamp, nowInSeconds);
     }
 
     private static ColumnMetadata getColumn(ByteBuffer name)

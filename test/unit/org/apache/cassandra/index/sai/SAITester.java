@@ -272,11 +272,8 @@ public abstract class SAITester extends CQLTester
 
         Randomization()
         {
-            if (random == null)
-            {
-                seed = Long.getLong("cassandra.test.random.seed", System.nanoTime());
-                random = new Random(seed);
-            }
+            seed = Long.getLong("cassandra.test.random.seed", System.nanoTime());
+            random = new Random(seed);
         }
 
         public void printSeedOnFailure()

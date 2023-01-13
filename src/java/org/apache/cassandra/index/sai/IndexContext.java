@@ -53,8 +53,8 @@ import org.apache.cassandra.index.sai.metrics.IndexMetrics;
 import org.apache.cassandra.index.sai.plan.Expression;
 import org.apache.cassandra.index.sai.utils.PrimaryKey;
 import org.apache.cassandra.index.sai.utils.PrimaryKeyFactory;
-import org.apache.cassandra.index.sai.utils.RangeIterator;
-import org.apache.cassandra.index.sai.utils.RangeUnionIterator;
+import org.apache.cassandra.index.sai.utils.KeyRangeIterator;
+import org.apache.cassandra.index.sai.utils.KeyRangeUnionIterator;
 import org.apache.cassandra.index.sai.utils.TypeUtil;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.schema.IndexMetadata;
@@ -83,7 +83,7 @@ public class IndexContext
     // Config can be null if the column context is "fake" (i.e. created for a filtering expression).
     private final IndexMetadata config;
 
-    private final ConcurrentMap<Memtable, MemtableIndex> liveMemtables = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Memtable, MemtableIndex> liveMemtableIndexMap = new ConcurrentHashMap<>();
 
     private final IndexMetrics indexMetrics;
 
@@ -142,15 +142,20 @@ public class IndexContext
         return table;
     }
 
+    public IndexMetadata getIndexMetadata()
+    {
+        return config;
+    }
+
     public long index(DecoratedKey key, Row row, Memtable mt)
     {
-        MemtableIndex current = liveMemtables.get(mt);
+        MemtableIndex current = liveMemtableIndexMap.get(mt);
 
         // We expect the relevant IndexMemtable to be present most of the time, so only make the
         // call to computeIfAbsent() if it's not. (see https://bugs.openjdk.java.net/browse/JDK-8161372)
         MemtableIndex target = (current != null)
                                ? current
-                               : liveMemtables.computeIfAbsent(mt, memtable -> new MemtableIndex(this));
+                               : liveMemtableIndexMap.computeIfAbsent(mt, memtable -> new MemtableIndex(this));
 
         long start = Clock.Global.nanoTime();
 
@@ -179,35 +184,35 @@ public class IndexContext
 
     public void renewMemtable(Memtable renewed)
     {
-        for (Memtable memtable : liveMemtables.keySet())
+        for (Memtable memtable : liveMemtableIndexMap.keySet())
         {
             // remove every index but the one that corresponds to the post-truncate Memtable
             if (renewed != memtable)
             {
-                liveMemtables.remove(memtable);
+                liveMemtableIndexMap.remove(memtable);
             }
         }
     }
 
     public void discardMemtable(Memtable discarded)
     {
-        liveMemtables.remove(discarded);
+        liveMemtableIndexMap.remove(discarded);
     }
 
-    public RangeIterator searchMemtable(Expression e, AbstractBounds<PartitionPosition> keyRange)
+    public KeyRangeIterator searchMemtableIndexes(Expression e, AbstractBounds<PartitionPosition> keyRange)
     {
-        Collection<MemtableIndex> memtables = liveMemtables.values();
+        Collection<MemtableIndex> memtableIndexes = liveMemtableIndexMap.values();
 
-        if (memtables.isEmpty())
+        if (memtableIndexes.isEmpty())
         {
-            return RangeIterator.empty();
+            return KeyRangeIterator.empty();
         }
 
-        RangeUnionIterator.Builder builder = RangeUnionIterator.builder();
+        KeyRangeIterator.Builder builder = KeyRangeUnionIterator.builder(memtableIndexes.size());
 
-        for (MemtableIndex index : memtables)
+        for (MemtableIndex memtableIndex : memtableIndexes)
         {
-            builder.add(index.search(e, keyRange));
+            builder.add(memtableIndex.search(e, keyRange));
         }
 
         return builder.build();
@@ -215,12 +220,12 @@ public class IndexContext
 
     public long liveMemtableWriteCount()
     {
-        return liveMemtables.values().stream().mapToLong(MemtableIndex::writeCount).sum();
+        return liveMemtableIndexMap.values().stream().mapToLong(MemtableIndex::writeCount).sum();
     }
 
     public long estimatedMemIndexMemoryUsed()
     {
-        return liveMemtables.values().stream().mapToLong(MemtableIndex::estimatedMemoryUsed).sum();
+        return liveMemtableIndexMap.values().stream().mapToLong(MemtableIndex::estimatedMemoryUsed).sum();
     }
 
     public ColumnMetadata getDefinition()
@@ -284,7 +289,7 @@ public class IndexContext
      */
     public void invalidate()
     {
-        liveMemtables.clear();
+        liveMemtableIndexMap.clear();
         indexMetrics.release();
         indexAnalyzerFactory.close();
         if (queryAnalyzerFactory != indexAnalyzerFactory)
@@ -301,27 +306,24 @@ public class IndexContext
             op == Operator.LIKE_MATCHES ||
             op == Operator.LIKE_SUFFIX) return false;
 
-        Expression.Op operator = Expression.Op.valueOf(op);
+        Expression.IndexOperator operator = Expression.IndexOperator.valueOf(op);
 
         if (isNonFrozenCollection())
         {
-            if (indexType == IndexTarget.Type.KEYS) return operator == Expression.Op.CONTAINS_KEY;
-            if (indexType == IndexTarget.Type.VALUES) return operator == Expression.Op.CONTAINS_VALUE;
-            return indexType == IndexTarget.Type.KEYS_AND_VALUES && operator == Expression.Op.EQ;
+            if (indexType == IndexTarget.Type.KEYS) return operator == Expression.IndexOperator.CONTAINS_KEY;
+            if (indexType == IndexTarget.Type.VALUES) return operator == Expression.IndexOperator.CONTAINS_VALUE;
+            return indexType == IndexTarget.Type.KEYS_AND_VALUES && operator == Expression.IndexOperator.EQ;
         }
 
         if (indexType == IndexTarget.Type.FULL)
-            return operator == Expression.Op.EQ;
+            return operator == Expression.IndexOperator.EQ;
 
         AbstractType<?> validator = getValidator();
 
-        if (operator == Expression.Op.IN)
-            return true;
-
-        if (operator != Expression.Op.EQ && EQ_ONLY_TYPES.contains(validator)) return false;
+        if (operator != Expression.IndexOperator.EQ && EQ_ONLY_TYPES.contains(validator)) return false;
 
         // RANGE only applicable to non-literal indexes
-        return (operator != null) && !(TypeUtil.isLiteral(validator) && operator == Expression.Op.RANGE);
+        return (operator != null) && !(TypeUtil.isLiteral(validator) && operator == Expression.IndexOperator.RANGE);
     }
 
     public ByteBuffer getValueOf(DecoratedKey key, Row row, int nowInSecs)

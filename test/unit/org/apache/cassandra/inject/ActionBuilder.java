@@ -36,9 +36,9 @@ import static org.apache.cassandra.inject.Expression.quote;
 public class ActionBuilder
 {
     private Class<?> helperClass = Helper.class;
-    private ConditionsBuilder conditionsBuilder = new ConditionsBuilder();
-    private BindingsBuilder bindingsBuilder = new BindingsBuilder();
-    private ActionsBuilder actionsBuilder = new ActionsBuilder();
+    private final ConditionsBuilder conditionsBuilder = new ConditionsBuilder();
+    private final BindingsBuilder bindingsBuilder = new BindingsBuilder();
+    private final ActionsBuilder actionsBuilder = new ActionsBuilder();
 
     public static ActionBuilder newActionBuilder() {
         return new ActionBuilder();

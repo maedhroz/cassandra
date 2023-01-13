@@ -44,9 +44,8 @@ import org.apache.cassandra.index.sai.QueryContext;
 import org.apache.cassandra.index.sai.StorageAttachedIndex;
 import org.apache.cassandra.index.sai.metrics.TableQueryMetrics;
 import org.apache.cassandra.index.sai.utils.PrimaryKey;
-import org.apache.cassandra.index.sai.utils.RangeIntersectionIterator;
-import org.apache.cassandra.index.sai.utils.RangeIterator;
-import org.apache.cassandra.io.util.FileUtils;
+import org.apache.cassandra.index.sai.utils.KeyRangeIntersectionIterator;
+import org.apache.cassandra.index.sai.utils.KeyRangeIterator;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.utils.FBUtilities;
 
@@ -130,7 +129,7 @@ public class QueryController
         return cfs.indexManager.getBestIndexFor(expression, StorageAttachedIndex.class).orElse(null);
     }
 
-    public UnfilteredRowIterator getPartition(PrimaryKey key, ReadExecutionController executionController)
+    public UnfilteredRowIterator queryStorage(PrimaryKey key, ReadExecutionController executionController)
     {
         if (key == null)
             throw new IllegalArgumentException("non-null key required");
@@ -154,16 +153,16 @@ public class QueryController
     }
 
     /**
-     * Build a {@link RangeIterator.Builder} from the given list of expressions by applying given operation (AND).
+     * Build a {@link KeyRangeIterator.Builder} from the given list of expressions by applying given operation (AND).
      * Building of such builder involves index search, results of which are persisted in the internal resources list
      *
      * @param expressions The expressions to build range iterator from (expressions with not results are ignored).
      *
      * @return range iterator builder based on given expressions and operation type.
      */
-    public RangeIterator.Builder getIndexes(Collection<Expression> expressions)
+    public KeyRangeIterator.Builder getIndexQueryResults(Collection<Expression> expressions)
     {
-        RangeIterator.Builder builder = RangeIntersectionIterator.selectiveBuilder();
+        KeyRangeIterator.Builder builder = KeyRangeIntersectionIterator.builder(expressions.size());
 
         try
         {
@@ -172,7 +171,7 @@ public class QueryController
                 if (e.context.isIndexed())
                 {
                     @SuppressWarnings("resource") // RangeIterators are closed by releaseIndexes
-                    RangeIterator memtableIterator = e.context.searchMemtable(e, mergeRange);
+                    KeyRangeIterator memtableIterator = e.context.searchMemtableIndexes(e, mergeRange);
 
                     builder.add(memtableIterator);
                 }
@@ -181,7 +180,7 @@ public class QueryController
         catch (Throwable t)
         {
             // all sstable indexes in view have been referenced, need to clean up when exception is thrown
-            FileUtils.closeQuietly(builder.ranges());
+            builder.cleanup();
             throw t;
         }
         return builder;

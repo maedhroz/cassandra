@@ -328,7 +328,11 @@ public enum CassandraRelevantProperties
      *
      * If only keyspaces are specified, mutations for all tables in such keyspace will be replayed
      * */
-    COMMIT_LOG_REPLAY_LIST("cassandra.replayList", null)
+    COMMIT_LOG_REPLAY_LIST("cassandra.replayList", null),
+
+    // SAI specific properties
+    /** Controls the maximum number of index query intersections that will take part in a query */
+    SAI_INTERSECTION_CLAUSE_LIMIT("cassandra.sai.intersection.clause.limit", "2");
 
     ;
 

@@ -21,20 +21,23 @@ import java.io.IOException;
 import java.util.PriorityQueue;
 import java.util.SortedSet;
 
-import org.apache.cassandra.index.sai.utils.PrimaryKey;
-import org.apache.cassandra.index.sai.utils.RangeIterator;
+import javax.annotation.concurrent.NotThreadSafe;
 
-public class KeyRangeIterator extends RangeIterator
+import org.apache.cassandra.index.sai.utils.KeyRangeIterator;
+import org.apache.cassandra.index.sai.utils.PrimaryKey;
+
+@NotThreadSafe
+public class InMemoryKeyRangeIterator extends KeyRangeIterator
 {
     private final PriorityQueue<PrimaryKey> keys;
     private final boolean uniqueKeys;
-    private volatile PrimaryKey lastKey;
+    private PrimaryKey lastKey;
 
     /**
-     * An in-memory {@link RangeIterator} that uses a {@link PriorityQueue} built from a {@link SortedSet}
+     * An in-memory {@link KeyRangeIterator} that uses a {@link PriorityQueue} built from a {@link SortedSet}
      * which has no duplication as its backing store.
      */
-    public KeyRangeIterator(SortedSet<PrimaryKey> keys)
+    public InMemoryKeyRangeIterator(SortedSet<PrimaryKey> keys)
     {
         super(keys.first(), keys.last(), keys.size());
         this.keys = new PriorityQueue<>(keys);
@@ -42,10 +45,10 @@ public class KeyRangeIterator extends RangeIterator
     }
 
     /**
-     * An in-memory {@link RangeIterator} that uses a {@link PriorityQueue} which may
+     * An in-memory {@link KeyRangeIterator} that uses a {@link PriorityQueue} which may
      * contain duplicated keys as its backing store.
      */
-    public KeyRangeIterator(PrimaryKey min, PrimaryKey max, PriorityQueue<PrimaryKey> keys)
+    public InMemoryKeyRangeIterator(PrimaryKey min, PrimaryKey max, PriorityQueue<PrimaryKey> keys)
     {
         super(min, max, keys.size());
         this.keys = keys;
@@ -59,7 +62,7 @@ public class KeyRangeIterator extends RangeIterator
         return key == null ? endOfData() : key;
     }
 
-    private PrimaryKey computeNextKey()
+    protected PrimaryKey computeNextKey()
     {
         PrimaryKey next = null;
 

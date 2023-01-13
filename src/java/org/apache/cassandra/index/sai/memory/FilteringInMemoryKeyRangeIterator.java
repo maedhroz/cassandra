@@ -17,24 +17,30 @@
  */
 package org.apache.cassandra.index.sai.memory;
 
-import java.util.Arrays;
-import java.util.PriorityQueue;
+import java.util.SortedSet;
 
-import org.apache.cassandra.dht.Murmur3Partitioner;
+import org.apache.cassandra.db.PartitionPosition;
+import org.apache.cassandra.dht.AbstractBounds;
 import org.apache.cassandra.index.sai.utils.PrimaryKey;
-import org.apache.cassandra.index.sai.utils.RangeIterator;
 
-public class PriorityKeyRangeIteratorTest extends AbstractKeyRangeIteratorTest
+/**
+ * An {@link InMemoryKeyRangeIterator} that filters the returned {@PrimaryKey}s based on the provided keyRange
+ */
+public class FilteringInMemoryKeyRangeIterator extends InMemoryKeyRangeIterator
 {
-    @Override
-    protected RangeIterator makeIterator(long minimumTokenValue, long maximumTokenValue, long... tokens)
+    private final AbstractBounds<PartitionPosition> keyRange;
+
+    public FilteringInMemoryKeyRangeIterator(SortedSet<PrimaryKey> keys, AbstractBounds<PartitionPosition> keyRange)
     {
-        PriorityQueue<PrimaryKey> queue = new PriorityQueue<>(tokens.length);
+        super(keys);
+        this.keyRange = keyRange;
+    }
 
-        Arrays.stream(tokens).forEach(t -> queue.add(keyForToken(t)));
-
-        return new KeyRangeIterator(primaryKeyFactory.createTokenOnly(new Murmur3Partitioner.LongToken(minimumTokenValue)),
-                                    primaryKeyFactory.createTokenOnly(new Murmur3Partitioner.LongToken(maximumTokenValue)),
-                                    queue);
+    protected PrimaryKey computeNext()
+    {
+        PrimaryKey key = computeNextKey();
+        while (key != null && !keyRange.contains(key.partitionKey()))
+            key = computeNextKey();
+        return key == null ? endOfData() : key;
     }
 }

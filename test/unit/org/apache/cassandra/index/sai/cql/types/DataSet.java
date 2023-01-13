@@ -678,8 +678,8 @@ public abstract class DataSet<T> extends SAITester
                 while (list.contains(value));
                 values[index] = value;
             }
-            Arrays.sort(values, (o1, o2) -> TypeUtil.compare(TypeUtil.encode(ByteBuffer.wrap(o1.getAddress()), InetAddressType.instance),
-                                                             TypeUtil.encode(ByteBuffer.wrap(o2.getAddress()), InetAddressType.instance),
+            Arrays.sort(values, (o1, o2) -> TypeUtil.compare(TypeUtil.asIndexBytes(ByteBuffer.wrap(o1.getAddress()), InetAddressType.instance),
+                                                             TypeUtil.asIndexBytes(ByteBuffer.wrap(o2.getAddress()), InetAddressType.instance),
                                                              InetAddressType.instance));
         }
 

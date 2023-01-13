@@ -191,11 +191,9 @@ public class TypeUtil
     }
 
     /**
-     * Encode an external term from a memtable index or a compaction. The purpose of this is to
-     * allow terms of particular types to be handled differently and not use the default
-     * {@link ByteComparable} encoding.
+     * Tranlates the external value of specific types into a format used by the index.
      */
-    public static ByteBuffer encode(ByteBuffer value, AbstractType<?> type)
+    public static ByteBuffer asIndexBytes(ByteBuffer value, AbstractType<?> type)
     {
         if (value == null)
             return null;
@@ -377,8 +375,6 @@ public class TypeUtil
         bytes[0] ^= 0x80;
         return ByteBuffer.wrap(bytes);
     }
-
-    /* Type comparison to get rid of ReversedType */
 
     /**
      * Returns <code>true</code> if values of the given {@link AbstractType} should be indexed as literals.

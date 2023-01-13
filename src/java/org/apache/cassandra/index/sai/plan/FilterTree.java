@@ -33,23 +33,22 @@ import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.schema.ColumnMetadata.Kind;
 import org.apache.cassandra.utils.FBUtilities;
 
-import static org.apache.cassandra.index.sai.plan.Operation.OperationType;
+import static org.apache.cassandra.index.sai.plan.Operation.BooleanOperator;
 
 /**
  * Tree-like structure to filter base table data using indexed expressions and non-user-defined filters.
  *
  * This is needed because:
  * 1. SAI doesn't index tombstones, base data may have been shadowed.
- * 2. SAI indexes partition offset, not all rows in partition match index condition.
- * 3. Replica filter protecting may fetch data that doesn't match index expressions.
+ * 2. Replica filter protecting may fetch data that doesn't match index expressions.
  */
 public class FilterTree
 {
-    protected final OperationType op;
+    protected final BooleanOperator op;
     protected final ListMultimap<ColumnMetadata, Expression> expressions;
     protected final List<FilterTree> children = new ArrayList<>();
 
-    FilterTree(OperationType operation,
+    FilterTree(BooleanOperator operation,
                ListMultimap<ColumnMetadata, Expression> expressions)
     {
         this.op = operation;
@@ -61,29 +60,29 @@ public class FilterTree
         children.add(child);
     }
 
-    public boolean isSatisfiedBy(DecoratedKey key, Unfiltered currentCluster, Row staticRow)
+    public boolean isSatisfiedBy(DecoratedKey key, Unfiltered unfiltered, Row staticRow)
     {
-        boolean result = localSatisfiedBy(key, currentCluster, staticRow);
+        boolean result = localSatisfiedBy(key, unfiltered, staticRow);
 
         for (FilterTree child : children)
-            result = op.apply(result, child.isSatisfiedBy(key, currentCluster, staticRow));
+            result = op.apply(result, child.isSatisfiedBy(key, unfiltered, staticRow));
 
         return result;
     }
 
-    private boolean localSatisfiedBy(DecoratedKey key, Unfiltered currentCluster, Row staticRow)
+    private boolean localSatisfiedBy(DecoratedKey key, Unfiltered unfiltered, Row staticRow)
     {
-        if (currentCluster == null || !currentCluster.isRow())
+        if (unfiltered == null || !unfiltered.isRow())
             return false;
 
         final int now = FBUtilities.nowInSeconds();
-        boolean result = op == OperationType.AND;
+        boolean result = op == BooleanOperator.AND;
 
         Iterator<ColumnMetadata> columnIterator = expressions.keySet().iterator();
         while (columnIterator.hasNext())
         {
             ColumnMetadata column = columnIterator.next();
-            Row row = column.kind == Kind.STATIC ? staticRow : (Row) currentCluster;
+            Row row = column.kind == Kind.STATIC ? staticRow : (Row) unfiltered;
 
             // If there is a column with multiple expressions that can mean an OR or (in the case of map
             // collections) it can mean different map indexes.
@@ -108,7 +107,7 @@ public class FilterTree
                 }
 
                 // If the operation is an AND then exit early if we get a single false
-                if (op == OperationType.AND && !result)
+                if (op == BooleanOperator.AND && !result)
                     return false;
             }
         }

@@ -193,7 +193,7 @@ public interface IndexRegistry
             }
         };
 
-        Index.Group group = new Index.Group()
+        Index.Group group = new Index.Group<Index>()
         {
             @Override
             public Set<Index> getIndexes()

@@ -79,7 +79,7 @@ public class Expression
                                      .collect(Collectors.toList());
 
         Preconditions.checkArgument(methods.size() == 1, "There are " + methods.size() + " methods annotated with " + annotation.getSimpleName());
-        return expr().clazz(clazz).method(methods.get(0).getName());
+        return Expression.clazz(clazz).method(methods.get(0).getName());
     }
 
     public Expression append(String elem)

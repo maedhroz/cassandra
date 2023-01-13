@@ -58,7 +58,7 @@ public class SAIRandomizedTester extends SAITester
     //
     // Note: The nextXXX methods maintain the contract of ThreadLocalRandom
     // where the max value is exclusive. The between methods maintain
-    // the contract of RandomizedTest where the max value is inclusive
+    // the contract where the max value is inclusive
     //
 
     public static int nextInt(int max)

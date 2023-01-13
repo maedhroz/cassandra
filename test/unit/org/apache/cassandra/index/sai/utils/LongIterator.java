@@ -24,7 +24,7 @@ import java.util.Random;
 import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.index.sai.SAITester;
 
-public class LongIterator extends RangeIterator
+public class LongIterator extends KeyRangeIterator
 {
     private final List<PrimaryKey> keys;
     private int currentIdx = 0;
@@ -34,6 +34,17 @@ public class LongIterator extends RangeIterator
      */
     private boolean shouldThrow = false;
     private final Random random = new Random();
+
+    public static LongIterator newEmptyIterator()
+    {
+        return new LongIterator();
+    }
+
+    private LongIterator()
+    {
+        super(null, null, 0);
+        keys = null;
+    }
 
     public LongIterator(long[] tokens)
     {
@@ -64,12 +75,12 @@ public class LongIterator extends RangeIterator
     }
 
     @Override
-    protected void performSkipTo(PrimaryKey nextToken)
+    protected void performSkipTo(PrimaryKey nextKey)
     {
         for (int i = currentIdx == 0 ? 0 : currentIdx - 1; i < keys.size(); i++)
         {
             PrimaryKey token = keys.get(i);
-            if (token.compareTo(nextToken) >= 0)
+            if (token.compareTo(nextKey) >= 0)
             {
                 currentIdx = i;
                 break;
@@ -87,7 +98,7 @@ public class LongIterator extends RangeIterator
     }
 
 
-    public static List<Long> convert(RangeIterator tokens)
+    public static List<Long> convert(KeyRangeIterator tokens)
     {
         List<Long> results = new ArrayList<>();
         while (tokens.hasNext())

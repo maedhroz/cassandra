@@ -36,11 +36,11 @@ public class Expression
 {
     private static final Logger logger = LoggerFactory.getLogger(Expression.class);
 
-    public enum Op
+    public enum IndexOperator
     {
-        EQ, RANGE, CONTAINS_KEY, CONTAINS_VALUE, IN;
+        EQ, RANGE, CONTAINS_KEY, CONTAINS_VALUE;
 
-        public static Op valueOf(Operator operator)
+        public static IndexOperator valueOf(Operator operator)
         {
             switch (operator)
             {
@@ -59,17 +59,9 @@ public class Expression
                 case GTE:
                     return RANGE;
 
-                case IN:
-                    return IN;
-
                 default:
                     return null;
             }
-        }
-
-        public boolean isEquality()
-        {
-            return this == EQ || this == CONTAINS_KEY || this == CONTAINS_VALUE;
         }
     }
 
@@ -79,7 +71,7 @@ public class Expression
     public final AbstractType<?> validator;
 
     @VisibleForTesting
-    protected Op operation;
+    protected IndexOperator operator;
 
     public Bound lower, upper;
     // The upperInclusive and lowerInclusive flags are maintained separately to the inclusive flags
@@ -118,7 +110,7 @@ public class Expression
             case CONTAINS_KEY:
                 lower = new Bound(value, validator, true);
                 upper = lower;
-                operation = Op.valueOf(op);
+                operator = IndexOperator.valueOf(op);
                 break;
 
             case LTE:
@@ -133,7 +125,7 @@ public class Expression
                     upperInclusive = true;
                 }
             case LT:
-                operation = Op.RANGE;
+                operator = IndexOperator.RANGE;
                 if (context.getDefinition().isReversedType())
                     lower = new Bound(value, validator, lowerInclusive);
                 else
@@ -152,7 +144,7 @@ public class Expression
                     lowerInclusive = true;
                 }
             case GT:
-                operation = Op.RANGE;
+                operator = IndexOperator.RANGE;
                 if (context.getDefinition().isReversedType())
                     upper = new Bound(value, validator,  upperInclusive);
                 else
@@ -160,7 +152,7 @@ public class Expression
                 break;
         }
 
-        assert operation != null;
+        assert operator != null;
 
         return this;
     }
@@ -189,7 +181,7 @@ public class Expression
                 int cmp = TypeUtil.comparePostFilter(lower.value, value, validator);
 
                 // in case of EQ lower == upper
-                if (operation == Op.EQ || operation == Op.CONTAINS_KEY || operation == Op.CONTAINS_VALUE)
+                if (operator == IndexOperator.EQ || operator == IndexOperator.CONTAINS_KEY || operator == IndexOperator.CONTAINS_VALUE)
                     return cmp == 0;
 
                 if (cmp > 0 || (cmp == 0 && !lowerInclusive))
@@ -224,7 +216,7 @@ public class Expression
                 final ByteBuffer term = analyzer.next();
 
                 boolean isMatch = false;
-                switch (operation)
+                switch (operator)
                 {
                     case EQ:
                     case CONTAINS_KEY:
@@ -247,9 +239,9 @@ public class Expression
         }
     }
 
-    public Op getOp()
+    public IndexOperator getOp()
     {
-        return operation;
+        return operator;
     }
 
     private boolean hasLower()
@@ -285,7 +277,7 @@ public class Expression
     {
         return String.format("Expression{name: %s, op: %s, lower: (%s, %s), upper: (%s, %s)}",
                              context.getColumnName(),
-                             operation,
+                             operator,
                              lower == null ? "null" : validator.getString(lower.value.raw),
                              lower != null && lower.inclusive,
                              upper == null ? "null" : validator.getString(upper.value.raw),
@@ -296,7 +288,7 @@ public class Expression
     public int hashCode()
     {
         return new HashCodeBuilder().append(context.getColumnName())
-                                    .append(operation)
+                                    .append(operator)
                                     .append(validator)
                                     .append(lower).append(upper).build();
     }
@@ -313,10 +305,10 @@ public class Expression
         Expression o = (Expression) other;
 
         return Objects.equals(context.getColumnName(), o.context.getColumnName())
-                && validator.equals(o.validator)
-                && operation == o.operation
-                && Objects.equals(lower, o.lower)
-                && Objects.equals(upper, o.upper);
+               && validator.equals(o.validator)
+               && operator == o.operator
+               && Objects.equals(lower, o.lower)
+               && Objects.equals(upper, o.upper);
     }
 
     /**
@@ -330,7 +322,7 @@ public class Expression
         public Value(ByteBuffer value, AbstractType<?> type)
         {
             this.raw = value;
-            this.encoded = TypeUtil.encode(value, type);
+            this.encoded = TypeUtil.asIndexBytes(value, type);
         }
 
         @Override

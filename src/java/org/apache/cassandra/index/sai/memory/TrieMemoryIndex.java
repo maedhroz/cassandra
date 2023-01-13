@@ -42,7 +42,7 @@ import org.apache.cassandra.index.sai.analyzer.AbstractAnalyzer;
 import org.apache.cassandra.index.sai.plan.Expression;
 import org.apache.cassandra.index.sai.utils.PrimaryKey;
 import org.apache.cassandra.index.sai.utils.PrimaryKeys;
-import org.apache.cassandra.index.sai.utils.RangeIterator;
+import org.apache.cassandra.index.sai.utils.KeyRangeIterator;
 import org.apache.cassandra.index.sai.utils.TypeUtil;
 import org.apache.cassandra.utils.Pair;
 import org.apache.cassandra.utils.bytecomparable.ByteComparable;
@@ -59,7 +59,6 @@ import org.apache.cassandra.utils.bytecomparable.ByteSourceInverse;
 public class TrieMemoryIndex
 {
     private static final Logger logger = LoggerFactory.getLogger(TrieMemoryIndex.class);
-    private static final int MINIMUM_QUEUE_SIZE = 128;
     private static final int MAX_RECURSIVE_KEY_LENGTH = 128;
 
     private final IndexContext indexContext;
@@ -68,19 +67,9 @@ public class TrieMemoryIndex
     private final AbstractAnalyzer.AnalyzerFactory analyzerFactory;
     private final AbstractType<?> validator;
     private final boolean isLiteral;
-    private final Object writeLock = new Object();
 
     private ByteBuffer minTerm;
     private ByteBuffer maxTerm;
-
-    private static final FastThreadLocal<Integer> lastQueueSize = new FastThreadLocal<Integer>()
-    {
-        protected Integer initialValue()
-        {
-            return MINIMUM_QUEUE_SIZE;
-        }
-    };
-
 
     public TrieMemoryIndex(IndexContext indexContext)
     {
@@ -101,51 +90,51 @@ public class TrieMemoryIndex
      * @param value indexed value
      * @return amount of heap allocated by the new value
      */
-    public long add(DecoratedKey key, Clustering<?> clustering, ByteBuffer value)
+    public synchronized long add(DecoratedKey key, Clustering<?> clustering, ByteBuffer value)
     {
-        synchronized (writeLock)
+        AbstractAnalyzer analyzer = analyzerFactory.create();
+        try
         {
-            AbstractAnalyzer analyzer = analyzerFactory.create();
-            try
+            value = TypeUtil.asIndexBytes(value, validator);
+            analyzer.reset(value);
+            final PrimaryKey primaryKey = indexContext.keyFactory().create(key, clustering);
+            final long initialSizeOnHeap = data.sizeOnHeap();
+            final long initialSizeOffHeap = data.sizeOffHeap();
+            final long reducerHeapSize = primaryKeysReducer.heapAllocations();
+
+            while (analyzer.hasNext())
             {
-                value = TypeUtil.encode(value, validator);
-                analyzer.reset(value.duplicate());
-                final PrimaryKey primaryKey = indexContext.keyFactory().create(key, clustering);
-                final long initialSizeOnHeap = data.sizeOnHeap();
-                final long initialSizeOffHeap = data.sizeOffHeap();
-                final long reducerHeapSize = primaryKeysReducer.heapAllocations();
+                final ByteBuffer term = analyzer.next();
 
-                while (analyzer.hasNext())
+                setMinMaxTerm(term.duplicate());
+
+                final ByteComparable comparableBytes = asComparableBytes(term);
+
+                try
                 {
-                    final ByteBuffer term = analyzer.next();
-
-                    setMinMaxTerm(term.duplicate());
-
-                    final ByteComparable encodedTerm = encode(term.duplicate());
-
-                    try
+                    if (term.limit() <= MAX_RECURSIVE_KEY_LENGTH)
                     {
-                        if (term.limit() <= MAX_RECURSIVE_KEY_LENGTH)
-                        {
-                            data.putRecursive(encodedTerm, primaryKey, primaryKeysReducer);
-                        }
-                        else
-                        {
-                            data.apply(Trie.singleton(encodedTerm, primaryKey), primaryKeysReducer);
-                        }
+                        data.putRecursive(comparableBytes, primaryKey, primaryKeysReducer);
                     }
-                    catch (InMemoryTrie.SpaceExhaustedException e)
+                    else
                     {
-                        throw new RuntimeException(e);
+                        data.apply(Trie.singleton(comparableBytes, primaryKey), primaryKeysReducer);
                     }
                 }
+                catch (InMemoryTrie.SpaceExhaustedException e)
+                {
+                    throw new RuntimeException(e);
+                }
+            }
 
-                return (data.sizeOnHeap() - initialSizeOnHeap) + (data.sizeOffHeap() - initialSizeOffHeap) + (primaryKeysReducer.heapAllocations() - reducerHeapSize);
-            }
-            finally
-            {
-                analyzer.end();
-            }
+            long onHeap = data.sizeOnHeap();
+            long offHeap = data.sizeOffHeap();
+            long heapAllocations = primaryKeysReducer.heapAllocations();
+            return (onHeap - initialSizeOnHeap) + (offHeap - initialSizeOffHeap) + (heapAllocations - reducerHeapSize);
+        }
+        finally
+        {
+            analyzer.end();
         }
     }
 
@@ -155,9 +144,9 @@ public class TrieMemoryIndex
 
      * @param expression the {@link Expression} to search for
      * @param keyRange the {@link AbstractBounds} containing the key range to restrict the search to
-     * @return a {@link RangeIterator} containing the search results
+     * @return a {@link KeyRangeIterator} containing the search results
      */
-    public RangeIterator search(Expression expression, AbstractBounds<PartitionPosition> keyRange)
+    public KeyRangeIterator search(Expression expression, AbstractBounds<PartitionPosition> keyRange)
     {
         if (logger.isTraceEnabled())
             logger.trace("Searching memtable index on expression '{}'...", expression);
@@ -167,7 +156,7 @@ public class TrieMemoryIndex
             case EQ:
             case CONTAINS_KEY:
             case CONTAINS_VALUE:
-                return exactMatch(expression);
+                return exactMatch(expression, keyRange);
             case RANGE:
                 return rangeMatch(expression, keyRange);
             default:
@@ -219,7 +208,7 @@ public class TrieMemoryIndex
         maxTerm = TypeUtil.max(term, maxTerm, indexContext.getValidator());
     }
 
-    private ByteComparable encode(ByteBuffer input)
+    private ByteComparable asComparableBytes(ByteBuffer input)
     {
         return isLiteral ? version -> append(ByteSource.of(input, version), ByteSource.TERMINATOR)
                          : version -> TypeUtil.asComparableBytes(input, validator, version);
@@ -253,24 +242,36 @@ public class TrieMemoryIndex
         };
     }
 
-    private RangeIterator exactMatch(Expression expression)
+    private KeyRangeIterator exactMatch(Expression expression, AbstractBounds<PartitionPosition> keyRange)
     {
-        final ByteComparable prefix = expression.lower == null ? ByteComparable.EMPTY : encode(expression.lower.value.encoded);
-        final PrimaryKeys primaryKeys = data.get(prefix);
-        if (primaryKeys == null)
-        {
-            return RangeIterator.empty();
-        }
-        return new KeyRangeIterator(primaryKeys.keys());
+        ByteComparable comparableMatch = expression.lower == null ? ByteComparable.EMPTY
+                                                                  : asComparableBytes(expression.lower.value.encoded);
+        PrimaryKeys primaryKeys = data.get(comparableMatch);
+        return primaryKeys == null ? KeyRangeIterator.empty()
+                                   : new FilteringInMemoryKeyRangeIterator(primaryKeys.keys(), keyRange);
     }
 
-    public static class Collector
+    private static class Collector
     {
+        private static final int MINIMUM_QUEUE_SIZE = 128;
+
+        // Maintain the last queue size used on this index to use for the next range match.
+        // This allows for receiving a stream of wide range queries where the queue size
+        // is larger than we would want to default the size to.
+        // TODO Investigate using a decaying histogram here to avoid the effect of outliers.
+        private static final FastThreadLocal<Integer> lastQueueSize = new FastThreadLocal<Integer>()
+        {
+            protected Integer initialValue()
+            {
+                return MINIMUM_QUEUE_SIZE;
+            }
+        };
+
         PrimaryKey minimumKey = null;
         PrimaryKey maximumKey = null;
-        PriorityQueue<PrimaryKey> mergedKeys = new PriorityQueue<>(lastQueueSize.get());
+        final PriorityQueue<PrimaryKey> mergedKeys = new PriorityQueue<>(lastQueueSize.get());
 
-        AbstractBounds<PartitionPosition> keyRange;
+        final AbstractBounds<PartitionPosition> keyRange;
 
         public Collector(AbstractBounds<PartitionPosition> keyRange)
         {
@@ -287,15 +288,7 @@ public class TrieMemoryIndex
             // shortcut to avoid generating iterator
             if (primaryKeys.size() == 1)
             {
-                PrimaryKey first = primaryKeys.first();
-                if (keyRange.contains(first.partitionKey()))
-                {
-                    mergedKeys.add(first);
-
-                    minimumKey = minimumKey == null ? first : first.compareTo(minimumKey) < 0 ? first : minimumKey;
-                    maximumKey = maximumKey == null ? first : first.compareTo(maximumKey) > 0 ? first : maximumKey;
-                }
-
+                processKey(primaryKeys.first());
                 return;
             }
 
@@ -304,26 +297,33 @@ public class TrieMemoryIndex
                 || primaryKeys.last().partitionKey().compareTo(keyRange.left) < 0)
                 return;
 
-            for (PrimaryKey key : primaryKeys)
-            {
-                if (keyRange.contains(key.partitionKey()))
-                {
-                    mergedKeys.add(key);
+            primaryKeys.forEach(this::processKey);
+        }
 
-                    minimumKey = minimumKey == null ? key : key.compareTo(minimumKey) < 0 ? key : minimumKey;
-                    maximumKey = maximumKey == null ? key : key.compareTo(maximumKey) > 0 ? key : maximumKey;
-                }
+        public void updateLastQueueSize()
+        {
+            lastQueueSize.set(Math.max(MINIMUM_QUEUE_SIZE, mergedKeys.size()));
+        }
+
+        private void processKey(PrimaryKey key)
+        {
+            if (keyRange.contains(key.partitionKey()))
+            {
+                mergedKeys.add(key);
+
+                minimumKey = minimumKey == null ? key : key.compareTo(minimumKey) < 0 ? key : minimumKey;
+                maximumKey = maximumKey == null ? key : key.compareTo(maximumKey) > 0 ? key : maximumKey;
             }
         }
     }
 
-    private RangeIterator rangeMatch(Expression expression, AbstractBounds<PartitionPosition> keyRange)
+    private KeyRangeIterator rangeMatch(Expression expression, AbstractBounds<PartitionPosition> keyRange)
     {
         ByteComparable lowerBound, upperBound;
         boolean lowerInclusive, upperInclusive;
         if (expression.lower != null)
         {
-            lowerBound = encode(expression.lower.value.encoded);
+            lowerBound = asComparableBytes(expression.lower.value.encoded);
             lowerInclusive = expression.lower.inclusive;
         }
         else
@@ -334,7 +334,7 @@ public class TrieMemoryIndex
 
         if (expression.upper != null)
         {
-            upperBound = encode(expression.upper.value.encoded);
+            upperBound = asComparableBytes(expression.upper.value.encoded);
             upperInclusive = expression.upper.inclusive;
         }
         else
@@ -351,11 +351,12 @@ public class TrieMemoryIndex
 
         if (cd.mergedKeys.isEmpty())
         {
-            return RangeIterator.empty();
+            return KeyRangeIterator.empty();
         }
 
-        lastQueueSize.set(Math.max(MINIMUM_QUEUE_SIZE, cd.mergedKeys.size()));
-        return new KeyRangeIterator(cd.minimumKey, cd.maximumKey, cd.mergedKeys);
+        cd.updateLastQueueSize();
+
+        return new InMemoryKeyRangeIterator(cd.minimumKey, cd.maximumKey, cd.mergedKeys);
     }
 
     private static class PrimaryKeysReducer implements InMemoryTrie.UpsertTransformer<PrimaryKeys, PrimaryKey>

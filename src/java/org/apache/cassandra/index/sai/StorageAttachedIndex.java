@@ -39,8 +39,6 @@ import org.apache.cassandra.cql3.statements.schema.IndexTarget;
 import org.apache.cassandra.db.CassandraWriteContext;
 import org.apache.cassandra.db.ColumnFamilyStore;
 import org.apache.cassandra.db.DecoratedKey;
-import org.apache.cassandra.db.DeletionTime;
-import org.apache.cassandra.db.RangeTombstone;
 import org.apache.cassandra.db.ReadCommand;
 import org.apache.cassandra.db.RegularAndStaticColumns;
 import org.apache.cassandra.db.WriteContext;
@@ -119,13 +117,11 @@ public class StorageAttachedIndex implements Index
             ImmutableSet.of(OrderPreservingPartitioner.class, LocalPartitioner.class, ByteOrderedPartitioner.class, RandomPartitioner.class);
 
     private final ColumnFamilyStore baseCfs;
-    private final IndexMetadata config;
     private final IndexContext indexContext;
 
     public StorageAttachedIndex(ColumnFamilyStore baseCfs, IndexMetadata config)
     {
         this.baseCfs = baseCfs;
-        this.config = config;
         TableMetadata tableMetadata = baseCfs.metadata();
         Pair<ColumnMetadata, IndexTarget.Type> target = TargetParser.parse(tableMetadata, config);
         this.indexContext = new IndexContext(tableMetadata.keyspace,
@@ -225,7 +221,7 @@ public class StorageAttachedIndex implements Index
     @Override
     public IndexMetadata getIndexMetadata()
     {
-        return config;
+        return indexContext.getIndexMetadata();
     }
 
     @Override
@@ -362,7 +358,7 @@ public class StorageAttachedIndex implements Index
     public void validate(PartitionUpdate update) throws InvalidRequestException
     {}
 
-    private class UpdateIndexer extends IndexerAdapter
+    private class UpdateIndexer implements Index.Indexer
     {
         private final DecoratedKey key;
         private final Memtable mt;
@@ -390,30 +386,6 @@ public class StorageAttachedIndex implements Index
         void adjustMemtableSize(long additionalSpace, OpOrder.Group opGroup)
         {
             mt.markExtraOnHeapUsed(additionalSpace, opGroup);
-        }
-    }
-
-    protected static abstract class IndexerAdapter implements Indexer
-    {
-        @Override
-        public void begin() { }
-
-        @Override
-        public void finish() { }
-
-        @Override
-        public void partitionDelete(DeletionTime dt)
-        {
-        }
-
-        @Override
-        public void rangeTombstone(RangeTombstone rt)
-        {
-        }
-
-        @Override
-        public void removeRow(Row row)
-        {
         }
     }
 
@@ -463,7 +435,7 @@ public class StorageAttachedIndex implements Index
     @Override
     public String toString()
     {
-        return String.format("%s.%s.%s", baseCfs.keyspace.getName(), baseCfs.name, config == null ? "?" : config.name);
+        return String.format("%s.%s.%s", baseCfs.keyspace.getName(), baseCfs.name, getIndexMetadata() == null ? "?" : getIndexMetadata());
     }
 
     /**

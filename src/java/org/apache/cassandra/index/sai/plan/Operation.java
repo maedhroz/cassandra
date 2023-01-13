@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.BiFunction;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
@@ -32,33 +33,33 @@ import org.apache.cassandra.cql3.Operator;
 import org.apache.cassandra.db.filter.RowFilter;
 import org.apache.cassandra.index.sai.IndexContext;
 import org.apache.cassandra.index.sai.analyzer.AbstractAnalyzer;
-import org.apache.cassandra.index.sai.utils.RangeIterator;
+import org.apache.cassandra.index.sai.utils.KeyRangeIterator;
 import org.apache.cassandra.index.sai.utils.TypeUtil;
 import org.apache.cassandra.schema.ColumnMetadata;
 
 public class Operation
 {
-    public enum OperationType
+    public enum BooleanOperator
     {
-        AND;
+        AND((a, b) -> a & b);
+
+        private final BiFunction<Boolean, Boolean, Boolean> func;
+
+        BooleanOperator(BiFunction<Boolean, Boolean, Boolean> func)
+        {
+            this.func = func;
+        }
 
         public boolean apply(boolean a, boolean b)
         {
-            switch (this)
-            {
-                case AND:
-                    return a & b;
-
-                default:
-                    throw new AssertionError();
-            }
+            return this.func.apply(a, b);
         }
     }
 
     @VisibleForTesting
-    protected static ListMultimap<ColumnMetadata, Expression> analyzeGroup(QueryController controller,
-                                                                           OperationType op,
-                                                                           List<RowFilter.Expression> expressions)
+    protected static ListMultimap<ColumnMetadata, Expression> buildIndexExpressions(QueryController controller,
+                                                                                    BooleanOperator booleanOperator,
+                                                                                    List<RowFilter.Expression> expressions)
     {
         ListMultimap<ColumnMetadata, Expression> analyzed = ArrayListMultimap.create();
 
@@ -112,7 +113,7 @@ public class Operation
                 // not-equals is combined with the range iff operator is AND.
                 {
                     Expression range;
-                    if (perColumn.size() == 0 || op != OperationType.AND)
+                    if (perColumn.size() == 0 || booleanOperator != BooleanOperator.AND)
                     {
                         range = new Expression(indexContext);
                         perColumn.add(range);
@@ -167,17 +168,31 @@ public class Operation
         }
     }
 
-    static RangeIterator buildIterator(QueryController controller)
+    /**
+     * Converts expressions into filter tree for query.
+     *
+     * @return a KeyRangeIterator over the index query results
+     */
+    static KeyRangeIterator buildIterator(QueryController controller)
     {
         return Node.buildTree(controller.filterOperation()).analyzeTree(controller).rangeIterator(controller);
     }
 
+    /**
+     * Converts expressions into filter tree (which is currently just a single AND).
+     *
+     * Filter tree allows us to do a couple of important optimizations
+     * namely, group flattening for AND operations (query rewrite), expression bounds checks,
+     * "satisfies by" checks for resulting rows with an early exit.
+     *
+     * @return root of the filter tree.
+     */
     static FilterTree buildFilter(QueryController controller)
     {
         return Node.buildTree(controller.filterOperation()).buildFilter(controller);
     }
 
-    public static abstract class Node
+    static abstract class Node
     {
         ListMultimap<ColumnMetadata, Expression> expressionMap;
 
@@ -205,7 +220,7 @@ public class Operation
 
         abstract FilterTree filterTree();
 
-        abstract RangeIterator rangeIterator(QueryController controller);
+        abstract KeyRangeIterator rangeIterator(QueryController controller);
 
         static Node buildTree(RowFilter filterOperation)
         {
@@ -253,9 +268,9 @@ public class Operation
         }
     }
 
-    public static abstract class OperatorNode extends Node
+    static abstract class OperatorNode extends Node
     {
-        List<Node> children = new ArrayList<>();
+        final List<Node> children = new ArrayList<>();
 
         @Override
         public List<Node> children()
@@ -270,24 +285,24 @@ public class Operation
         }
     }
 
-    public static class AndNode extends OperatorNode
+    static class AndNode extends OperatorNode
     {
         @Override
         public void analyze(List<RowFilter.Expression> expressionList, QueryController controller)
         {
-            expressionMap = analyzeGroup(controller, OperationType.AND, expressionList);
+            expressionMap = buildIndexExpressions(controller, BooleanOperator.AND, expressionList);
         }
 
         @Override
         FilterTree filterTree()
         {
-            return new FilterTree(OperationType.AND, expressionMap);
+            return new FilterTree(BooleanOperator.AND, expressionMap);
         }
 
         @Override
-        RangeIterator rangeIterator(QueryController controller)
+        KeyRangeIterator rangeIterator(QueryController controller)
         {
-            RangeIterator.Builder builder = controller.getIndexes(expressionMap.values());
+            KeyRangeIterator.Builder builder = controller.getIndexQueryResults(expressionMap.values());
             for (Node child : children)
             {
                 boolean canFilter = child.canFilter();
@@ -298,20 +313,20 @@ public class Operation
         }
     }
 
-    public static class ExpressionNode extends Node
+    static class ExpressionNode extends Node
     {
-        RowFilter.Expression expression;
+        final RowFilter.Expression expression;
 
         @Override
         public void analyze(List<RowFilter.Expression> expressionList, QueryController controller)
         {
-            expressionMap = analyzeGroup(controller, OperationType.AND, expressionList);
+            expressionMap = buildIndexExpressions(controller, BooleanOperator.AND, expressionList);
         }
 
         @Override
         FilterTree filterTree()
         {
-            return new FilterTree(OperationType.AND, expressionMap);
+            return new FilterTree(BooleanOperator.AND, expressionMap);
         }
 
         public ExpressionNode(RowFilter.Expression expression)
@@ -326,10 +341,11 @@ public class Operation
         }
 
         @Override
-        RangeIterator rangeIterator(QueryController controller)
+        KeyRangeIterator rangeIterator(QueryController controller)
         {
-            assert canFilter();
-            return controller.getIndexes(expressionMap.values()).build();
+            assert canFilter() : "Cannot process query with no expressions";
+
+            return controller.getIndexQueryResults(expressionMap.values()).build();
         }
     }
 }

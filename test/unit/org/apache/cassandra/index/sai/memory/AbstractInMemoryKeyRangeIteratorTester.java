@@ -18,20 +18,18 @@
 package org.apache.cassandra.index.sai.memory;
 
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.index.sai.SAITester;
+import org.apache.cassandra.index.sai.utils.KeyRangeIterator;
 import org.apache.cassandra.index.sai.utils.PrimaryKey;
 import org.apache.cassandra.index.sai.utils.PrimaryKeyFactory;
-import org.apache.cassandra.index.sai.utils.RangeIterator;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 
-@Ignore
-public abstract class AbstractKeyRangeIteratorTest
+public abstract class AbstractInMemoryKeyRangeIteratorTester
 {
     protected PrimaryKeyFactory primaryKeyFactory;
 
@@ -42,65 +40,65 @@ public abstract class AbstractKeyRangeIteratorTest
     }
 
     @Test
-    public void singleTokenIsReturned() throws Exception
+    public void singleTokenIsReturned()
     {
-        RangeIterator iterator= makeIterator(1, 1, 1);
+        KeyRangeIterator iterator= makeIterator(1, 1, 1);
 
         assertIterator(iterator, 1);
     }
 
     @Test
-    public void duplicateSingleTokenIsReturned() throws Exception
+    public void duplicateSingleTokenIsReturned()
     {
-        RangeIterator iterator= makeIterator(1, 1, 1, 1);
+        KeyRangeIterator iterator= makeIterator(1, 1, 1, 1);
 
         assertIterator(iterator, 1);
     }
 
     @Test
-    public void withoutSkipAllTokensAreReturnedInTokenOrder() throws Exception
+    public void withoutSkipAllTokensAreReturnedInTokenOrder()
     {
-        RangeIterator iterator= makeIterator(1, 3, 1, 2, 3);
+        KeyRangeIterator iterator= makeIterator(1, 3, 1, 2, 3);
 
         assertIterator(iterator, 1, 2, 3);
     }
 
     @Test
-    public void tokensAddedOutOfOrderAreReturnedInOrder() throws Exception
+    public void tokensAddedOutOfOrderAreReturnedInOrder()
     {
-        RangeIterator iterator= makeIterator(1, 3, 3, 2, 1);
+        KeyRangeIterator iterator= makeIterator(1, 3, 3, 2, 1);
 
         assertIterator(iterator, 1, 2, 3);
     }
 
     @Test
-    public void matchingTokensAreIgnoredAtStart() throws Exception
+    public void matchingTokensAreIgnoredAtStart()
     {
-        RangeIterator iterator= makeIterator(1, 3, 1, 1, 2, 3);
+        KeyRangeIterator iterator= makeIterator(1, 3, 1, 1, 2, 3);
 
         assertIterator(iterator, 1, 2, 3);
     }
 
     @Test
-    public void matchingTokensAreIgnoredInMiddle() throws Exception
+    public void matchingTokensAreIgnoredInMiddle()
     {
-        RangeIterator iterator= makeIterator(1, 3, 1, 2, 2, 3);
+        KeyRangeIterator iterator= makeIterator(1, 3, 1, 2, 2, 3);
 
         assertIterator(iterator, 1, 2, 3);
     }
 
     @Test
-    public void matchingTokensAreIgnoredAtEnd() throws Exception
+    public void matchingTokensAreIgnoredAtEnd()
     {
-        RangeIterator iterator= makeIterator(1, 3, 1, 2, 3, 3);
+        KeyRangeIterator iterator= makeIterator(1, 3, 1, 2, 3, 3);
 
         assertIterator(iterator, 1, 2, 3);
     }
 
     @Test
-    public void skipToTokenBeforeFirstTokenWillReturnAllTokens() throws Exception
+    public void skipToTokenBeforeFirstTokenWillReturnAllTokens()
     {
-        RangeIterator iterator= makeIterator(1, 3, 1, 2, 3);
+        KeyRangeIterator iterator= makeIterator(1, 3, 1, 2, 3);
 
         iterator.skipTo(primaryKeyFactory.createTokenOnly(new Murmur3Partitioner.LongToken(0)));
 
@@ -108,9 +106,9 @@ public abstract class AbstractKeyRangeIteratorTest
     }
 
     @Test
-    public void skipToFirstTokenWillReturnAllTokens() throws Exception
+    public void skipToFirstTokenWillReturnAllTokens()
     {
-        RangeIterator iterator= makeIterator(1, 3, 1, 2, 3);
+        KeyRangeIterator iterator= makeIterator(1, 3, 1, 2, 3);
 
         iterator.skipTo(primaryKeyFactory.createTokenOnly(new Murmur3Partitioner.LongToken(1)));
 
@@ -118,9 +116,9 @@ public abstract class AbstractKeyRangeIteratorTest
     }
 
     @Test
-    public void skipToMiddleTokenWillReturnRemainingTokens() throws Exception
+    public void skipToMiddleTokenWillReturnRemainingTokens()
     {
-        RangeIterator iterator= makeIterator(1, 3, 1, 2, 3);
+        KeyRangeIterator iterator= makeIterator(1, 3, 1, 2, 3);
 
         iterator.skipTo(primaryKeyFactory.createTokenOnly(new Murmur3Partitioner.LongToken(2)));
 
@@ -128,9 +126,9 @@ public abstract class AbstractKeyRangeIteratorTest
     }
 
     @Test
-    public void skipToLastTokenWillReturnLastToken() throws Exception
+    public void skipToLastTokenWillReturnLastToken()
     {
-        RangeIterator iterator= makeIterator(1, 3, 1, 2, 3);
+        KeyRangeIterator iterator= makeIterator(1, 3, 1, 2, 3);
 
         iterator.skipTo(primaryKeyFactory.createTokenOnly(new Murmur3Partitioner.LongToken(3)));
 
@@ -138,9 +136,9 @@ public abstract class AbstractKeyRangeIteratorTest
     }
 
     @Test
-    public void skipToAfterLastTokenWillReturnNoTokens() throws Exception
+    public void skipToAfterLastTokenWillReturnNoTokens()
     {
-        RangeIterator iterator= makeIterator(1, 3, 1, 2, 3);
+        KeyRangeIterator iterator= makeIterator(1, 3, 1, 2, 3);
 
         iterator.skipTo(primaryKeyFactory.createTokenOnly(new Murmur3Partitioner.LongToken(4)));
 
@@ -148,16 +146,16 @@ public abstract class AbstractKeyRangeIteratorTest
     }
 
     @Test
-    public void skipToWithMatchingTokensWithReturnCorrectTokens() throws Exception
+    public void skipToWithMatchingTokensWithReturnCorrectTokens()
     {
-        RangeIterator iterator= makeIterator(1, 3, 1, 1, 2, 2, 3, 3);
+        KeyRangeIterator iterator= makeIterator(1, 3, 1, 1, 2, 2, 3, 3);
 
         iterator.skipTo(primaryKeyFactory.createTokenOnly(new Murmur3Partitioner.LongToken(2)));
 
         assertIterator(iterator, 2, 3);
     }
 
-    private void assertIterator(RangeIterator iterator, long... tokens)
+    private void assertIterator(KeyRangeIterator iterator, long... tokens)
     {
         for(long token : tokens)
         {
@@ -167,7 +165,7 @@ public abstract class AbstractKeyRangeIteratorTest
     }
 
 
-    protected abstract RangeIterator makeIterator(long minimumTokenValue, long maximumTokenValue, long... tokens);
+    protected abstract KeyRangeIterator makeIterator(long minimumTokenValue, long maximumTokenValue, long... tokens);
 
     protected PrimaryKey keyForToken(long token)
     {

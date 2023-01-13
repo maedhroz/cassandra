@@ -26,12 +26,12 @@ import static com.google.common.base.Preconditions.checkState;
 
 /**
  * This is fork of the Guava AbstractIterator, the only difference
- * is that state & next variables are now protected, this was required
- * for SkippableIterator.skipTo(..) to void all previous state.
+ * is that the next variable is now protected so that the KeyRangeIterator.skipTo
+ * method can avoid early state changed.
  */
 public abstract class AbstractGuavaIterator<T> implements PeekingIterator<T>
 {
-    protected State state = State.NOT_READY;
+    private State state = State.NOT_READY;
 
     /** Constructor for use by subclasses. */
     protected AbstractGuavaIterator() {}
