@@ -358,37 +358,6 @@ public class StorageAttachedIndex implements Index
     public void validate(PartitionUpdate update) throws InvalidRequestException
     {}
 
-    private class UpdateIndexer implements Index.Indexer
-    {
-        private final DecoratedKey key;
-        private final Memtable mt;
-        private final WriteContext writeContext;
-
-        UpdateIndexer(DecoratedKey key, Memtable mt, WriteContext writeContext)
-        {
-            this.key = key;
-            this.mt = mt;
-            this.writeContext = writeContext;
-        }
-
-        @Override
-        public void insertRow(Row row)
-        {
-            adjustMemtableSize(indexContext.index(key, row, mt), CassandraWriteContext.fromContext(writeContext).getGroup());
-        }
-
-        @Override
-        public void updateRow(Row oldRow, Row newRow)
-        {
-            insertRow(newRow);
-        }
-
-        void adjustMemtableSize(long additionalSpace, OpOrder.Group opGroup)
-        {
-            mt.markExtraOnHeapUsed(additionalSpace, opGroup);
-        }
-    }
-
     @Override
     public Searcher searcherFor(ReadCommand command) throws InvalidRequestException
     {
@@ -445,5 +414,36 @@ public class StorageAttachedIndex implements Index
     {
         baseCfs.indexManager.makeIndexNonQueryable(this, Status.BUILD_FAILED);
         logger.warn(indexContext.logMessage("Storage-attached index is no longer queryable. Please restart this node to repair it."));
+    }
+
+    private class UpdateIndexer implements Index.Indexer
+    {
+        private final DecoratedKey key;
+        private final Memtable memtable;
+        private final WriteContext writeContext;
+
+        UpdateIndexer(DecoratedKey key, Memtable memtable, WriteContext writeContext)
+        {
+            this.key = key;
+            this.memtable = memtable;
+            this.writeContext = writeContext;
+        }
+
+        @Override
+        public void insertRow(Row row)
+        {
+            adjustMemtableSize(indexContext.index(key, row, memtable), CassandraWriteContext.fromContext(writeContext).getGroup());
+        }
+
+        @Override
+        public void updateRow(Row oldRow, Row newRow)
+        {
+            insertRow(newRow);
+        }
+
+        void adjustMemtableSize(long additionalSpace, OpOrder.Group opGroup)
+        {
+            memtable.markExtraOnHeapUsed(additionalSpace, opGroup);
+        }
     }
 }

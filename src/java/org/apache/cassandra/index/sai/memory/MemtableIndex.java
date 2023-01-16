@@ -69,7 +69,7 @@ public class MemtableIndex
         return index.getMaxTerm();
     }
 
-    public long index(DecoratedKey key, Clustering clustering, ByteBuffer value)
+    public long index(DecoratedKey key, Clustering<?> clustering, ByteBuffer value)
     {
         if (value == null || value.remaining() == 0)
             return 0;

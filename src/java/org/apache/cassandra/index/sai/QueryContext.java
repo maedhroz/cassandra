@@ -21,9 +21,6 @@ package org.apache.cassandra.index.sai;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.concurrent.NotThreadSafe;
 
-import com.google.common.annotations.VisibleForTesting;
-
-import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.db.ReadCommand;
 import org.apache.cassandra.exceptions.QueryCancelledException;
 import org.apache.cassandra.utils.Clock;
@@ -48,16 +45,10 @@ public class QueryContext
 
     public long queryTimeouts = 0;
 
-    @VisibleForTesting
-    public QueryContext()
-    {
-        this(null, DatabaseDescriptor.getRangeRpcTimeout(TimeUnit.MILLISECONDS));
-    }
-
     public QueryContext(ReadCommand readCommand, long executionQuotaMs)
     {
         this.readCommand = readCommand;
-        this.executionQuotaNano = TimeUnit.MILLISECONDS.toNanos(executionQuotaMs);
+        executionQuotaNano = TimeUnit.MILLISECONDS.toNanos(executionQuotaMs);
         queryStartTimeNanos = Clock.Global.nanoTime();
     }
 

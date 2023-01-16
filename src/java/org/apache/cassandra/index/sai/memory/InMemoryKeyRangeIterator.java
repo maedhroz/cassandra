@@ -97,6 +97,7 @@ public class InMemoryKeyRangeIterator extends KeyRangeIterator
         }
     }
 
+    @Override
     public void close() throws IOException
     {}
 }

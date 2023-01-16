@@ -20,6 +20,7 @@ package org.apache.cassandra.index.sai.plan;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Set;
 
 import com.google.common.collect.Lists;
 
@@ -110,23 +111,21 @@ public class QueryController
      */
     public IndexContext getContext(RowFilter.Expression expression)
     {
-        StorageAttachedIndex index = getBestIndexFor(expression);
+        Set<StorageAttachedIndex> indexes = getBestIndexFor(expression);
 
-        if (index != null)
-            return index.getIndexContext();
-
-        return new IndexContext(cfs.metadata().keyspace,
-                                cfs.metadata().name,
-                                cfs.metadata().partitionKeyType,
-                                cfs.metadata().comparator,
-                                expression.column(),
-                                IndexTarget.Type.VALUES,
-                                null);
+        return indexes.isEmpty() ? new IndexContext(cfs.metadata().keyspace,
+                                                    cfs.metadata().name,
+                                                    cfs.metadata().partitionKeyType,
+                                                    cfs.metadata().comparator,
+                                                    expression.column(),
+                                                    IndexTarget.Type.VALUES,
+                                                    null)
+                                 : indexes.iterator().next().getIndexContext();
     }
 
-    public StorageAttachedIndex getBestIndexFor(RowFilter.Expression expression)
+    public Set<StorageAttachedIndex> getBestIndexFor(RowFilter.Expression expression)
     {
-        return cfs.indexManager.getBestIndexFor(expression, StorageAttachedIndex.class).orElse(null);
+        return cfs.indexManager.getBestIndexFor(expression, StorageAttachedIndex.class);
     }
 
     public UnfilteredRowIterator queryStorage(PrimaryKey key, ReadExecutionController executionController)

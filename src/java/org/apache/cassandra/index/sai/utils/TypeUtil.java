@@ -191,7 +191,7 @@ public class TypeUtil
     }
 
     /**
-     * Tranlates the external value of specific types into a format used by the index.
+     * Translates the external value of specific types into a format used by the index.
      */
     public static ByteBuffer asIndexBytes(ByteBuffer value, AbstractType<?> type)
     {

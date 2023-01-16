@@ -513,15 +513,13 @@ public interface Index
          * Notification of the start of a partition update.
          * This event always occurs before any other during the update.
          */
-        default void begin()
-        {}
+        default void begin() {}
 
         /**
          * Notification of a top level partition delete.
          * @param deletionTime
          */
-        default void partitionDelete(DeletionTime deletionTime)
-        {}
+        default void partitionDelete(DeletionTime deletionTime) {}
 
         /**
          * Notification of a RangeTombstone.
@@ -529,8 +527,7 @@ public interface Index
          * and a notification will be passed for each of them.
          * @param tombstone
          */
-        default void rangeTombstone(RangeTombstone tombstone)
-        {}
+        default void rangeTombstone(RangeTombstone tombstone) {}
 
         /**
          * Notification that a new row was inserted into the Memtable holding the partition.
@@ -540,8 +537,7 @@ public interface Index
          *
          * @param row the Row being inserted into the base table's Memtable.
          */
-        default void insertRow(Row row)
-        {}
+        default void insertRow(Row row) {}
 
         /**
          * Notification of a modification to a row in the base table's Memtable.
@@ -562,8 +558,7 @@ public interface Index
          * @param newRowData data that was not present in the existing row and is being inserted
          *                   into the base table's Memtable
          */
-        default void updateRow(Row oldRowData, Row newRowData)
-        {}
+        default void updateRow(Row oldRowData, Row newRowData) {}
 
         /**
          * Notification that a row was removed from the partition.
@@ -581,15 +576,13 @@ public interface Index
          *
          * @param row data being removed from the base table
          */
-        default void removeRow(Row row)
-        {}
+        default void removeRow(Row row) {}
 
         /**
          * Notification of the end of the partition update.
          * This event always occurs after all others for the particular update.
          */
-        default void finish()
-        {}
+        default void finish() {}
     }
 
     /*
@@ -664,28 +657,28 @@ public interface Index
      * {@link SecondaryIndexManager#registerIndex(Index, Object, Supplier)} during index registering
      * at {@link #register(IndexRegistry)} method.
      */
-    interface Group<T extends Index>
+    interface Group
     {
         /**
          * Returns the indexes that are members of this group.
          *
          * @return the indexes that are members of this group
          */
-        Set<T> getIndexes();
+        Set<Index> getIndexes();
 
         /**
          * Adds the specified {@link Index} as a member of this group.
          *
          * @param index the index to be added
          */
-        void addIndex(T index);
+        void addIndex(Index index);
 
         /**
          * Removes the specified {@link Index} from the members of this group.
          *
          * @param index the index to be removed
          */
-        void removeIndex(T index);
+        void removeIndex(Index index);
 
         /**
          * Returns if this group contains the specified {@link Index}.
@@ -693,7 +686,7 @@ public interface Index
          * @param index the index to be removed
          * @return {@code true} if this group contains {@code index}, {@code false} otherwise
          */
-        boolean containsIndex(T index);
+        boolean containsIndex(Index index);
 
         /**
          * Creates an new {@code Indexer} object for updates to a given partition.
@@ -714,7 +707,7 @@ public interface Index
          * (this could be because the index doesn't care about that particular partition, doesn't care about
          * that type of transaction, ...).
          */
-        Indexer indexerFor(Predicate<T> indexSelector,
+        Indexer indexerFor(Predicate<Index> indexSelector,
                            DecoratedKey key,
                            RegularAndStaticColumns columns,
                            int nowInSec,

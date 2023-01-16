@@ -29,7 +29,6 @@ import java.util.concurrent.TimeUnit;
 import com.google.common.base.Objects;
 import org.junit.Test;
 
-import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.distributed.Cluster;
 import org.apache.cassandra.distributed.api.IInvokableInstance;
 import org.apache.cassandra.distributed.test.TestBaseImpl;
@@ -54,7 +53,7 @@ public class IndexAvailabilityTest extends TestBaseImpl
                                                "WITH compaction = {'class' : 'SizeTieredCompactionStrategy', 'enabled' : false }";
     private static final String CREATE_INDEX = "CREATE CUSTOM INDEX %s ON %s.%s(%s) USING 'StorageAttachedIndex'";
     
-    private static Map<NodeIndex, Index.Status> expectedNodeIndexQueryability = new ConcurrentHashMap<>();
+    private static final Map<NodeIndex, Index.Status> expectedNodeIndexQueryability = new ConcurrentHashMap<>();
     private List<String> keyspaces;
     private List<String> indexesPerKs;
 
@@ -144,7 +143,7 @@ public class IndexAvailabilityTest extends TestBaseImpl
         }
     }
 
-    private void markIndexNonQueryable(IInvokableInstance node, String keyspace, String table, String indexName) throws Exception
+    private void markIndexNonQueryable(IInvokableInstance node, String keyspace, String table, String indexName)
     {
         expectedNodeIndexQueryability.put(NodeIndex.create(keyspace, indexName, node), Index.Status.BUILD_FAILED);
 
@@ -155,7 +154,7 @@ public class IndexAvailabilityTest extends TestBaseImpl
         });
     }
 
-    private void markIndexQueryable(IInvokableInstance node, String keyspace, String table, String indexName) throws Exception
+    private void markIndexQueryable(IInvokableInstance node, String keyspace, String table, String indexName)
     {
         expectedNodeIndexQueryability.put(NodeIndex.create(keyspace, indexName, node), Index.Status.BUILD_SUCCEEDED);
 
@@ -166,7 +165,7 @@ public class IndexAvailabilityTest extends TestBaseImpl
         });
     }
 
-    private void markIndexBuilding(IInvokableInstance node, String keyspace, String table, String indexName) throws Exception
+    private void markIndexBuilding(IInvokableInstance node, String keyspace, String table, String indexName)
     {
         expectedNodeIndexQueryability.put(NodeIndex.create(keyspace, indexName, node), Index.Status.FULL_REBUILD_STARTED);
 
@@ -240,9 +239,7 @@ public class IndexAvailabilityTest extends TestBaseImpl
         if (table == null)
             return Index.Status.UNKNOWN;
 
-        SecondaryIndexManager indexManager = Keyspace.openAndGetStore(table).indexManager;
-        
-        return indexManager.getIndexStatus(replica, keyspaceName, indexName);
+        return SecondaryIndexManager.getIndexStatus(replica, keyspaceName, indexName);
     }
 
     private static InetAddressAndPort getFullAddress(IInvokableInstance node)

@@ -27,7 +27,7 @@ import org.apache.cassandra.io.util.FileUtils;
 /**
  * Range Union Iterator is used to return sorted stream of elements from multiple RangeIterator instances.
  */
-@SuppressWarnings("resource")
+@SuppressWarnings({"resource", "RedundantSuppression"})
 public class KeyRangeUnionIterator extends KeyRangeIterator
 {
     private final List<KeyRangeIterator> ranges;
@@ -109,7 +109,7 @@ public class KeyRangeUnionIterator extends KeyRangeIterator
     @VisibleForTesting
     public static class Builder extends KeyRangeIterator.Builder
     {
-        protected List<KeyRangeIterator> rangeIterators;
+        protected final List<KeyRangeIterator> rangeIterators;
 
         Builder(int size)
         {

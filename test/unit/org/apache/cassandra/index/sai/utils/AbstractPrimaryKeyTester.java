@@ -36,87 +36,87 @@ import static org.junit.Assert.assertTrue;
 
 public class AbstractPrimaryKeyTester extends SAIRandomizedTester
 {
-    static TableMetadata simplePartition = TableMetadata.builder("test", "test")
-                                                        .partitioner(Murmur3Partitioner.instance)
-                                                        .addPartitionKeyColumn("pk1", Int32Type.instance)
-                                                        .build();
+    static final TableMetadata simplePartition = TableMetadata.builder("test", "test")
+                                                              .partitioner(Murmur3Partitioner.instance)
+                                                              .addPartitionKeyColumn("pk1", Int32Type.instance)
+                                                              .build();
 
-    static TableMetadata compositePartition = TableMetadata.builder("test", "test")
-                                                           .partitioner(Murmur3Partitioner.instance)
-                                                           .addPartitionKeyColumn("pk1", Int32Type.instance)
-                                                           .addPartitionKeyColumn("pk2", Int32Type.instance)
-                                                           .build();
+    static final TableMetadata compositePartition = TableMetadata.builder("test", "test")
+                                                                 .partitioner(Murmur3Partitioner.instance)
+                                                                 .addPartitionKeyColumn("pk1", Int32Type.instance)
+                                                                 .addPartitionKeyColumn("pk2", Int32Type.instance)
+                                                                 .build();
 
-    static TableMetadata simplePartitionSingleClusteringAsc = TableMetadata.builder("test", "test")
-                                                                           .partitioner(Murmur3Partitioner.instance)
-                                                                           .addPartitionKeyColumn("pk1", Int32Type.instance)
-                                                                           .addClusteringColumn("ck1", UTF8Type.instance)
-                                                                           .build();
-
-    static TableMetadata simplePartitionMultipleClusteringAsc = TableMetadata.builder("test", "test")
-                                                                             .partitioner(Murmur3Partitioner.instance)
-                                                                             .addPartitionKeyColumn("pk1", Int32Type.instance)
-                                                                             .addClusteringColumn("ck1", UTF8Type.instance)
-                                                                             .addClusteringColumn("ck2", UTF8Type.instance)
-                                                                             .build();
-
-    static TableMetadata simplePartitionSingleClusteringDesc = TableMetadata.builder("test", "test")
-                                                                            .partitioner(Murmur3Partitioner.instance)
-                                                                            .addPartitionKeyColumn("pk1", Int32Type.instance)
-                                                                            .addClusteringColumn("ck1", ReversedType.getInstance(UTF8Type.instance))
-                                                                            .build();
-
-    static TableMetadata simplePartitionMultipleClusteringDesc = TableMetadata.builder("test", "test")
-                                                                              .partitioner(Murmur3Partitioner.instance)
-                                                                              .addPartitionKeyColumn("pk1", Int32Type.instance)
-                                                                              .addClusteringColumn("ck1", ReversedType.getInstance(UTF8Type.instance))
-                                                                              .addClusteringColumn("ck2", ReversedType.getInstance(UTF8Type.instance))
-                                                                              .build();
-
-    static TableMetadata compositePartitionSingleClusteringAsc = TableMetadata.builder("test", "test")
-                                                                              .partitioner(Murmur3Partitioner.instance)
-                                                                              .addPartitionKeyColumn("pk1", Int32Type.instance)
-                                                                              .addPartitionKeyColumn("pk2", Int32Type.instance)
-                                                                              .addClusteringColumn("ck1", UTF8Type.instance)
-                                                                              .build();
-
-    static TableMetadata compositePartitionMultipleClusteringAsc = TableMetadata.builder("test", "test")
-                                                                                .partitioner(Murmur3Partitioner.instance)
-                                                                                .addPartitionKeyColumn("pk1", Int32Type.instance)
-                                                                                .addPartitionKeyColumn("pk2", Int32Type.instance)
-                                                                                .addClusteringColumn("ck1", UTF8Type.instance)
-                                                                                .addClusteringColumn("ck2", UTF8Type.instance)
-                                                                                .build();
-
-    static TableMetadata compositePartitionSingleClusteringDesc = TableMetadata.builder("test", "test")
-                                                                               .partitioner(Murmur3Partitioner.instance)
-                                                                               .addPartitionKeyColumn("pk1", Int32Type.instance)
-                                                                               .addPartitionKeyColumn("pk2", Int32Type.instance)
-                                                                               .addClusteringColumn("ck1", ReversedType.getInstance(UTF8Type.instance))
-                                                                               .build();
-
-    static TableMetadata compositePartitionMultipleClusteringDesc = TableMetadata.builder("test", "test")
+    static final TableMetadata simplePartitionSingleClusteringAsc = TableMetadata.builder("test", "test")
                                                                                  .partitioner(Murmur3Partitioner.instance)
                                                                                  .addPartitionKeyColumn("pk1", Int32Type.instance)
-                                                                                 .addPartitionKeyColumn("pk2", Int32Type.instance)
-                                                                                 .addClusteringColumn("ck1", ReversedType.getInstance(UTF8Type.instance))
-                                                                                 .addClusteringColumn("ck2", ReversedType.getInstance(UTF8Type.instance))
+                                                                                 .addClusteringColumn("ck1", UTF8Type.instance)
                                                                                  .build();
 
-    static TableMetadata simplePartitionMultipleClusteringMixed = TableMetadata.builder("test", "test")
-                                                                               .partitioner(Murmur3Partitioner.instance)
-                                                                               .addPartitionKeyColumn("pk1", Int32Type.instance)
-                                                                               .addClusteringColumn("ck1", UTF8Type.instance)
-                                                                               .addClusteringColumn("ck2", ReversedType.getInstance(UTF8Type.instance))
-                                                                               .build();
+    static final TableMetadata simplePartitionMultipleClusteringAsc = TableMetadata.builder("test", "test")
+                                                                                   .partitioner(Murmur3Partitioner.instance)
+                                                                                   .addPartitionKeyColumn("pk1", Int32Type.instance)
+                                                                                   .addClusteringColumn("ck1", UTF8Type.instance)
+                                                                                   .addClusteringColumn("ck2", UTF8Type.instance)
+                                                                                   .build();
 
-    static TableMetadata compositePartitionMultipleClusteringMixed = TableMetadata.builder("test", "test")
+    static final TableMetadata simplePartitionSingleClusteringDesc = TableMetadata.builder("test", "test")
                                                                                   .partitioner(Murmur3Partitioner.instance)
                                                                                   .addPartitionKeyColumn("pk1", Int32Type.instance)
-                                                                                  .addPartitionKeyColumn("pk2", Int32Type.instance)
-                                                                                  .addClusteringColumn("ck1", UTF8Type.instance)
-                                                                                  .addClusteringColumn("ck2", ReversedType.getInstance(UTF8Type.instance))
+                                                                                  .addClusteringColumn("ck1", ReversedType.getInstance(UTF8Type.instance))
                                                                                   .build();
+
+    static final TableMetadata simplePartitionMultipleClusteringDesc = TableMetadata.builder("test", "test")
+                                                                                    .partitioner(Murmur3Partitioner.instance)
+                                                                                    .addPartitionKeyColumn("pk1", Int32Type.instance)
+                                                                                    .addClusteringColumn("ck1", ReversedType.getInstance(UTF8Type.instance))
+                                                                                    .addClusteringColumn("ck2", ReversedType.getInstance(UTF8Type.instance))
+                                                                                    .build();
+
+    static final TableMetadata compositePartitionSingleClusteringAsc = TableMetadata.builder("test", "test")
+                                                                                    .partitioner(Murmur3Partitioner.instance)
+                                                                                    .addPartitionKeyColumn("pk1", Int32Type.instance)
+                                                                                    .addPartitionKeyColumn("pk2", Int32Type.instance)
+                                                                                    .addClusteringColumn("ck1", UTF8Type.instance)
+                                                                                    .build();
+
+    static final TableMetadata compositePartitionMultipleClusteringAsc = TableMetadata.builder("test", "test")
+                                                                                      .partitioner(Murmur3Partitioner.instance)
+                                                                                      .addPartitionKeyColumn("pk1", Int32Type.instance)
+                                                                                      .addPartitionKeyColumn("pk2", Int32Type.instance)
+                                                                                      .addClusteringColumn("ck1", UTF8Type.instance)
+                                                                                      .addClusteringColumn("ck2", UTF8Type.instance)
+                                                                                      .build();
+
+    static final TableMetadata compositePartitionSingleClusteringDesc = TableMetadata.builder("test", "test")
+                                                                                     .partitioner(Murmur3Partitioner.instance)
+                                                                                     .addPartitionKeyColumn("pk1", Int32Type.instance)
+                                                                                     .addPartitionKeyColumn("pk2", Int32Type.instance)
+                                                                                     .addClusteringColumn("ck1", ReversedType.getInstance(UTF8Type.instance))
+                                                                                     .build();
+
+    static final TableMetadata compositePartitionMultipleClusteringDesc = TableMetadata.builder("test", "test")
+                                                                                       .partitioner(Murmur3Partitioner.instance)
+                                                                                       .addPartitionKeyColumn("pk1", Int32Type.instance)
+                                                                                       .addPartitionKeyColumn("pk2", Int32Type.instance)
+                                                                                       .addClusteringColumn("ck1", ReversedType.getInstance(UTF8Type.instance))
+                                                                                       .addClusteringColumn("ck2", ReversedType.getInstance(UTF8Type.instance))
+                                                                                       .build();
+
+    static final TableMetadata simplePartitionMultipleClusteringMixed = TableMetadata.builder("test", "test")
+                                                                                     .partitioner(Murmur3Partitioner.instance)
+                                                                                     .addPartitionKeyColumn("pk1", Int32Type.instance)
+                                                                                     .addClusteringColumn("ck1", UTF8Type.instance)
+                                                                                     .addClusteringColumn("ck2", ReversedType.getInstance(UTF8Type.instance))
+                                                                                     .build();
+
+    static final TableMetadata compositePartitionMultipleClusteringMixed = TableMetadata.builder("test", "test")
+                                                                                        .partitioner(Murmur3Partitioner.instance)
+                                                                                        .addPartitionKeyColumn("pk1", Int32Type.instance)
+                                                                                        .addPartitionKeyColumn("pk2", Int32Type.instance)
+                                                                                        .addClusteringColumn("ck1", UTF8Type.instance)
+                                                                                        .addClusteringColumn("ck2", ReversedType.getInstance(UTF8Type.instance))
+                                                                                        .build();
 
     void assertByteComparison(PrimaryKey a, PrimaryKey b, int expected)
     {
@@ -154,9 +154,9 @@ public class AbstractPrimaryKeyTester extends SAIRandomizedTester
         return table.partitioner.decorateKey(key);
     }
 
-    Clustering makeClustering(TableMetadata table, String...clusteringKeys)
+    Clustering<?> makeClustering(TableMetadata table, String...clusteringKeys)
     {
-        Clustering clustering;
+        Clustering<?> clustering;
         if (table.comparator.size() == 0)
             clustering = Clustering.EMPTY;
         else

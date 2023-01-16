@@ -24,7 +24,7 @@ import org.apache.cassandra.dht.AbstractBounds;
 import org.apache.cassandra.index.sai.utils.PrimaryKey;
 
 /**
- * An {@link InMemoryKeyRangeIterator} that filters the returned {@PrimaryKey}s based on the provided keyRange
+ * An {@link InMemoryKeyRangeIterator} that filters the returned {@link PrimaryKey}s based on the provided keyRange
  */
 public class FilteringInMemoryKeyRangeIterator extends InMemoryKeyRangeIterator
 {
@@ -36,6 +36,7 @@ public class FilteringInMemoryKeyRangeIterator extends InMemoryKeyRangeIterator
         this.keyRange = keyRange;
     }
 
+    @Override
     protected PrimaryKey computeNext()
     {
         PrimaryKey key = computeNextKey();

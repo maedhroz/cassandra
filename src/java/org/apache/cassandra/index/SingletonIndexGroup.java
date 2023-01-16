@@ -40,7 +40,7 @@ import org.apache.cassandra.schema.TableMetadata;
 /**
  * An {@link Index.Group} containing a single {@link Index}, to which it just delegates the calls.
  */
-public class SingletonIndexGroup implements Index.Group<Index>
+public class SingletonIndexGroup implements Index.Group
 {
     private final Index delegate;
     private final Set<Index> indexes;

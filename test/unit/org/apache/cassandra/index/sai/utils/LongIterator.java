@@ -55,10 +55,9 @@ public class LongIterator extends KeyRangeIterator
             this.keys.add(fromToken(token));
     }
 
-    public LongIterator throwsException()
+    public void throwsException()
     {
         this.shouldThrow = true;
-        return this;
     }
 
     @Override

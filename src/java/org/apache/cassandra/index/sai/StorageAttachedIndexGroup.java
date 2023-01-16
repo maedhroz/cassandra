@@ -57,11 +57,11 @@ import org.apache.cassandra.schema.TableMetadata;
  * Orchestrates building of storage-attached indices, and manages lifecycle of resources shared between them.
  */
 @ThreadSafe
-public class StorageAttachedIndexGroup implements Index.Group<StorageAttachedIndex>, INotificationConsumer
+public class StorageAttachedIndexGroup implements Index.Group, INotificationConsumer
 {
     private final TableQueryMetrics queryMetrics;
     private final TableStateMetrics stateMetrics;
-    private final Set<StorageAttachedIndex> indices = Sets.newConcurrentHashSet();
+    private final Set<Index> indexes = Sets.newConcurrentHashSet();
     private final ColumnFamilyStore baseCfs;
 
     StorageAttachedIndexGroup(ColumnFamilyStore baseCfs)
@@ -81,26 +81,28 @@ public class StorageAttachedIndexGroup implements Index.Group<StorageAttachedInd
     }
 
     @Override
-    public Set<StorageAttachedIndex> getIndexes()
+    public Set<Index> getIndexes()
     {
-        return indices;
+        return indexes;
     }
 
     @Override
-    public void addIndex(StorageAttachedIndex index)
+    public void addIndex(Index index)
     {
-        indices.add(index);
+        assert index instanceof StorageAttachedIndex;
+        indexes.add(index);
     }
 
     @Override
-    public void removeIndex(StorageAttachedIndex index)
+    public void removeIndex(Index index)
     {
-        boolean removed = indices.remove(index);
+        assert index instanceof StorageAttachedIndex;
+        boolean removed = indexes.remove(index);
         assert removed : "Cannot remove non-existing index " + index;
         /*
          * For the in-memory implementation we only need to unsubscribe from the tracker
          */
-        if (indices.isEmpty())
+        if (indexes.isEmpty())
         {
             baseCfs.getTracker().unsubscribe(this);
         }
@@ -116,13 +118,13 @@ public class StorageAttachedIndexGroup implements Index.Group<StorageAttachedInd
     }
 
     @Override
-    public boolean containsIndex(StorageAttachedIndex index)
+    public boolean containsIndex(Index index)
     {
-        return indices.contains(index);
+        return indexes.contains(index);
     }
 
     @Override
-    public Index.Indexer indexerFor(Predicate<StorageAttachedIndex> indexSelector,
+    public Index.Indexer indexerFor(Predicate<Index> indexSelector,
                                     DecoratedKey key,
                                     RegularAndStaticColumns columns,
                                     int nowInSec,
@@ -131,10 +133,10 @@ public class StorageAttachedIndexGroup implements Index.Group<StorageAttachedInd
                                     Memtable memtable)
     {
         final Set<Index.Indexer> indexers =
-                indices.stream().filter(indexSelector)
-                                .map(i -> i.indexerFor(key, columns, nowInSec, ctx, transactionType, memtable))
-                                .filter(Objects::nonNull)
-                                .collect(Collectors.toSet());
+                indexes.stream().filter(indexSelector)
+                       .map(i -> i.indexerFor(key, columns, nowInSec, ctx, transactionType, memtable))
+                       .filter(Objects::nonNull)
+                       .collect(Collectors.toSet());
 
         return indexers.isEmpty() ? null : new Index.Indexer()
         {
@@ -157,7 +159,7 @@ public class StorageAttachedIndexGroup implements Index.Group<StorageAttachedInd
     @Override
     public StorageAttachedIndexQueryPlan queryPlanFor(RowFilter rowFilter)
     {
-        return StorageAttachedIndexQueryPlan.create(baseCfs, queryMetrics, indices, rowFilter);
+        return StorageAttachedIndexQueryPlan.create(baseCfs, queryMetrics, indexes, rowFilter);
     }
 
     @Override
@@ -176,11 +178,11 @@ public class StorageAttachedIndexGroup implements Index.Group<StorageAttachedInd
     @Override
     public Set<Component> getComponents()
     {
-        return getComponents(indices);
+        return getComponents(indexes);
     }
 
     // TODO: Currently returns an empty set for in-memory only implementation
-    static Set<Component> getComponents(Collection<StorageAttachedIndex> indices)
+    static Set<Component> getComponents(Collection<Index> indices)
     {
         return Collections.emptySet();
     }
@@ -190,11 +192,11 @@ public class StorageAttachedIndexGroup implements Index.Group<StorageAttachedInd
     {
         if (notification instanceof MemtableRenewedNotification)
         {
-            indices.forEach(index -> index.getIndexContext().renewMemtable(((MemtableRenewedNotification) notification).renewed));
+            indexes.forEach(index -> ((StorageAttachedIndex)index).getIndexContext().renewMemtable(((MemtableRenewedNotification) notification).renewed));
         }
         else if (notification instanceof MemtableDiscardedNotification)
         {
-            indices.forEach(index -> index.getIndexContext().discardMemtable(((MemtableDiscardedNotification) notification).memtable));
+            indexes.forEach(index -> ((StorageAttachedIndex)index).getIndexContext().discardMemtable(((MemtableDiscardedNotification) notification).memtable));
         }
     }
 
@@ -203,7 +205,7 @@ public class StorageAttachedIndexGroup implements Index.Group<StorageAttachedInd
      */
     public int totalQueryableIndexCount()
     {
-        return Ints.checkedCast(indices.stream().filter(baseCfs.indexManager::isIndexQueryable).count());
+        return Ints.checkedCast(indexes.stream().filter(baseCfs.indexManager::isIndexQueryable).count());
     }
 
     /**
@@ -211,7 +213,7 @@ public class StorageAttachedIndexGroup implements Index.Group<StorageAttachedInd
      */
     public int totalIndexCount()
     {
-        return indices.size();
+        return indexes.size();
     }
 
     public TableMetadata metadata()
@@ -230,6 +232,6 @@ public class StorageAttachedIndexGroup implements Index.Group<StorageAttachedInd
     @VisibleForTesting
     public void reset()
     {
-        indices.forEach(StorageAttachedIndex::makeIndexNonQueryable);
+        indexes.forEach(i -> ((StorageAttachedIndex) i).makeIndexNonQueryable());
     }
 }

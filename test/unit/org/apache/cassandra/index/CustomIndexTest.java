@@ -1463,7 +1463,7 @@ public class CustomIndexTest extends CQLTester
             registry.registerIndex(this, Group.class, Group::new);
         }
 
-        private static class Group implements Index.Group<Index>
+        private static class Group implements Index.Group
         {
             Map<String, IndexWithSharedGroup> indexes = Maps.newConcurrentMap();
 

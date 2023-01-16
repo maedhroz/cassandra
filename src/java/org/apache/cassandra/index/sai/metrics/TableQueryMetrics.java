@@ -73,7 +73,7 @@ public class TableQueryMetrics extends AbstractMetrics
         private final Timer queryLatency;
 
         /**
-         * Global metrics for all indices hit during the query.
+         * Global metrics for all indexes hit during the query.
          */
         private final Histogram partitionReads;
         private final Histogram rowsFiltered;

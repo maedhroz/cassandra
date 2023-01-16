@@ -23,16 +23,14 @@ import java.nio.ByteBuffer;
 import com.google.common.base.MoreObjects;
 
 /**
- * Default noOp tokenizer. The iterator will iterate only once
- * returning the unmodified input
+ * Default NoOp tokenizer. The iterator will iterate only once returning the unmodified input
  */
 public class NoOpAnalyzer extends AbstractAnalyzer
 {
     private ByteBuffer input;
     private boolean hasNext = false;
 
-    @SuppressWarnings("unused")
-    NoOpAnalyzer() {}
+    public NoOpAnalyzer() {}
 
     @Override
     public boolean hasNext()

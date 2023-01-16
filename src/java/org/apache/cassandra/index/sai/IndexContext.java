@@ -81,9 +81,10 @@ public class IndexContext
     private final AbstractType<?> validator;
 
     // Config can be null if the column context is "fake" (i.e. created for a filtering expression).
+    @Nullable
     private final IndexMetadata config;
 
-    private final ConcurrentMap<Memtable, MemtableIndex> liveMemtableIndexMap = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Memtable, MemtableIndex> liveMemtableIndexMap;
 
     private final IndexMetrics indexMetrics;
 
@@ -105,12 +106,12 @@ public class IndexContext
         this.clusteringComparator = Objects.requireNonNull(clusteringComparator);
         this.columnMetadata = Objects.requireNonNull(columnMetadata);
         this.indexType = Objects.requireNonNull(indexType);
+        this.validator = TypeUtil.cellValueType(columnMetadata, indexType);
+        this.primaryKeyFactory = PrimaryKey.factory(clusteringComparator);
 
         this.config = config;
-        this.indexMetrics = new IndexMetrics(this);
-        this.validator = TypeUtil.cellValueType(columnMetadata, indexType);
-
-        this.primaryKeyFactory = PrimaryKey.factory(clusteringComparator);
+        this.indexMetrics = config == null ? null : new IndexMetrics(this);
+        this.liveMemtableIndexMap = config == null ? null : new ConcurrentHashMap<>();
 
         // We currently only support the NoOpAnalyzer
         this.indexAnalyzerFactory = AbstractAnalyzer.fromOptions(getValidator(), Collections.emptyMap());
@@ -149,6 +150,8 @@ public class IndexContext
 
     public long index(DecoratedKey key, Row row, Memtable mt)
     {
+        assert config != null : "Attempt to index on a non-indexing context";
+
         MemtableIndex current = liveMemtableIndexMap.get(mt);
 
         // We expect the relevant IndexMemtable to be present most of the time, so only make the
@@ -184,6 +187,8 @@ public class IndexContext
 
     public void renewMemtable(Memtable renewed)
     {
+        assert liveMemtableIndexMap != null : "Attempt to renew memtable on non-indexing context";
+
         for (Memtable memtable : liveMemtableIndexMap.keySet())
         {
             // remove every index but the one that corresponds to the post-truncate Memtable
@@ -196,11 +201,15 @@ public class IndexContext
 
     public void discardMemtable(Memtable discarded)
     {
+        assert liveMemtableIndexMap != null : "Attempt to discard memtable from non-indexing context";
+
         liveMemtableIndexMap.remove(discarded);
     }
 
     public KeyRangeIterator searchMemtableIndexes(Expression e, AbstractBounds<PartitionPosition> keyRange)
     {
+        assert liveMemtableIndexMap != null : "Attempt to perform search on non-indexing context";
+
         Collection<MemtableIndex> memtableIndexes = liveMemtableIndexMap.values();
 
         if (memtableIndexes.isEmpty())
@@ -220,11 +229,15 @@ public class IndexContext
 
     public long liveMemtableWriteCount()
     {
+        assert liveMemtableIndexMap != null : "Attempt to get metrics from non-indexing context";
+
         return liveMemtableIndexMap.values().stream().mapToLong(MemtableIndex::writeCount).sum();
     }
 
     public long estimatedMemIndexMemoryUsed()
     {
+        assert liveMemtableIndexMap != null : "Attempt to get metrics from non-indexing context";
+
         return liveMemtableIndexMap.values().stream().mapToLong(MemtableIndex::estimatedMemoryUsed).sum();
     }
 
@@ -253,9 +266,10 @@ public class IndexContext
         return columnMetadata.name.toString();
     }
 
+    @Nullable
     public String getIndexName()
     {
-        return this.config == null ? null : config.name;
+        return config == null ? null : config.name;
     }
 
     /**
@@ -289,8 +303,10 @@ public class IndexContext
      */
     public void invalidate()
     {
-        liveMemtableIndexMap.clear();
-        indexMetrics.release();
+        if (liveMemtableIndexMap != null)
+            liveMemtableIndexMap.clear();
+        if (indexMetrics != null)
+            indexMetrics.release();
         indexAnalyzerFactory.close();
         if (queryAnalyzerFactory != indexAnalyzerFactory)
         {

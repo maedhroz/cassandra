@@ -36,7 +36,7 @@ import org.apache.cassandra.tracing.Tracing;
  * initially sorting the ranges. This implementation also supports an intersection limit which limits
  * the number of ranges that will be included in the intersection. This currently defaults to 2.
  */
-@SuppressWarnings("resource")
+@SuppressWarnings({"resource", "RedundantSuppression"})
 public class KeyRangeIntersectionIterator extends KeyRangeIterator
 {
     private static final Logger logger = LoggerFactory.getLogger(MethodHandles.lookup().lookupClass());
@@ -70,12 +70,11 @@ public class KeyRangeIntersectionIterator extends KeyRangeIterator
         PrimaryKey highestKey = getCurrent();
 
         outer:
+        // We need to check if highestKey exceeds the maximum because the maximum is
+        // the lowest value maximum of all the ranges. As a result any value could
+        // potentially exceed it.
         while (highestKey != null && highestKey.compareTo(getMaximum()) <= 0)
         {
-            assert highestKey.compareTo(getMaximum()) <= 0 :
-            String.format("skipped to a key greater than the maximum key; " +
-                          "target key: %s, maximum key: %s", highestKey, getMaximum());
-
             // Try advance all iterators to the highest key seen so far.
             // Once this inner loop finishes normally, all iterators are guaranteed to be at the same value.
             for (int index = 0; index < ranges.size(); index++)

@@ -144,6 +144,12 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
 {
     private static final Logger logger = LoggerFactory.getLogger(SecondaryIndexManager.class);
 
+    // executes index status propagation task asynchronously to avoid potential deadlock on SIM
+    private static final ExecutorPlus statusPropagationExecutor = executorFactory().withJmxInternal()
+                                                                                   .sequential("StatusPropagationExecutor");
+    // used to produce a status string from the current endpoint states in JSON format for Gossip propagation
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
     // default page size (in rows) when rebuilding the index for a whole partition
     public static final int DEFAULT_PAGE_SIZE = 10000;
 
@@ -152,9 +158,6 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
      */
     public static final Map<InetAddressAndPort, Map<String, Index.Status>> peerIndexStatus = new ConcurrentHashMap<>();
 
-    // executes index status propagation task asynchronously to avoid potential deadlock on SIM
-    private static final ExecutorPlus statusPropagationExecutor = executorFactory().withJmxInternal()
-                                                                                   .sequential("StatusPropagationExecutor");
     /**
      * All registered indexes.
      */
@@ -1207,13 +1210,13 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
         return indexes.values().stream().filter((i) -> i.supportsExpression(expression.column(), expression.operator())).findFirst();
     }
 
-    public <T extends Index> Optional<T> getBestIndexFor(RowFilter.Expression expression, Class<T> indexType)
+    public <T extends Index> Set<T> getBestIndexFor(RowFilter.Expression expression, Class<T> indexType)
     {
         return indexes.values()
                       .stream()
                       .filter(i -> indexType.isInstance(i) && i.supportsExpression(expression.column(), expression.operator()))
                       .map(indexType::cast)
-                      .findFirst();
+                      .collect(Collectors.toSet());
     }
 
     /**
@@ -1784,7 +1787,8 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
 
     public void makeIndexNonQueryable(Index index, Index.Status status)
     {
-        assert status != Index.Status.BUILD_SUCCEEDED : "Index cannot be marked non-queryable with status " + status;
+        if (status == Index.Status.BUILD_SUCCEEDED)
+            throw new IllegalStateException("Index cannot be marked non-queryable with status " + status);
 
         String name = index.getIndexMetadata().name;
         if (indexes.get(name) == index)
@@ -1797,7 +1801,8 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
 
     public void makeIndexQueryable(Index index, Index.Status status)
     {
-        assert status == Index.Status.BUILD_SUCCEEDED : "Index cannot be marked queryable with status " + status;
+        if (status != Index.Status.BUILD_SUCCEEDED)
+            throw new IllegalStateException("Index cannot be marked queryable with status " + status);
 
         String name = index.getIndexMetadata().name;
         if (indexes.get(name) == index)
@@ -1829,6 +1834,7 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
             if (endpoint.equals(FBUtilities.getBroadcastAddressAndPort()))
                 return;
 
+            @SuppressWarnings("unchecked")
             Map<String, String> peerStatus = (Map<String, String>) JSONValue.parseWithException(versionedValue.value);
             Map<String, Index.Status> indexStatus = new ConcurrentHashMap<>();
 
@@ -1878,8 +1884,6 @@ public class SecondaryIndexManager implements IndexRegistry, INotificationConsum
         }
         return delta;
     }
-
-    private static ObjectMapper objectMapper = new ObjectMapper();
 
     private synchronized static void propagateLocalIndexStatus(String keyspace, String index, Index.Status status)
     {

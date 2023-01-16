@@ -35,6 +35,7 @@ import org.apache.cassandra.io.util.FileUtils;
  * ex. (1, 2, 3) + (3, 3, 4, 5) -> (1, 2, 3, 3, 3, 4, 5)
  * ex. (1, 2, 2, 3) + (3, 4, 4, 6, 6, 7) -> (1, 2, 2, 3, 3, 4, 4, 6, 6, 7)
  *
+ * TODO Investigate removing the use of PriorityQueue from this class (https://issues.apache.org/jira/browse/CASSANDRA-18165)
  */
 public class KeyRangeConcatIterator extends KeyRangeIterator
 {

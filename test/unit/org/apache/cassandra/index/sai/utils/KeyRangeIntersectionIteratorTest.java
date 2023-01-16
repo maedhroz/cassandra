@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
-import org.junit.Assert;
 import org.junit.Test;
 
 import com.carrotsearch.hppc.LongHashSet;
@@ -31,6 +30,10 @@ import org.apache.cassandra.io.util.FileUtils;
 
 import static org.apache.cassandra.index.sai.utils.LongIterator.convert;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 public class KeyRangeIntersectionIteratorTest extends AbstractKeyRangeIteratorTester
 {
@@ -52,8 +55,8 @@ public class KeyRangeIntersectionIteratorTest extends AbstractKeyRangeIteratorTe
 
         KeyRangeIterator range = builder.build();
 
-        Assert.assertNotNull(range);
-        Assert.assertFalse(range.hasNext());
+        assertNotNull(range);
+        assertFalse(range.hasNext());
 
         builder = KeyRangeIntersectionIterator.builder(16, Integer.MAX_VALUE);
         // both ranges overlap by min/max but not by value
@@ -62,8 +65,8 @@ public class KeyRangeIntersectionIteratorTest extends AbstractKeyRangeIteratorTe
 
         range = builder.build();
 
-        Assert.assertNotNull(range);
-        Assert.assertFalse(range.hasNext());
+        assertNotNull(range);
+        assertFalse(range.hasNext());
     }
 
     @Test
@@ -109,7 +112,7 @@ public class KeyRangeIntersectionIteratorTest extends AbstractKeyRangeIteratorTe
         builder.add(new LongIterator(new long[] { 4L, 6L, 7L, 9L, 10L }));
 
         KeyRangeIterator range = builder.build();
-        Assert.assertNotNull(range);
+        assertNotNull(range);
 
         // first let's skipTo something before range
         assertEquals(4L, range.skipTo(LongIterator.fromToken(3L)).token().getLongValue());
@@ -124,12 +127,12 @@ public class KeyRangeIntersectionIteratorTest extends AbstractKeyRangeIteratorTe
         assertEquals(7L, range.getCurrent().token().getLongValue());
         assertEquals(7L, range.next().token().getLongValue());
 
-        Assert.assertTrue(range.hasNext());
+        assertTrue(range.hasNext());
         assertEquals(10L, range.getCurrent().token().getLongValue());
 
         // now right after the last element
-        Assert.assertNull(range.skipTo(LongIterator.fromToken(11L)));
-        Assert.assertFalse(range.hasNext());
+        assertNull(range.skipTo(LongIterator.fromToken(11L)));
+        assertFalse(range.hasNext());
     }
 
     @Test
@@ -146,7 +149,7 @@ public class KeyRangeIntersectionIteratorTest extends AbstractKeyRangeIteratorTe
 
         KeyRangeIterator tokens = builder.build();
 
-        Assert.assertNotNull(tokens);
+        assertNotNull(tokens);
         assertEquals(7L, tokens.getMinimum().token().getLongValue());
         assertEquals(9L, tokens.getMaximum().token().getLongValue());
         assertEquals(9L, tokens.getCount());
@@ -159,8 +162,8 @@ public class KeyRangeIntersectionIteratorTest extends AbstractKeyRangeIteratorTe
     {
         KeyRangeIntersectionIterator.Builder builder = KeyRangeIntersectionIterator.builder(16, Integer.MAX_VALUE);
 
-        Assert.assertNull(builder.getMinimum());
-        Assert.assertNull(builder.getMaximum());
+        assertNull(builder.getMinimum());
+        assertNull(builder.getMaximum());
         assertEquals(0L, builder.getCount());
         assertEquals(0L, builder.rangeCount());
 
@@ -172,7 +175,7 @@ public class KeyRangeIntersectionIteratorTest extends AbstractKeyRangeIteratorTe
         assertEquals(6L, builder.getMaximum().token().getLongValue());
         assertEquals(9L, builder.getCount());
         assertEquals(3L, builder.rangeCount());
-        Assert.assertFalse(builder.isDisjoint());
+        assertFalse(builder.isDisjoint());
 
         assertEquals(1L, builder.rangeIterators.get(0).getMinimum().token().getLongValue());
         assertEquals(4L, builder.rangeIterators.get(1).getMinimum().token().getLongValue());
@@ -222,11 +225,11 @@ public class KeyRangeIntersectionIteratorTest extends AbstractKeyRangeIteratorTe
         builder.add(new LongIterator(new long[] { 1L, 2L, 3L }));
         builder.add(new LongIterator(new long[] { 4L, 5L, 6L }));
 
-        Assert.assertTrue(builder.isDisjoint());
+        assertTrue(builder.isDisjoint());
 
         KeyRangeIterator disjointIntersection = builder.build();
-        Assert.assertNotNull(disjointIntersection);
-        Assert.assertFalse(disjointIntersection.hasNext());
+        assertNotNull(disjointIntersection);
+        assertFalse(disjointIntersection.hasNext());
 
     }
 
@@ -292,9 +295,9 @@ public class KeyRangeIntersectionIteratorTest extends AbstractKeyRangeIteratorTe
 
     public static void assertEmpty(KeyRangeIterator range)
     {
-        Assert.assertNull(range.getMinimum());
-        Assert.assertNull(range.getMaximum());
-        Assert.assertFalse(range.hasNext());
+        assertNull(range.getMinimum());
+        assertNull(range.getMaximum());
+        assertFalse(range.hasNext());
         assertEquals(0, range.getCount());
     }
 
@@ -305,7 +308,7 @@ public class KeyRangeIntersectionIteratorTest extends AbstractKeyRangeIteratorTe
                                                               .add(new LongIterator(new long[] { 1L, 2L, 3L }))
                                                               .build();
 
-        Assert.assertNotNull(tokens);
+        assertNotNull(tokens);
         tokens.close();
     }
 
@@ -316,23 +319,23 @@ public class KeyRangeIntersectionIteratorTest extends AbstractKeyRangeIteratorTe
 
         rangeA = new LongIterator(new long[] { 1L, 5L });
         rangeB = new LongIterator(new long[] { 5L, 9L });
-        Assert.assertTrue(!KeyRangeIntersectionIterator.isDisjoint(rangeA, rangeB));
+        assertFalse(KeyRangeIntersectionIterator.isDisjoint(rangeA, rangeB));
 
         rangeA = new LongIterator(new long[] { 5L, 9L });
         rangeB = new LongIterator(new long[] { 1L, 6L });
-        Assert.assertTrue(!KeyRangeIntersectionIterator.isDisjoint(rangeA, rangeB));
+        assertFalse(KeyRangeIntersectionIterator.isDisjoint(rangeA, rangeB));
 
         rangeA = new LongIterator(new long[] { 5L, 9L });
         rangeB = new LongIterator(new long[] { 5L, 9L });
-        Assert.assertTrue(!KeyRangeIntersectionIterator.isDisjoint(rangeA, rangeB));
+        assertFalse(KeyRangeIntersectionIterator.isDisjoint(rangeA, rangeB));
 
         rangeA = new LongIterator(new long[] { 1L, 4L });
         rangeB = new LongIterator(new long[] { 5L, 9L });
-        Assert.assertFalse(!KeyRangeIntersectionIterator.isDisjoint(rangeA, rangeB));
+        assertTrue(KeyRangeIntersectionIterator.isDisjoint(rangeA, rangeB));
 
         rangeA = new LongIterator(new long[] { 6L, 9L });
         rangeB = new LongIterator(new long[] { 1L, 4L });
-        Assert.assertFalse(!KeyRangeIntersectionIterator.isDisjoint(rangeA, rangeB));
+        assertTrue(KeyRangeIntersectionIterator.isDisjoint(rangeA, rangeB));
     }
 
     @Test
