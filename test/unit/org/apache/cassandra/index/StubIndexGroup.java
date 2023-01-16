@@ -39,7 +39,7 @@ import org.apache.cassandra.schema.TableMetadata;
 /**
  * Basic custom index group implementation for testing.
  */
-public class StubIndexGroup implements Index.Group<Index>
+public class StubIndexGroup implements Index.Group
 {
     private final Set<Index> indexes = new HashSet<>();
 
