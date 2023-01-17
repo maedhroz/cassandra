@@ -31,11 +31,11 @@ import org.apache.cassandra.io.util.FileUtils;
  * place, to produce a new stably sorted iterator. Duplicates are eliminated later in
  * {@link org.apache.cassandra.index.sai.plan.StorageAttachedIndexSearcher}
  * as results from multiple SSTable indexes and their respective segments are consumed.
- * <p/>
+ *
  * ex. (1, 2, 3) + (3, 3, 4, 5) -> (1, 2, 3, 3, 3, 4, 5)
  * ex. (1, 2, 2, 3) + (3, 4, 4, 6, 6, 7) -> (1, 2, 2, 3, 3, 4, 4, 6, 6, 7)
  *
- * TODO Investigate removing the use of PriorityQueue from this class (https://issues.apache.org/jira/browse/CASSANDRA-18165)
+ * TODO Investigate removing the use of PriorityQueue from this class <a href="https://issues.apache.org/jira/browse/CASSANDRA-18165">CASSANDRA-18165</a>
  */
 public class KeyRangeConcatIterator extends KeyRangeIterator
 {

@@ -83,7 +83,7 @@ public class TrieMemoryIndex
     }
 
     /**
-     * Adds a index value to the in-memory index
+     * Adds an index value to the in-memory index
      *
      * @param key partition key for the indexed value
      * @param clustering clustering for the indexed value
@@ -140,7 +140,7 @@ public class TrieMemoryIndex
 
     /**
      * Search for an expression in the in-memory index within the {@link AbstractBounds} defined
-     * by keyRange. This can either be a exact match or a range match.
+     * by keyRange. This can either be an exact match or a range match.
 
      * @param expression the {@link Expression} to search for
      * @param keyRange the {@link AbstractBounds} containing the key range to restrict the search to
@@ -210,7 +210,7 @@ public class TrieMemoryIndex
 
     private ByteComparable asComparableBytes(ByteBuffer input)
     {
-        return isLiteral ? version -> append(ByteSource.of(input, version), ByteSource.TERMINATOR)
+        return isLiteral ? version -> terminated(ByteSource.of(input, version))
                          : version -> TypeUtil.asComparableBytes(input, validator, version);
     }
 
@@ -221,7 +221,7 @@ public class TrieMemoryIndex
 
     }
 
-    private ByteSource append(ByteSource src, int lastByte)
+    private ByteSource terminated(ByteSource src)
     {
         return new ByteSource()
         {
@@ -237,7 +237,7 @@ public class TrieMemoryIndex
                     return n;
 
                 done = true;
-                return lastByte;
+                return ByteSource.TERMINATOR;
             }
         };
     }

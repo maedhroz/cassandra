@@ -129,7 +129,9 @@ public class KeyRangeUnionIterator extends KeyRangeIterator
                 statistics.update(range);
             }
             else
+            {
                 FileUtils.closeQuietly(range);
+            }
 
             return this;
         }

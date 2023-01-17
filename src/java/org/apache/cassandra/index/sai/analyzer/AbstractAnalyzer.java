@@ -31,7 +31,7 @@ public abstract class AbstractAnalyzer implements Iterator<ByteBuffer>
     String nextLiteral = null;
 
     /**
-     * @return true if index value is transformed, eg. normalized or lower-cased or tokenized.
+     * @return true if index value is transformed, e.g. normalized or lower-cased or tokenized.
      */
     public abstract boolean transformValue();
 

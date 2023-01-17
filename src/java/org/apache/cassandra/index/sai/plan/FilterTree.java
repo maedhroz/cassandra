@@ -89,7 +89,7 @@ public class FilterTree
             List<Expression> filters = expressions.get(column);
 
             // We do a reverse iteration over the filters because NOT_EQ operations will be at the end
-            // of the filter list and we want to check them first.
+            // of the filter list, and we want to check them first.
             ListIterator<Expression> filterIterator = filters.listIterator(filters.size());
             while (filterIterator.hasPrevious())
             {

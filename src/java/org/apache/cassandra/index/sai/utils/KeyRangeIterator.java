@@ -88,7 +88,7 @@ public abstract class KeyRangeIterator extends AbstractGuavaIterator<PrimaryKey>
             return endOfData();
 
         // In the case of deferred iterators the current value may not accurately
-        // reflect the next value so we need to check that as well
+        // reflect the next value, so we need to check that as well
         if (current.compareTo(nextKey) >= 0)
         {
             next = next == null ? recomputeNext() : next;

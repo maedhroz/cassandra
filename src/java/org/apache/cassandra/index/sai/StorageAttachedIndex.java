@@ -192,7 +192,7 @@ public class StorageAttachedIndex implements Index
 
         AbstractType<?> type = TypeUtil.cellValueType(target.left, target.right);
 
-        // If we are indexing map entries we need to validate the sub-types
+        // If we are indexing map entries we need to validate the subtypes
         if (TypeUtil.isComposite(type))
         {
             for (AbstractType<?> subType : type.subTypes())

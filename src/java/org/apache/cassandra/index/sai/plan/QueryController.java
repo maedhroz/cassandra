@@ -111,7 +111,7 @@ public class QueryController
      */
     public IndexContext getContext(RowFilter.Expression expression)
     {
-        Set<StorageAttachedIndex> indexes = getBestIndexFor(expression);
+        Set<StorageAttachedIndex> indexes = cfs.indexManager.getBestIndexFor(expression, StorageAttachedIndex.class);
 
         return indexes.isEmpty() ? new IndexContext(cfs.metadata().keyspace,
                                                     cfs.metadata().name,
@@ -121,11 +121,6 @@ public class QueryController
                                                     IndexTarget.Type.VALUES,
                                                     null)
                                  : indexes.iterator().next().getIndexContext();
-    }
-
-    public Set<StorageAttachedIndex> getBestIndexFor(RowFilter.Expression expression)
-    {
-        return cfs.indexManager.getBestIndexFor(expression, StorageAttachedIndex.class);
     }
 
     public UnfilteredRowIterator queryStorage(PrimaryKey key, ReadExecutionController executionController)
@@ -169,7 +164,7 @@ public class QueryController
             {
                 if (e.context.isIndexed())
                 {
-                    @SuppressWarnings("resource") // RangeIterators are closed by releaseIndexes
+                    @SuppressWarnings({"resource", "RedundantSuppression"}) // RangeIterators are closed by releaseIndexes
                     KeyRangeIterator memtableIterator = e.context.searchMemtableIndexes(e, mergeRange);
 
                     builder.add(memtableIterator);
@@ -186,21 +181,21 @@ public class QueryController
     }
 
     /**
-     * Returns whether this query is selecting the {@link PrimaryKey}.
-     * The query selects the key if any of the following statements is true:
+     * Returns whether this query is not selecting the {@link PrimaryKey}.
+     * The query does not select the key if both of the following statements are false:
      *  1. The table associated with the query is not using clustering keys
      *  2. The clustering index filter for the command wants the row.
      *
-     *  Item 3 is important in paged queries where the {@link org.apache.cassandra.db.filter.ClusteringIndexSliceFilter} for
+     *  Item 2 is important in paged queries where the {@link org.apache.cassandra.db.filter.ClusteringIndexSliceFilter} for
      *  subsequent paged queries may not select rows that are returned by the index
      *  search because that is initially partition based.
      *
      * @param key The {@link PrimaryKey} to be tested
-     * @return true if the key is selected by the query
+     * @return true if the key is not selected by the query
      */
-    public boolean selects(PrimaryKey key)
+    public boolean doesNotSelect(PrimaryKey key)
     {
-        return key.hasEmptyClustering() || command.clusteringIndexFilter(key.partitionKey()).selects(key.clustering());
+        return !key.hasEmptyClustering() && !command.clusteringIndexFilter(key.partitionKey()).selects(key.clustering());
     }
 
     // Note: This method assumes that the selects method has already been called for the

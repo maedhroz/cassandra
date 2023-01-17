@@ -52,7 +52,7 @@ public class Operation
 
         public boolean apply(boolean a, boolean b)
         {
-            return this.func.apply(a, b);
+            return func.apply(a, b);
         }
     }
 
@@ -63,7 +63,7 @@ public class Operation
     {
         ListMultimap<ColumnMetadata, Expression> analyzed = ArrayListMultimap.create();
 
-        // sort all of the expressions in the operation by name and priority of the logical operator
+        // sort all the expressions in the operation by name and priority of the logical operator
         // this gives us an efficient way to handle inequality and combining into ranges without extra processing
         // and converting expressions from one type to another.
         expressions.sort((a, b) -> {

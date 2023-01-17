@@ -17,10 +17,8 @@
  */
 package org.apache.cassandra.index.sai.memory;
 
-import java.io.IOException;
 import java.util.PriorityQueue;
 import java.util.SortedSet;
-
 import javax.annotation.concurrent.NotThreadSafe;
 
 import org.apache.cassandra.index.sai.utils.KeyRangeIterator;
@@ -98,6 +96,6 @@ public class InMemoryKeyRangeIterator extends KeyRangeIterator
     }
 
     @Override
-    public void close() throws IOException
+    public void close()
     {}
 }

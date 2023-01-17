@@ -146,8 +146,9 @@ public class KeyRangeIntersectionIterator extends KeyRangeIterator
     public static class Builder extends KeyRangeIterator.Builder
     {
         private final int limit;
-        // tracks if any of the added ranges are disjoint with the ranges, which is useful in case of intersection,
-        // as it gives a direct answer as to whether the iterator is going to produce any results.
+        // tracks if any of the added ranges are disjoint with the other ranges, which is useful
+        // in case of intersection, as it gives a direct answer whether the iterator is going
+        // to produce any results.
         private boolean isDisjoint;
 
         protected final List<KeyRangeIterator> rangeIterators;
@@ -221,7 +222,7 @@ public class KeyRangeIntersectionIterator extends KeyRangeIterator
 
         private KeyRangeIterator buildIterator(Statistics statistics, List<KeyRangeIterator> ranges)
         {
-            // if the ranges are disjoint or we have an intersection with an empty set,
+            // if the ranges are disjoint, or we have an intersection with an empty set,
             // we can simply return an empty iterator, because it's not going to produce any results.
             if (isDisjoint)
             {

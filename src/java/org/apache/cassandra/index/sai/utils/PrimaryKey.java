@@ -132,7 +132,7 @@ public class PrimaryKey implements Comparable<PrimaryKey>
         int cmp = token().compareTo(o.token());
 
         // If the tokens don't match then we don't need to compare any more of the key.
-        // Otherwise if it's partition key is null or the other partition key is null
+        // Otherwise, if it's partition key is null or the other partition key is null
         // then one or both of the keys are token only so we can only compare tokens
         if ((cmp != 0) || (partitionKey == null) || o.partitionKey() == null)
             return cmp;
@@ -149,7 +149,7 @@ public class PrimaryKey implements Comparable<PrimaryKey>
 
     /**
      * Return whether the primary key has an empty clustering or not.
-     * By default the clustering is empty if the internal clustering
+     * By default, the clustering is empty if the internal clustering
      * is null or is empty.
      *
      * @return {@code true} if the clustering is empty, otherwise {@code false}
