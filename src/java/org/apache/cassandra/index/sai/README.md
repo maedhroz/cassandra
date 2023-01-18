@@ -55,7 +55,7 @@ Follow the instructions to build and start Cassandra in README.asc in root folde
 
 1.) Run the following DDL statements to create a table and two indexes:
 
-`CREATE KEYSPACE test WITH replication = {'class': 'NetworkTopologyStrategy' , 'Cassandra': '1'};`
+`CREATE KEYSPACE test WITH replication = {'class': 'SimpleStrategy', 'replication_factor': '1'};`
 
 `USE test;`
 
