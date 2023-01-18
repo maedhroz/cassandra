@@ -32,6 +32,7 @@ import org.apache.cassandra.distributed.api.IInstance;
 import org.apache.cassandra.distributed.api.IInvokableInstance;
 import org.apache.cassandra.distributed.api.SimpleQueryResult;
 import org.apache.cassandra.index.Index;
+import org.apache.cassandra.index.IndexStatusManager;
 import org.apache.cassandra.index.SecondaryIndexManager;
 import org.apache.cassandra.locator.InetAddressAndPort;
 import org.assertj.core.util.Streams;
@@ -95,7 +96,7 @@ public class SAIUtil
             {
                 for (InetAddressAndPort node : nodes)
                 {
-                    Index.Status status = SecondaryIndexManager.getIndexStatus(node, keyspace, index);
+                    Index.Status status = IndexStatusManager.instance.getIndexStatus(node, keyspace, index);
                     assert status == Index.Status.BUILD_SUCCEEDED
                         : "Index " + index + " not queryable on node " + node + " (status = " + status + ')';
                 }

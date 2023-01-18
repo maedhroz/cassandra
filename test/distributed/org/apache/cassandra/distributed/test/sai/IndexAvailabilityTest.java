@@ -33,6 +33,7 @@ import org.apache.cassandra.distributed.Cluster;
 import org.apache.cassandra.distributed.api.IInvokableInstance;
 import org.apache.cassandra.distributed.test.TestBaseImpl;
 import org.apache.cassandra.index.Index;
+import org.apache.cassandra.index.IndexStatusManager;
 import org.apache.cassandra.index.SecondaryIndexManager;
 import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.schema.KeyspaceMetadata;
@@ -239,7 +240,7 @@ public class IndexAvailabilityTest extends TestBaseImpl
         if (table == null)
             return Index.Status.UNKNOWN;
 
-        return SecondaryIndexManager.getIndexStatus(replica, keyspaceName, indexName);
+        return IndexStatusManager.instance.getIndexStatus(replica, keyspaceName, indexName);
     }
 
     private static InetAddressAndPort getFullAddress(IInvokableInstance node)
