@@ -42,7 +42,7 @@ public abstract class AbstractInMemoryKeyRangeIteratorTester
     @Test
     public void singleTokenIsReturned()
     {
-        KeyRangeIterator iterator= makeIterator(1, 1, 1);
+        KeyRangeIterator iterator = makeIterator(1, 1, 1);
 
         assertIterator(iterator, 1);
     }
@@ -50,7 +50,7 @@ public abstract class AbstractInMemoryKeyRangeIteratorTester
     @Test
     public void duplicateSingleTokenIsReturned()
     {
-        KeyRangeIterator iterator= makeIterator(1, 1, 1, 1);
+        KeyRangeIterator iterator = makeIterator(1, 1, 1, 1);
 
         assertIterator(iterator, 1);
     }
@@ -58,7 +58,7 @@ public abstract class AbstractInMemoryKeyRangeIteratorTester
     @Test
     public void withoutSkipAllTokensAreReturnedInTokenOrder()
     {
-        KeyRangeIterator iterator= makeIterator(1, 3, 1, 2, 3);
+        KeyRangeIterator iterator = makeIterator(1, 3, 1, 2, 3);
 
         assertIterator(iterator, 1, 2, 3);
     }
@@ -66,7 +66,7 @@ public abstract class AbstractInMemoryKeyRangeIteratorTester
     @Test
     public void tokensAddedOutOfOrderAreReturnedInOrder()
     {
-        KeyRangeIterator iterator= makeIterator(1, 3, 3, 2, 1);
+        KeyRangeIterator iterator = makeIterator(1, 3, 3, 2, 1);
 
         assertIterator(iterator, 1, 2, 3);
     }
@@ -74,7 +74,7 @@ public abstract class AbstractInMemoryKeyRangeIteratorTester
     @Test
     public void matchingTokensAreIgnoredAtStart()
     {
-        KeyRangeIterator iterator= makeIterator(1, 3, 1, 1, 2, 3);
+        KeyRangeIterator iterator = makeIterator(1, 3, 1, 1, 2, 3);
 
         assertIterator(iterator, 1, 2, 3);
     }
@@ -82,7 +82,7 @@ public abstract class AbstractInMemoryKeyRangeIteratorTester
     @Test
     public void matchingTokensAreIgnoredInMiddle()
     {
-        KeyRangeIterator iterator= makeIterator(1, 3, 1, 2, 2, 3);
+        KeyRangeIterator iterator = makeIterator(1, 3, 1, 2, 2, 3);
 
         assertIterator(iterator, 1, 2, 3);
     }
@@ -90,7 +90,7 @@ public abstract class AbstractInMemoryKeyRangeIteratorTester
     @Test
     public void matchingTokensAreIgnoredAtEnd()
     {
-        KeyRangeIterator iterator= makeIterator(1, 3, 1, 2, 3, 3);
+        KeyRangeIterator iterator = makeIterator(1, 3, 1, 2, 3, 3);
 
         assertIterator(iterator, 1, 2, 3);
     }
@@ -98,7 +98,7 @@ public abstract class AbstractInMemoryKeyRangeIteratorTester
     @Test
     public void skipToTokenBeforeFirstTokenWillReturnAllTokens()
     {
-        KeyRangeIterator iterator= makeIterator(1, 3, 1, 2, 3);
+        KeyRangeIterator iterator = makeIterator(1, 3, 1, 2, 3);
 
         iterator.skipTo(primaryKeyFactory.createTokenOnly(new Murmur3Partitioner.LongToken(0)));
 
@@ -108,7 +108,7 @@ public abstract class AbstractInMemoryKeyRangeIteratorTester
     @Test
     public void skipToFirstTokenWillReturnAllTokens()
     {
-        KeyRangeIterator iterator= makeIterator(1, 3, 1, 2, 3);
+        KeyRangeIterator iterator = makeIterator(1, 3, 1, 2, 3);
 
         iterator.skipTo(primaryKeyFactory.createTokenOnly(new Murmur3Partitioner.LongToken(1)));
 
@@ -118,7 +118,7 @@ public abstract class AbstractInMemoryKeyRangeIteratorTester
     @Test
     public void skipToMiddleTokenWillReturnRemainingTokens()
     {
-        KeyRangeIterator iterator= makeIterator(1, 3, 1, 2, 3);
+        KeyRangeIterator iterator = makeIterator(1, 3, 1, 2, 3);
 
         iterator.skipTo(primaryKeyFactory.createTokenOnly(new Murmur3Partitioner.LongToken(2)));
 
@@ -128,7 +128,7 @@ public abstract class AbstractInMemoryKeyRangeIteratorTester
     @Test
     public void skipToLastTokenWillReturnLastToken()
     {
-        KeyRangeIterator iterator= makeIterator(1, 3, 1, 2, 3);
+        KeyRangeIterator iterator = makeIterator(1, 3, 1, 2, 3);
 
         iterator.skipTo(primaryKeyFactory.createTokenOnly(new Murmur3Partitioner.LongToken(3)));
 
@@ -138,7 +138,7 @@ public abstract class AbstractInMemoryKeyRangeIteratorTester
     @Test
     public void skipToAfterLastTokenWillReturnNoTokens()
     {
-        KeyRangeIterator iterator= makeIterator(1, 3, 1, 2, 3);
+        KeyRangeIterator iterator = makeIterator(1, 3, 1, 2, 3);
 
         iterator.skipTo(primaryKeyFactory.createTokenOnly(new Murmur3Partitioner.LongToken(4)));
 
@@ -148,7 +148,7 @@ public abstract class AbstractInMemoryKeyRangeIteratorTester
     @Test
     public void skipToWithMatchingTokensWithReturnCorrectTokens()
     {
-        KeyRangeIterator iterator= makeIterator(1, 3, 1, 1, 2, 2, 3, 3);
+        KeyRangeIterator iterator = makeIterator(1, 3, 1, 1, 2, 2, 3, 3);
 
         iterator.skipTo(primaryKeyFactory.createTokenOnly(new Murmur3Partitioner.LongToken(2)));
 

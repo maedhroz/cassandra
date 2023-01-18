@@ -191,7 +191,7 @@ public abstract class SAITester extends CQLTester
         {
             return new ObjectName(String.format("org.apache.cassandra.metrics:type=StorageAttachedIndex," +
                                                 "keyspace=%s,table=%s,scope=%s,name=%s",
-                                                 keyspace, table, type, name));
+                                                keyspace, table, type, name));
         }
         catch (Throwable ex)
         {
@@ -267,8 +267,8 @@ public abstract class SAITester extends CQLTester
 
     public static class Randomization
     {
-        private long seed;
-        private Random random;
+        private final long seed;
+        private final Random random;
 
         Randomization()
         {

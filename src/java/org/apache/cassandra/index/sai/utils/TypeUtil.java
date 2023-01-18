@@ -24,7 +24,6 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.Iterator;
-import java.util.Set;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
@@ -101,7 +100,7 @@ public class TypeUtil
      */
     public static ByteBuffer min(ByteBuffer a, ByteBuffer b, AbstractType<?> type)
     {
-        return a == null ?  b : (b == null || compare(b, a, type) > 0) ? a : b;
+        return a == null ? b : (b == null || compare(b, a, type) > 0) ? a : b;
     }
 
     /**
@@ -110,7 +109,7 @@ public class TypeUtil
      */
     public static ByteBuffer max(ByteBuffer a, ByteBuffer b, AbstractType<?> type)
     {
-        return a == null ?  b : (b == null || compare(b, a, type) < 0) ? a : b;
+        return a == null ? b : (b == null || compare(b, a, type) < 0) ? a : b;
     }
 
     /**
@@ -119,7 +118,7 @@ public class TypeUtil
      */
     public static ByteComparable min(ByteComparable a, ByteComparable b)
     {
-        return a == null ?  b : (b == null || ByteComparable.compare(b, a, ByteComparable.Version.OSS42) > 0) ? a : b;
+        return a == null ? b : (b == null || ByteComparable.compare(b, a, ByteComparable.Version.OSS42) > 0) ? a : b;
     }
 
     /**
@@ -128,7 +127,7 @@ public class TypeUtil
      */
     public static ByteComparable max(ByteComparable a, ByteComparable b)
     {
-        return a == null ?  b : (b == null || ByteComparable.compare(b, a, ByteComparable.Version.OSS42) < 0) ? a : b;
+        return a == null ? b : (b == null || ByteComparable.compare(b, a, ByteComparable.Version.OSS42) < 0) ? a : b;
     }
 
     public static AbstractType<?> cellValueType(ColumnMetadata columnMetadata, IndexTarget.Type indexType)
@@ -418,15 +417,6 @@ public class TypeUtil
     {
         type = baseType(type);
         return type.isCollection() && type.isMultiCell();
-    }
-
-    /**
-     * Returns <code>true</code> if given {@link AbstractType} is included in the types.
-     */
-    public static boolean isIn(AbstractType<?> type, Set<AbstractType<?>> types)
-    {
-        type = baseType(type);
-        return types.contains(type);
     }
 
     /**

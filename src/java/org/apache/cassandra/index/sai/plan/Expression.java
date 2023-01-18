@@ -146,7 +146,7 @@ public class Expression
             case GT:
                 operator = IndexOperator.RANGE;
                 if (context.getDefinition().isReversedType())
-                    upper = new Bound(value, validator,  upperInclusive);
+                    upper = new Bound(value, validator, upperInclusive);
                 else
                     lower = new Bound(value, validator, lowerInclusive);
                 break;

@@ -222,7 +222,7 @@ public class IndexAvailabilityTest extends TestBaseImpl
     {
         InetAddressAndPort replicaAddressAndPort = getFullAddress(replica);
         await().atMost(5, TimeUnit.SECONDS)
-               .until(() -> node.callOnInstance(() -> getIndexStatus(keyspace, index, replicaAddressAndPort) == status).booleanValue());
+               .until(() -> node.callOnInstance(() -> getIndexStatus(keyspace, index, replicaAddressAndPort) == status));
     }
 
     private static Index.Status getNodeIndexStatus(IInvokableInstance node, String keyspaceName, String indexName, InetAddressAndPort replica)

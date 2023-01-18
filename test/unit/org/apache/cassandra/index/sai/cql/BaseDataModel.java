@@ -334,7 +334,7 @@ class BaseDataModel
 
     }
 
-    class SimplePrimaryKeyList extends ForwardingList<String>
+    static class SimplePrimaryKeyList extends ForwardingList<String>
     {
         private final List<String> primaryKeys;
 
@@ -356,7 +356,7 @@ class BaseDataModel
         }
     }
 
-    class CompoundPrimaryKeyList extends ForwardingList<String>
+    static class CompoundPrimaryKeyList extends ForwardingList<String>
     {
         private final List<String> primaryKeys;
         private final int rowsPerPartition;

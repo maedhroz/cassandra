@@ -167,7 +167,7 @@ public class StorageAttachedIndexDDLTest extends SAITester
     }
 
     @Test
-    public void shouldCreateIndexIfExists() throws Throwable
+    public void shouldCreateIndexIfExists()
     {
         createTable("CREATE TABLE %s (id text PRIMARY KEY, val text)");
 
@@ -236,7 +236,7 @@ public class StorageAttachedIndexDDLTest extends SAITester
     }
 
     @Test
-    public void shouldCreateIndexWithAlias() throws Throwable
+    public void shouldCreateIndexWithAlias()
     {
         createTable("CREATE TABLE %s (id text PRIMARY KEY, val text)");
 
@@ -273,7 +273,7 @@ public class StorageAttachedIndexDDLTest extends SAITester
     }
 
     @Test
-    public void shouldFailCreationOnMultipleColumns() throws Throwable
+    public void shouldFailCreationOnMultipleColumns()
     {
         createTable("CREATE TABLE %s (id text PRIMARY KEY, val1 text, val2 text)");
 
@@ -307,7 +307,7 @@ public class StorageAttachedIndexDDLTest extends SAITester
     }
 
     @Test
-    public void shouldRejectQueriesWithCustomExpressions() throws Throwable
+    public void shouldRejectQueriesWithCustomExpressions()
     {
         createTable(CREATE_TABLE_TEMPLATE);
 
