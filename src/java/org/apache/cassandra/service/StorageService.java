@@ -146,6 +146,7 @@ import org.apache.cassandra.gms.IFailureDetector;
 import org.apache.cassandra.gms.TokenSerializer;
 import org.apache.cassandra.gms.VersionedValue;
 import org.apache.cassandra.hints.HintsService;
+import org.apache.cassandra.index.IndexStatusManager;
 import org.apache.cassandra.io.sstable.IScrubber;
 import org.apache.cassandra.io.sstable.IVerifier;
 import org.apache.cassandra.io.sstable.SSTableLoader;
@@ -614,7 +615,7 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
      * they get the Gossip shutdown message, so even if
      * we don't get time to broadcast this, it is not a problem.
      *
-     * See {@link Gossiper#markAsShutdown(InetAddressAndPort)}
+     * See {@code Gossiper#markAsShutdown(InetAddressAndPort)}
      */
     private void shutdownClientServers()
     {
@@ -2661,6 +2662,12 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
         }
         else
         {
+            if (state == ApplicationState.INDEX_STATUS)
+            {
+                updateIndexStatus(endpoint, value);
+                return;
+            }
+
             EndpointState epState = Gossiper.instance.getEndpointStateForEndpoint(endpoint);
             if (epState == null || Gossiper.instance.isDeadState(epState))
             {
@@ -2729,6 +2736,11 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
     private static String[] splitValue(VersionedValue value)
     {
         return value.value.split(VersionedValue.DELIMITER_STR, -1);
+    }
+
+    private void updateIndexStatus(InetAddressAndPort endpoint, VersionedValue versionedValue)
+    {
+        IndexStatusManager.instance.receivePeerIndexStatus(endpoint, versionedValue);
     }
 
     private void updateNetVersion(InetAddressAndPort endpoint, VersionedValue value)
@@ -2802,6 +2814,12 @@ public class StorageService extends NotificationBroadcasterSupport implements IE
                     break;
                 case HOST_ID:
                     SystemKeyspace.updatePeerInfo(endpoint, "host_id", UUID.fromString(entry.getValue().value));
+                    break;
+                case INDEX_STATUS:
+                    // Need to set the peer index status in SIM here
+                    // to ensure the status is correct before the node
+                    // fully joins the ring
+                    updateIndexStatus(endpoint, entry.getValue());
                     break;
             }
         }
