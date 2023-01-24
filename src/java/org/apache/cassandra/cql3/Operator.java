@@ -319,7 +319,7 @@ public enum Operator
      */
     public void writeToUnsignedVInt(DataOutputPlus output) throws IOException
     {
-        output.writeUnsignedVInt(b);
+        output.writeUnsignedVInt32(b);
     }
 
     public int getValue()

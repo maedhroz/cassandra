@@ -1083,17 +1083,22 @@ public class SelectStatement implements CQLStatement.SingleKeyspaceCqlStatement
             return prepare(state, false, bindVariables);
         }
 
-        public SelectStatement prepare(VariableSpecifications variableSpecifications) throws InvalidRequestException
+        public SelectStatement prepare(VariableSpecifications variableSpecifications)
         {
             return prepare(state, false, variableSpecifications);
         }
 
-        public SelectStatement prepare(boolean forView) throws InvalidRequestException
+        public SelectStatement prepare(boolean forView)
         {
             return prepare(state, forView, bindVariables);
         }
 
-        public SelectStatement prepare(ClientState state, boolean forView, VariableSpecifications variableSpecifications) throws InvalidRequestException
+        public SelectStatement prepare(ClientState state, boolean forView)
+        {
+            return prepare(state, forView, bindVariables);
+        }
+
+        public SelectStatement prepare(ClientState state, boolean forView, VariableSpecifications variableSpecifications)
         {
             TableMetadata table = Schema.instance.validateTable(keyspace(), name());
 

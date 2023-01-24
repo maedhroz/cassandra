@@ -245,8 +245,8 @@ public class TxnUpdate implements Update
 
         try (DataOutputBuffer out = new DataOutputBuffer((int) size))
         {
-            out.writeUnsignedVInt(version);
-            out.writeUnsignedVInt(end - start);
+            out.writeUnsignedVInt32(version);
+            out.writeUnsignedVInt32(end - start);
             for (int i = start ; i < end ; ++i)
                 serializer.serialize(items.get(i), out, version);
             return out.buffer(false);

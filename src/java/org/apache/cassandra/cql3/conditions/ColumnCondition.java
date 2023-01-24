@@ -369,7 +369,7 @@ public abstract class ColumnCondition
                 columnMetadataSerializer.serialize(bound.column, out, version);
                 bound.comparisonOperator.writeToUnsignedVInt(out);
                 BoundKind kind = bound.kind();
-                out.writeUnsignedVInt(kind.ordinal());
+                out.writeUnsignedVInt32(kind.ordinal());
                 kind.serializer.serialize(bound, out, version);
             }
 
@@ -1007,7 +1007,7 @@ public abstract class ColumnCondition
             UserType userType = (UserType) column.type;
             Iterator<Cell<?>> iter = getCells(row, column);
             // User type doesn't use the protocol version so passing in null
-            return iter.hasNext() ? userType.serializeForNativeProtocol(iter, null) : null;
+            return iter.hasNext() ? userType.serializeForNativeProtocol(iter) : null;
         }
 
         private boolean isSatisfiedBy(ByteBuffer rowValue)

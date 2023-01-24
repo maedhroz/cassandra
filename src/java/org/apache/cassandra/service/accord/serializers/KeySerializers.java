@@ -36,7 +36,6 @@ import accord.primitives.PartialRoute;
 import accord.primitives.Range;
 import accord.primitives.Ranges;
 import accord.primitives.RoutableKey;
-import accord.primitives.Routables;
 import accord.primitives.Route;
 import accord.primitives.RoutingKeys;
 import accord.primitives.Seekables;
@@ -343,7 +342,7 @@ public class KeySerializers
         @Override
         public void serialize(KS keys, DataOutputPlus out, int version) throws IOException
         {
-            out.writeUnsignedVInt(keys.size());
+            out.writeUnsignedVInt32(keys.size());
             for (int i=0, mi=keys.size(); i<mi; i++)
                 keySerializer.serialize(keys.get(i), out, version);
         }
@@ -374,7 +373,7 @@ public class KeySerializers
         @Override
         public void serialize(RS ranges, DataOutputPlus out, int version) throws IOException
         {
-            out.writeUnsignedVInt(ranges.size());
+            out.writeUnsignedVInt32(ranges.size());
             for (int i=0, mi=ranges.size(); i<mi; i++)
                 TokenRange.serializer.serialize((TokenRange) ranges.get(i), out, version);
         }

@@ -75,14 +75,14 @@ public abstract class DepsSerializer<D extends Deps> implements IVersionedSerial
         KeySerializers.keys.serialize(keys, out, version);
 
         int txnIdCount = deps.txnIdCount();
-        out.writeUnsignedVInt(txnIdCount);
+        out.writeUnsignedVInt32(txnIdCount);
         for (int i=0; i<txnIdCount; i++)
             CommandSerializers.txnId.serialize(deps.txnId(i), out, version);
 
         int keyToTxnIdCount = keyToTxnIdCount(deps);
-        out.writeUnsignedVInt(keyToTxnIdCount);
+        out.writeUnsignedVInt32(keyToTxnIdCount);
         for (int i=0; i<keyToTxnIdCount; i++)
-            out.writeUnsignedVInt(keyToTxnId(deps, i));
+            out.writeUnsignedVInt32(keyToTxnId(deps, i));
     }
 
     @Override

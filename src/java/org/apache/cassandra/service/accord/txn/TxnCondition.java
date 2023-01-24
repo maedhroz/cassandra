@@ -585,7 +585,7 @@ public abstract class TxnCondition
         @Override
         public void serialize(TxnCondition condition, DataOutputPlus out, int version) throws IOException
         {
-            out.writeUnsignedVInt(condition.kind.ordinal());
+            out.writeUnsignedVInt32(condition.kind.ordinal());
             condition.kind.serializer().serialize(condition, out, version);
         }
 

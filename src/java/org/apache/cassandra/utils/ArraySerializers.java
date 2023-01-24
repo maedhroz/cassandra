@@ -32,7 +32,7 @@ public class ArraySerializers
 {
     public static <T> void serializeArray(T[] items, DataOutputPlus out, int version, IVersionedSerializer<T> serializer) throws IOException
     {
-        out.writeUnsignedVInt(items.length);
+        out.writeUnsignedVInt32(items.length);
         for (T item : items)
             serializer.serialize(item, out, version);
     }

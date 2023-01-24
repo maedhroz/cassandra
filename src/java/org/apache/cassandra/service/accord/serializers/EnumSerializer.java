@@ -41,7 +41,7 @@ public class EnumSerializer<E extends Enum<E>> implements IVersionedSerializer<E
     @Override
     public void serialize(E t, DataOutputPlus out, int version) throws IOException
     {
-        out.writeUnsignedVInt(t.ordinal());
+        out.writeUnsignedVInt32(t.ordinal());
     }
 
     @Override

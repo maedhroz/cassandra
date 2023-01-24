@@ -77,7 +77,6 @@ import static org.apache.cassandra.cql3.Operator.GTE;
 import static org.apache.cassandra.cql3.Operator.LT;
 import static org.apache.cassandra.cql3.Operator.LTE;
 import static org.apache.cassandra.cql3.Operator.NEQ;
-import static org.apache.cassandra.transport.ProtocolVersion.CURRENT;
 import static org.apache.cassandra.utils.ByteBufferUtil.EMPTY_BYTE_BUFFER;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -122,7 +121,7 @@ public class ColumnConditionTest extends CQLTester
         AbstractType<?> type = definition.type;
         if (type.isFrozenCollection())
         {
-            ByteBuffer cellValue = ListSerializer.pack(values, values.size(), CURRENT);
+            ByteBuffer cellValue = ListSerializer.pack(values, values.size());
             Cell<ByteBuffer> cell = new BufferCell(definition, 0L, Cell.NO_TTL, Cell.NO_DELETION_TIME, cellValue, null);
             return BTreeRow.singleCellRow(Clustering.EMPTY, cell);
         }
@@ -168,7 +167,7 @@ public class ColumnConditionTest extends CQLTester
     {
         if (definition.type.isFrozenCollection())
         {
-            ByteBuffer cellValue = SetSerializer.pack(values, values.size(), CURRENT);
+            ByteBuffer cellValue = SetSerializer.pack(values, values.size());
             Cell<ByteBuffer> cell = new BufferCell(definition, 0L, Cell.NO_TTL, Cell.NO_DELETION_TIME, cellValue, null);
             return BTreeRow.singleCellRow(Clustering.EMPTY, cell);
         }
@@ -198,7 +197,7 @@ public class ColumnConditionTest extends CQLTester
         if (definition.type.isFrozenCollection())
         {
             List<ByteBuffer> packableValues = values.entrySet().stream().flatMap(entry -> Stream.of(entry.getKey(), entry.getValue())).collect(Collectors.toList());
-            ByteBuffer cellValue = MapSerializer.pack(packableValues, values.size(), CURRENT);
+            ByteBuffer cellValue = MapSerializer.pack(packableValues, values.size());
             Cell<ByteBuffer> cell = new BufferCell(definition, 0L, Cell.NO_TTL, Cell.NO_DELETION_TIME, cellValue, null);
             return BTreeRow.singleCellRow(Clustering.EMPTY, cell);
         }

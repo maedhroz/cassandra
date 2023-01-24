@@ -135,7 +135,7 @@ public abstract class Token implements RingPosition<Token>, Serializable
         {
             IPartitioner p = token.getPartitioner();
             if (!p.isFixedLength())
-                out.writeUnsignedVInt(p.getTokenFactory().byteSize(token));
+                out.writeUnsignedVInt32(p.getTokenFactory().byteSize(token));
             p.getTokenFactory().serialize(token, out);
         }
 

@@ -196,7 +196,7 @@ public abstract class TxnReferenceValue
         @Override
         public void serialize(TxnReferenceValue value, DataOutputPlus out, int version) throws IOException
         {
-            out.writeUnsignedVInt(value.kind().ordinal());
+            out.writeUnsignedVInt32(value.kind().ordinal());
             value.kind().serializer.serialize(value, out, version);
         }
 
