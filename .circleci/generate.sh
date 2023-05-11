@@ -18,7 +18,7 @@
 #
 
 BASEDIR=`dirname $0`
-BASE_BRANCH=trunk
+BASE_BRANCH=maedhroz/CASSANDRA-16052
 set -e
 
 die ()
