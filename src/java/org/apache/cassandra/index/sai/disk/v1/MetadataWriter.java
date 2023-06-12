@@ -53,7 +53,7 @@ public class MetadataWriter implements Closeable
         @Override
         public void close()
         {
-            map.put(getName(), getBytes());
+            map.put(getName(), getBytesRef());
         }
     }
 

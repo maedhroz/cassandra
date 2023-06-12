@@ -41,6 +41,11 @@ public class RAMIndexOutput extends IndexOutput
         out = new GrowableByteArrayDataOutput(128);
     }
 
+    public byte[] getBytes()
+    {
+        return out.getBytes();
+    }
+
     @Override
     public long getChecksum()
     {
@@ -70,9 +75,14 @@ public class RAMIndexOutput extends IndexOutput
         externalOut.writeBytes(out.getBytes(), 0, out.getPosition());
     }
 
-    public BytesRef getBytes()
+    public BytesRef getBytesRef()
     {
         return new BytesRef(out.getBytes(), 0, out.getPosition());
+    }
+
+    public void writeTo(byte[] bytes, int offset)
+    {
+        System.arraycopy(out.getBytes(), 0, bytes, offset, out.getPosition());
     }
 
     public void reset()
