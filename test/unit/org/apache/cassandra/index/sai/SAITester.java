@@ -43,6 +43,7 @@ import javax.management.AttributeNotFoundException;
 import javax.management.ObjectName;
 
 import com.google.common.collect.Sets;
+import org.apache.cassandra.index.sai.disk.format.OnDiskFormat;
 import org.junit.After;
 import org.junit.Assert;
 import org.junit.BeforeClass;
@@ -127,13 +128,13 @@ public abstract class SAITester extends CQLTester
                                                                             .build();
 
     protected static final Injections.Counter perSSTableValidationCounter = Injections.newCounter("PerSSTableValidationCounter")
-                                                                                      .add(newInvokePoint().onClass(IndexDescriptor.class)
-                                                                                                           .onMethod("validatePerSSTableComponents"))
+                                                                                      .add(newInvokePoint().onClass(OnDiskFormat.class)
+                                                                                                           .onMethod("validatePerSSTableIndexComponents"))
                                                                                       .build();
 
     protected static final Injections.Counter perColumnValidationCounter = Injections.newCounter("PerColumnValidationCounter")
-                                                                                     .add(newInvokePoint().onClass(IndexDescriptor.class)
-                                                                                                          .onMethod("validatePerIndexComponents"))
+                                                                                     .add(newInvokePoint().onClass(OnDiskFormat.class)
+                                                                                                          .onMethod("validatePerColumnIndexComponents"))
                                                                                      .build();
 
     private static Randomization random;

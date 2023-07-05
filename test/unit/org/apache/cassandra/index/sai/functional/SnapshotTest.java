@@ -104,7 +104,7 @@ public class SnapshotTest extends SAITester
         verifyIndexFiles(numericIndexContext, null, 2, 0);
         assertNotEquals(snapshotLastModified, indexFilesLastModified());
         assertNumRows(2, "SELECT * FROM %%s WHERE v1 >= 0");
-        assertValidationCount(2, 2); // compaction should not validate
+        assertValidationCount(4, 2); // compaction should not validate
 
         // index components are included after rebuild
         verifyIndexComponentsIncludedInSSTable();
