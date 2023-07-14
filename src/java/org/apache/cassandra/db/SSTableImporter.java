@@ -186,6 +186,8 @@ public class SSTableImporter
         try (Refs<SSTableReader> refs = Refs.ref(newSSTables))
         {
             abortIfDraining();
+            
+            // TODO: Build SAI SSTable indexes in isolation/offline (without updating queryability)
             cfs.getTracker().addSSTables(newSSTables);
             for (SSTableReader reader : newSSTables)
             {
