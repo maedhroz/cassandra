@@ -35,6 +35,21 @@ public class DuplicateRowIDTest extends SAITester
         requireNetwork();
     }
 
+@Test
+public void testEmptyString()
+{
+    createTable("CREATE TABLE %s (k TEXT PRIMARY KEY, v text)");
+    createIndex(String.format(CREATE_INDEX_TEMPLATE, 'v'));
+
+    execute("INSERT INTO %s (k, v) VALUES ('0', '')");
+    execute("INSERT INTO %s (k) VALUES ('1')");
+    
+    // flush(); <---- there is not always a memtable index involved, a fix will have to pay attention to this
+
+    List<Row> rows = executeNet("SELECT * FROM %s WHERE v = ''").all();
+    assertEquals(1, rows.size());
+}
+    
     @Test
     public void shouldTolerateDuplicatedRowIDsAfterMemtableUpdates() throws Throwable
     {

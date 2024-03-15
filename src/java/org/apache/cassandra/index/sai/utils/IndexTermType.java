@@ -490,7 +490,7 @@ public class IndexTermType
     public int comparePostFilter(Expression.Value requestedValue, Expression.Value columnValue)
     {
         if (isInetAddress())
-            return compareInet(requestedValue.encoded, columnValue.encoded);
+            return compareInet(requestedValue.raw, columnValue.raw);
             // Override comparisons for frozen collections and composite types (map entries)
         else if (isComposite() || isFrozen())
             return FastByteOperations.compareUnsigned(requestedValue.raw, columnValue.raw);
@@ -789,7 +789,7 @@ public class IndexTermType
      */
     private static int compareInet(ByteBuffer b1, ByteBuffer b2)
     {
-        assert isIPv6(b1) && isIPv6(b2);
+//        assert isIPv6(b1) && isIPv6(b2);
 
         return FastByteOperations.compareUnsigned(b1, b2);
     }
