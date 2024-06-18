@@ -70,6 +70,9 @@ public final class DropTableStatement extends AlterSchemaStatement
         if (table.isView())
             throw ire("Cannot use DROP TABLE on a materialized view. Please use DROP MATERIALIZED VIEW instead.");
 
+        if (table.isAccordEnabled() && table.params.pendingDrop)
+            throw ire("Table '%s.%s' is already being dropped", keyspaceName, tableName);
+
         Iterable<ViewMetadata> views = keyspace.views.forTable(table.id);
         if (!isEmpty(views))
         {
