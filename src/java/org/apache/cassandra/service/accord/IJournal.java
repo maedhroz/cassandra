@@ -34,12 +34,13 @@ import accord.utils.PersistentField.Persister;
 public interface IJournal
 {
     Command loadCommand(int commandStoreId, TxnId txnId, RedundantBefore redundantBefore, DurableBefore durableBefore);
+    SavedCommand.MinimalCommand loadMinimal(int commandStoreId, TxnId txnId, SavedCommand.Load load, RedundantBefore redundantBefore, DurableBefore durableBefore);
 
     RedundantBefore loadRedundantBefore(int commandStoreId);
     NavigableMap<TxnId, Ranges> loadBootstrapBeganAt(int commandStoreId);
     NavigableMap<Timestamp, Ranges> loadSafeToRead(int commandStoreId);
     CommandStores.RangesForEpoch.Snapshot loadRangesForEpoch(int commandStoreId);
-    List<Deps> loadHistoricalTransactions(int store);
+    List<Deps> loadHistoricalTransactions(long epoch, int store);
 
     void appendCommand(int store, SavedCommand.DiffWriter value, Runnable onFlush);
     Persister<DurableBefore, DurableBefore> durableBeforePersister();
