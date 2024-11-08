@@ -33,8 +33,7 @@ import java.util.stream.Stream;
 import javax.annotation.Nullable;
 
 import com.google.common.annotations.VisibleForTesting;
-// TODO: add back when accord-core Property supports it
-//import org.slf4j.Logger;
+import org.slf4j.Logger;
 
 import accord.utils.Gen;
 import accord.utils.Gens;
@@ -157,11 +156,10 @@ public class StatefulASTBase extends TestBaseImpl
         return cluster;
     }
 
-    // TODO: add back when accord-core Property supports it
-//    protected <S extends BaseState> Property.StatefulSuccess<S, Void> onSuccess(Logger logger)
-//    {
-//        return (state, sut, history) -> logger.info("Successful for the following:\nState {}\nHistory:\n{}", state, Property.formatList("\t\t", history));
-//    }
+    protected <S extends BaseState> Property.StatefulSuccess<S, Void> onSuccess(Logger logger)
+    {
+        return (state, sut, history) -> logger.info("Successful for the following:\nState {}\nHistory:\n{}", state, Property.formatList("\t\t", history));
+    }
 
     protected static <S extends BaseState> Property.Command<S, Void, ?> flushTable(RandomSource rs, S state)
     {
