@@ -60,7 +60,7 @@ FROM [keyspace_name.] table_name
     public final Optional<OrderBy> orderBy;
     public final Optional<Value> limit;
     public final boolean allowFiltering;
-
+    public final boolean insertNewLine;
     public Select(List<Expression> selections)
     {
         this(selections, Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty());
@@ -68,10 +68,10 @@ FROM [keyspace_name.] table_name
 
     public Select(List<Expression> selections, Optional<TableReference> source, Optional<Conditional> where, Optional<OrderBy> orderBy, Optional<Value> limit)
     {
-        this(selections, source, where, orderBy, limit, false);
+        this(selections, source, where, orderBy, limit, false, true);
     }
 
-    public Select(List<Expression> selections, Optional<TableReference> source, Optional<Conditional> where, Optional<OrderBy> orderBy, Optional<Value> limit, boolean allowFiltering)
+    public Select(List<Expression> selections, Optional<TableReference> source, Optional<Conditional> where, Optional<OrderBy> orderBy, Optional<Value> limit, boolean allowFiltering, boolean insertNewLine)
     {
         this.selections = selections;
         this.source = source;
@@ -79,6 +79,7 @@ FROM [keyspace_name.] table_name
         this.orderBy = orderBy;
         this.limit = limit;
         this.allowFiltering = allowFiltering;
+        this.insertNewLine = insertNewLine;
         if (!source.isPresent())
         {
             if (where.isPresent())
@@ -99,7 +100,7 @@ FROM [keyspace_name.] table_name
 
     public Select withAllowFiltering()
     {
-        return new Select(selections, source, where, orderBy, limit, true);
+        return new Select(selections, source, where, orderBy, limit, true, insertNewLine);
     }
 
     @Override
@@ -121,31 +122,36 @@ FROM [keyspace_name.] table_name
         }
         if (source.isPresent())
         {
-            newLine(sb, indent);
+            if (insertNewLine) newLine(sb, indent);
+            else sb.append(' ');
             sb.append("FROM ");
             source.get().toCQL(sb, indent);
             if (where.isPresent())
             {
-                newLine(sb, indent);
+                if (insertNewLine) newLine(sb, indent);
+                else sb.append(' ');
                 sb.append("WHERE ");
                 where.get().toCQL(sb, indent);
             }
             if (orderBy.isPresent())
             {
-                newLine(sb, indent);
+                if (insertNewLine) newLine(sb, indent);
+                else sb.append(' ');
                 sb.append("ORDER BY ");
                 orderBy.get().toCQL(sb, indent);
             }
             if (limit.isPresent())
             {
-                newLine(sb, indent);
+                if (insertNewLine) newLine(sb, indent);
+                else sb.append(' ');
                 sb.append("LIMIT ");
                 limit.get().toCQL(sb, indent);
             }
 
             if (allowFiltering)
             {
-                newLine(sb, indent);
+                if (insertNewLine) newLine(sb, indent);
+                else sb.append(' ');
                 sb.append("ALLOW FILTERING");
             }
         }
@@ -271,6 +277,8 @@ FROM [keyspace_name.] table_name
 
     public static class Builder
     {
+        private boolean addNewLine = true;
+        private boolean filtering = false;
         @Nullable // null means wildcard
         private List<Expression> selections = new ArrayList<>();
         private Optional<TableReference> source = Optional.empty();
@@ -289,6 +297,12 @@ FROM [keyspace_name.] table_name
         public Builder withColumnSelection(String name, AbstractType<?> type)
         {
             return withSelection(Reference.of(new Symbol(name, type)));
+        }
+
+        public Builder allowFiltering()
+        {
+            filtering = true;
+            return this;
         }
 
         public Builder withSelection(Expression e)
@@ -351,6 +365,12 @@ FROM [keyspace_name.] table_name
             return this;
         }
 
+        public Builder withoutNewLine()
+        {
+            addNewLine = false;
+            return this;
+        }
+
         /**
          * When the column type/value type isn't known, this will fall back to byte type
          */
@@ -388,7 +408,9 @@ FROM [keyspace_name.] table_name
                               source,
                               where.isEmpty() ? Optional.empty() : Optional.of(where.build()),
                               orderBy.isEmpty() ? Optional.empty() : Optional.of(orderBy.build()),
-                              limit);
+                              limit,
+                              filtering,
+                              addNewLine);
         }
     }
 }

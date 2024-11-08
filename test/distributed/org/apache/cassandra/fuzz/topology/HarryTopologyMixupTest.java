@@ -20,11 +20,10 @@ package org.apache.cassandra.fuzz.topology;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.TreeSet;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
-
 import javax.annotation.Nullable;
 
 import com.google.common.base.Throwables;
@@ -41,19 +40,25 @@ import accord.utils.RandomSource;
 import org.apache.cassandra.distributed.Cluster;
 import org.apache.cassandra.distributed.api.IInstanceConfig;
 import org.apache.cassandra.distributed.shared.ClusterUtils;
-import org.apache.cassandra.harry.HarryHelper;
+import org.apache.cassandra.exceptions.RequestTimeoutException;
+import org.apache.cassandra.harry.SchemaSpec;
+import org.apache.cassandra.harry.dsl.HistoryBuilder;
 import org.apache.cassandra.harry.dsl.ReplayingHistoryBuilder;
-import org.apache.cassandra.harry.model.Model;
-import org.apache.cassandra.harry.operations.Query;
-import org.apache.cassandra.harry.sut.SystemUnderTest;
-import org.apache.cassandra.harry.sut.TokenPlacementModel;
-import org.apache.cassandra.harry.sut.injvm.InJvmSut;
+import org.apache.cassandra.harry.execution.InJvmDTestVisitExecutor;
+import org.apache.cassandra.harry.gen.EntropySource;
+import org.apache.cassandra.harry.gen.Generator;
+import org.apache.cassandra.harry.gen.Generators;
+import org.apache.cassandra.harry.gen.SchemaGenerators;
+import org.apache.cassandra.harry.gen.rng.JdkRandomEntropySource;
 import org.apache.cassandra.service.consensus.TransactionalMode;
+import org.apache.cassandra.utils.AssertionUtils;
+import org.assertj.core.api.Condition;
 
 import static org.apache.cassandra.distributed.shared.ClusterUtils.waitForCMSToQuiesce;
 
 public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyMixupTest.Spec>
 {
+    protected static final Condition<Object> TIMEOUT_CHECKER = AssertionUtils.isInstanceof(RequestTimeoutException.class);
     private static final Logger logger = LoggerFactory.getLogger(HarryTopologyMixupTest.class);
 
     public static class AccordMode
@@ -64,7 +69,9 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
             this.passthroughMode = passthroughMode;
         }
 
-        public enum Kind { None, Direct, Passthrough }
+        public enum Kind
+        {None, Direct, Passthrough}
+
         public final Kind kind;
         @Nullable
         public final TransactionalMode passthroughMode;
@@ -101,28 +108,73 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
         if (cause != null) return;
         if (((HarryState) state).numInserts > 0)
         {
-            // do one last read just to make sure we validate the data...
-            var harry = state.schemaSpec.harry;
-            harry.validateAll(harry.quiescentChecker());
+            for (Integer pkIdx : state.testState.pkGen.generated())
+                state.testState.history.selectPartition(pkIdx);
         }
     }
 
     private static BiFunction<RandomSource, Cluster, Spec> createSchemaSpec(AccordMode mode)
     {
         return (rs, cluster) -> {
-            long seed = rs.nextLong();
-            var schema = HarryHelper.schemaSpecBuilder("harry", "tbl").surjection().inflate(seed);
+            EntropySource rng = new JdkRandomEntropySource(rs.nextLong());
+            Generator<SchemaSpec> schemaGen;
+            org.apache.cassandra.harry.SchemaSpec schema;
             if (mode.kind != AccordMode.Kind.None)
-                schema = schema.withTransactionMode(mode.passthroughMode);
-            ReplayingHistoryBuilder harry = HarryHelper.dataGen(seed,
-                    mode.kind == AccordMode.Kind.Direct ? new AccordSut(cluster) : new InJvmSut(cluster),
-                    new TokenPlacementModel.SimpleReplicationFactor(3),
-                    SystemUnderTest.ConsistencyLevel.QUORUM,
-                    schema);
-            cluster.schemaChange(String.format("CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 3};", HarryHelper.KEYSPACE));
-            cluster.schemaChange(schema.compile().cql());
+                schemaGen = SchemaGenerators.schemaSpecGen("harry", "table", 1000,
+                                                           SchemaSpec.Options.TRANSACTIONAL_MODE, mode.passthroughMode.toString());
+            else
+                schemaGen = SchemaGenerators.schemaSpecGen("harry", "table", 1000);
+
+            schema = schemaGen.generate(rng);
+
+            HistoryBuilder harry = new ReplayingHistoryBuilder(schema.valueGenerators,
+                                                               hb -> InJvmDTestVisitExecutor.builder()
+                                                                                            .nodeSelector(new InJvmDTestVisitExecutor.NodeSelector()
+                                                                                            {
+                                                                                                private final AtomicLong cnt = new AtomicLong();
+
+                                                                                                @Override
+                                                                                                public int select(long lts)
+                                                                                                {
+                                                                                                    for (int i = 0; i < 42; i++)
+                                                                                                    {
+                                                                                                        int selected = (int) (cnt.getAndIncrement() % cluster.size() + 1);
+                                                                                                        if (!cluster.get(selected).isShutdown())
+                                                                                                            return selected;
+                                                                                                    }
+                                                                                                    throw new IllegalStateException("Unable to find an alive instance");
+                                                                                                }
+                                                                                            })
+                                                                                            .retryPolicy(t -> {
+                                                                                                t = Throwables.getRootCause(t);
+                                                                                                if (!TIMEOUT_CHECKER.matches(t))
+                                                                                                    return false;
+
+                                                                                                TxnId id;
+                                                                                                try
+                                                                                                {
+                                                                                                    id = TxnId.parse(t.getMessage());
+                                                                                                }
+                                                                                                catch (Throwable t2)
+                                                                                                {
+                                                                                                    return true;
+                                                                                                }
+                                                                                                try
+                                                                                                {
+                                                                                                    var nodes = cluster.stream().filter(i -> !i.isShutdown()).mapToInt(i -> i.config().num()).toArray();
+                                                                                                    logger.warn("Timeout for txn {}; debug info\n{}", id, ClusterUtils.queryTxnStateAsString(cluster, id, nodes));
+                                                                                                }
+                                                                                                catch (Throwable t3)
+                                                                                                {
+                                                                                                    t.addSuppressed(t3);
+                                                                                                }
+                                                                                                return false;
+                                                                                            })
+                                                                                            .build(schema, hb, cluster));
+            cluster.schemaChange(String.format("CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 3};", schema.keyspace));
+            cluster.schemaChange(schema.compile());
             waitForCMSToQuiesce(cluster, cluster.get(1));
-            return new Spec(harry, mode);
+            return new Spec(harry, schema);
         };
     }
 
@@ -144,7 +196,7 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
     private static CommandGen<Spec> cqlOperations(Spec spec)
     {
         Command<State<Spec>, Void, ?> insert = new HarryCommand(state -> "Harry Insert" + state.commandNamePostfix(), state -> {
-            spec.harry.insert();
+            spec.history.insert();
             ((HarryState) state).numInserts++;
         });
         return (rs, state) -> {
@@ -164,83 +216,41 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
 
     private static Command<State<Spec>, Void, ?> validateAll(State<Spec> state)
     {
-        Spec spec = state.schemaSpec;
-        var schema = spec.harry.schema();
-        boolean writeThroughAccord = schema.isWriteTimeFromAccord();
+        Spec spec = state.testState;
         List<Command<State<Spec>, Void, ?>> reads = new ArrayList<>();
-        Model model = spec.harry.quiescentChecker();
-        for (Long pd : new TreeSet<>(spec.harry.pds()))
+
+        for (Integer pkIdx : spec.pkGen.generated())
         {
-            reads.add(new HarryCommand(s -> "Harry Validate pd=" + pd  + state.commandNamePostfix(), s -> model.validate(Query.selectAllColumns(schema, pd, false))));
-            // as of this writing Accord does not support ORDER BY
-            if (!writeThroughAccord)
-                reads.add(new HarryCommand(s -> "Harry Reverse Validate pd=" + pd + state.commandNamePostfix(), s -> model.validate(Query.selectAllColumns(schema, pd, true))));
+            long pd = spec.schema.valueGenerators.pkGen.descriptorAt(pkIdx);
+            reads.add(new HarryCommand(s -> String.format("Harry Validate pd=%d%s", pd, state.commandNamePostfix()), s -> spec.history.selectPartition(pkIdx)));
         }
         reads.add(new HarryCommand(s -> "Reset Harry Write State" + state.commandNamePostfix(), s -> ((HarryState) s).numInserts = 0));
         return Property.multistep(reads);
     }
 
-    private static class AccordSut extends InJvmSut
+    public static class Spec implements TestState
     {
-        private AccordSut(Cluster cluster)
+        private final Generators.TrackingGenerator<Integer> pkGen;
+        private final HistoryBuilder history;
+        private final SchemaSpec schema;
+
+        public Spec(HistoryBuilder history, SchemaSpec schema)
         {
-            super(cluster, roundRobin(cluster), retryOnTimeout(), 10, 3);
+            this.history = history;
+            this.schema = schema;
+            this.pkGen = Generators.tracking(Generators.int32(0, schema.valueGenerators.pkPopulation()));
         }
 
         @Override
-        public Object[][] execute(String statement, ConsistencyLevel cl, int coordinator, int pageSize, Object... bindings)
+        public String table()
         {
-            return super.execute(wrapInTxn(statement), cl, coordinator, pageSize, bindings);
+            return schema.table;
         }
 
         @Override
-        protected void onException(Throwable t)
+        public String keyspace()
         {
-            t = Throwables.getRootCause(t);
-            if (!TIMEOUT_CHECKER.matches(t)) return;
-
-            TxnId id;
-            try
-            {
-                id = TxnId.parse(t.getMessage());
-            }
-            catch (Throwable t2)
-            {
-                return;
-            }
-            try
-            {
-                var nodes = cluster.stream().filter(i -> !i.isShutdown()).mapToInt(i -> i.config().num()).toArray();
-                logger.warn("Timeout for txn {}; debug info\n{}", id, ClusterUtils.queryTxnStateAsString(cluster, id, nodes));
-            }
-            catch (Throwable t3)
-            {
-                t.addSuppressed(t3);
-            }
-        }
-    }
-
-    public static class Spec implements TopologyMixupTestBase.SchemaSpec
-    {
-        private final ReplayingHistoryBuilder harry;
-        private final AccordMode mode;
-
-        public Spec(ReplayingHistoryBuilder harry, AccordMode mode)
-        {
-            this.harry = harry;
-            this.mode = mode;
-        }
-
-        @Override
-        public String name()
-        {
-            return harry.schema().table;
-        }
-
-        @Override
-        public String keyspaceName()
-        {
-            return HarryHelper.KEYSPACE;
+            return schema.keyspace;
         }
     }
 
@@ -248,6 +258,7 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
     {
         private long generation;
         private int numInserts = 0;
+
         public HarryState(RandomSource rs)
         {
             super(rs, createSchemaSpec(mode), HarryTopologyMixupTest::cqlOperations);
