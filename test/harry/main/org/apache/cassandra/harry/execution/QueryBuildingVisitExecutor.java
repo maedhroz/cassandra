@@ -51,13 +51,13 @@ public class QueryBuildingVisitExecutor extends VisitExecutor
         {
             wrapSingleQueryFormat = "%s";
             wrapQueryFormat = "BEGIN UNLOGGED BATCH\n" +
-                              "  %s;\n" +
+                              "  %s\n" +
                               "APPLY BATCH;";
         }
         else
         {
             wrapQueryFormat = "BEGIN TRANSACTION\n" +
-                              "  %s;\n" +
+                              "  %s\n" +
                               "COMMIT TRANSACTION;";
             wrapSingleQueryFormat = wrapQueryFormat;
         }

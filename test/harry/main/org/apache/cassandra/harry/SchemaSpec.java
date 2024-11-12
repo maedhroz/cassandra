@@ -38,6 +38,8 @@ import org.apache.cassandra.harry.util.IteratorsUtil;
 import org.apache.cassandra.service.consensus.TransactionalMode;
 import org.apache.cassandra.utils.ByteArrayUtil;
 
+import static org.apache.cassandra.harry.SchemaSpec.Options.SKIP_WRITE_TIMESTAMPS;
+import static org.apache.cassandra.harry.SchemaSpec.Options.TRANSACTIONAL_MODE;
 import static org.apache.cassandra.harry.gen.InvertibleGenerator.MAX_ENTROPY;
 
 public class SchemaSpec
@@ -347,9 +349,20 @@ public class SchemaSpec
         return optionsMap;
     }
 
+    public boolean writeTimestampsAllowed()
+    {
+        if (options.containsKey(SKIP_WRITE_TIMESTAMPS))
+            return false;
+        Object mode = options.get(TRANSACTIONAL_MODE);
+        if (mode == null)
+            return true;
+
+        return !TransactionalMode.full.toString().equals(mode);
+    }
     public enum Options
     {
         TRANSACTIONAL_MODE,
+        SKIP_WRITE_TIMESTAMPS,
         DISABLE_READ_REPAIR,
         COMPACT_STRATEGY,
         COMPACT_STORAGE,

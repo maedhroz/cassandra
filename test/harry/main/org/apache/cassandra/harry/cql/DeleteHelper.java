@@ -41,10 +41,12 @@ public class DeleteHelper
         b.append("DELETE FROM ")
          .append(Symbol.maybeQuote(schema.keyspace))
          .append(".")
-         .append(Symbol.maybeQuote(schema.table))
-         .append(" USING TIMESTAMP ")
-         .append(timestamp)
-         .append(" WHERE ");
+         .append(Symbol.maybeQuote(schema.table));
+
+        if (timestamp != -1 && schema.writeTimestampsAllowed())
+            b.append(" USING TIMESTAMP ").append(timestamp);
+
+        b.append(" WHERE ");
 
         List<Object> bindings = new ArrayList<>();
 
@@ -70,10 +72,12 @@ public class DeleteHelper
         b.append("DELETE FROM ")
          .append(Symbol.maybeQuote(schema.keyspace))
          .append(".")
-         .append(Symbol.maybeQuote(schema.table))
-         .append(" USING TIMESTAMP ")
-         .append(timestamp)
-         .append(" WHERE ");
+         .append(Symbol.maybeQuote(schema.table));
+
+        if (timestamp != -1 && schema.writeTimestampsAllowed())
+            b.append(" USING TIMESTAMP ").append(timestamp);
+
+        b.append(" WHERE ");
 
         List<Object> bindings = new ArrayList<>();
 
@@ -126,10 +130,12 @@ public class DeleteHelper
         b.append("FROM ")
          .append(Symbol.maybeQuote(schema.keyspace))
          .append(".")
-         .append(Symbol.maybeQuote(schema.table))
-         .append(" USING TIMESTAMP ")
-         .append(timestamp)
-         .append(" WHERE ");
+         .append(Symbol.maybeQuote(schema.table));
+
+        if (timestamp != -1 && schema.writeTimestampsAllowed())
+            b.append(" USING TIMESTAMP ").append(timestamp);
+
+        b.append(" WHERE ");
 
         List<Object> bindings = new ArrayList<>();
 
@@ -158,10 +164,12 @@ public class DeleteHelper
         b.append("DELETE FROM ")
          .append(Symbol.maybeQuote(schema.keyspace))
          .append(".")
-         .append(Symbol.maybeQuote(schema.table))
-         .append(" USING TIMESTAMP ")
-         .append(timestamp)
-         .append(" WHERE ");
+         .append(Symbol.maybeQuote(schema.table));
+
+        if (timestamp != -1 && schema.writeTimestampsAllowed())
+            b.append(" USING TIMESTAMP ").append(timestamp);
+
+        b.append(" WHERE ");
 
         List<Object> bindings = new ArrayList<>();
 

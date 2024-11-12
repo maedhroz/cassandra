@@ -23,12 +23,9 @@ import java.util.List;
 import accord.utils.Invariants;
 import org.apache.cassandra.harry.ColumnSpec;
 import org.apache.cassandra.harry.MagicConstants;
-import org.apache.cassandra.harry.op.Operations;
 import org.apache.cassandra.harry.SchemaSpec;
 import org.apache.cassandra.harry.execution.CompiledStatement;
-import org.apache.cassandra.service.consensus.TransactionalMode;
-
-import static org.apache.cassandra.harry.SchemaSpec.Options.TRANSACTIONAL_MODE;
+import org.apache.cassandra.harry.op.Operations;
 
 public class WriteHelper
 {
@@ -91,15 +88,13 @@ public class WriteHelper
         }
 
         b.append(")");
-        if (timestamp != -1 &&
-            (!schema.options.containsKey(TRANSACTIONAL_MODE) ||
-             TransactionalMode.off.toString().equals(schema.options.get(TRANSACTIONAL_MODE))))
+        if (timestamp != -1 && schema.writeTimestampsAllowed())
         {
             b.append(" USING TIMESTAMP ")
-             .append(timestamp)
-             .append(";");
+             .append(timestamp);
         }
 
+        b.append(";");
         return new CompiledStatement(b.toString(), adjustArraySize(bindings, bindingsCount));
     }
 
@@ -144,9 +139,7 @@ public class WriteHelper
          .append('.')
          .append(schema.table);
 
-        if (timestamp != -1 &&
-            (!schema.options.containsKey(TRANSACTIONAL_MODE) ||
-             TransactionalMode.off.toString().equals(schema.options.get(TRANSACTIONAL_MODE))))
+        if (timestamp != -1 && schema.writeTimestampsAllowed())
         {
             b.append(" USING TIMESTAMP ")
              .append(timestamp)
