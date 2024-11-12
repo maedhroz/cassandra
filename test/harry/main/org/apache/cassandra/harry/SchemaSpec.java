@@ -19,12 +19,15 @@
 package org.apache.cassandra.harry;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 import accord.utils.Invariants;
 import org.apache.cassandra.cql3.ast.Symbol;
@@ -32,6 +35,7 @@ import org.apache.cassandra.harry.gen.Generator;
 import org.apache.cassandra.harry.gen.Generators;
 import org.apache.cassandra.harry.gen.ValueGenerators;
 import org.apache.cassandra.harry.util.IteratorsUtil;
+import org.apache.cassandra.service.consensus.TransactionalMode;
 import org.apache.cassandra.utils.ByteArrayUtil;
 
 import static org.apache.cassandra.harry.gen.InvertibleGenerator.MAX_ENTROPY;
@@ -163,6 +167,12 @@ public class SchemaSpec
         {
             appendWith.run();
             sb.append(" COMPACT STORAGE AND");
+        }
+
+        if (options.containsKey(Options.TRANSACTIONAL_MODE))
+        {
+            appendWith.run();
+            sb.append(" transactional_mode = '").append(options.get(Options.TRANSACTIONAL_MODE).toString()).append("' AND");
         }
 
         if (options.containsKey(Options.DISABLE_READ_REPAIR))
@@ -317,7 +327,22 @@ public class SchemaSpec
         Map<Options, Object> optionsMap = new HashMap<>(options.length / 2);
         for (int i = 0; i < options.length; i+=2)
         {
-            optionsMap.put((Options) options[i], options[i + 1]);
+            Options option = (Options) options[i];
+            switch (option)
+            {
+                case TRANSACTIONAL_MODE:
+                    Invariants.checkState(options[i + 1] instanceof String);
+                    Set<String> possible = Arrays.stream(TransactionalMode.values()).map(Object::toString).collect(Collectors.toSet());
+                    String value = (String) options[i + 1];
+                    Invariants.checkState(possible.contains(value),
+                                          "Should have contained one of %s, but got %s", possible, value);
+                    optionsMap.put(option, value);
+                    break;
+                default:
+                    optionsMap.put(option, options[i + 1]);
+                    break;
+            }
+
         }
         return optionsMap;
     }

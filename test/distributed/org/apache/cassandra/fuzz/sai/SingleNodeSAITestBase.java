@@ -120,7 +120,6 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
             CassandraRelevantProperties.SAI_INTERSECTION_CLAUSE_LIMIT.setInt(100);
             beforeEach();
             cluster.get(1).nodetool("disableautocompaction");
-            System.out.println(schema.compile());
             cluster.schemaChange(schema.compile());
             Streams.concat(schema.clusteringKeys.stream(),
                            schema.regularColumns.stream(),

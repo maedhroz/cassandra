@@ -26,6 +26,9 @@ import org.apache.cassandra.harry.MagicConstants;
 import org.apache.cassandra.harry.op.Operations;
 import org.apache.cassandra.harry.SchemaSpec;
 import org.apache.cassandra.harry.execution.CompiledStatement;
+import org.apache.cassandra.service.consensus.TransactionalMode;
+
+import static org.apache.cassandra.harry.SchemaSpec.Options.TRANSACTIONAL_MODE;
 
 public class WriteHelper
 {
@@ -88,7 +91,9 @@ public class WriteHelper
         }
 
         b.append(")");
-        if (timestamp != -1)
+        if (timestamp != -1 &&
+            (!schema.options.containsKey(TRANSACTIONAL_MODE) ||
+             TransactionalMode.off.toString().equals(schema.options.get(TRANSACTIONAL_MODE))))
         {
             b.append(" USING TIMESTAMP ")
              .append(timestamp)
@@ -110,36 +115,38 @@ public class WriteHelper
     }
 
     public static CompiledStatement inflateUpdate(Operations.WriteOp op,
-                                                  SchemaSpec schemaSpec,
+                                                  SchemaSpec schema,
                                                   long timestamp)
     {
-        assert op.vds().length == schemaSpec.regularColumns.size();
-        assert op.sds().length == schemaSpec.staticColumns.size();
-        assert op.vds().length == schemaSpec.valueGenerators.regularColumnGens.size();
-        assert op.sds().length == schemaSpec.valueGenerators.staticColumnGens.size();
+        assert op.vds().length == schema.regularColumns.size();
+        assert op.sds().length == schema.staticColumns.size();
+        assert op.vds().length == schema.valueGenerators.regularColumnGens.size();
+        assert op.sds().length == schema.valueGenerators.staticColumnGens.size();
 
-        Object[] partitionKey = schemaSpec.valueGenerators.pkGen.inflate(op.pd);
-        assert partitionKey.length == schemaSpec.partitionKeys.size();
-        Object[] clusteringKey = schemaSpec.valueGenerators.ckGen.inflate(op.cd());
-        assert clusteringKey.length == schemaSpec.clusteringKeys.size();
+        Object[] partitionKey = schema.valueGenerators.pkGen.inflate(op.pd);
+        assert partitionKey.length == schema.partitionKeys.size();
+        Object[] clusteringKey = schema.valueGenerators.ckGen.inflate(op.cd());
+        assert clusteringKey.length == schema.clusteringKeys.size();
         Object[] regularColumns = new Object[op.vds().length];
         Object[] staticColumns = new Object[op.sds().length];
 
         for (int i = 0; i < op.vds().length; i++)
-            regularColumns[i] = schemaSpec.valueGenerators.regularColumnGens.get(i).inflate(op.vds()[i]);
+            regularColumns[i] = schema.valueGenerators.regularColumnGens.get(i).inflate(op.vds()[i]);
 
         for (int i = 0; i < op.sds().length; i++)
-            staticColumns[i] = schemaSpec.valueGenerators.staticColumnGens.get(i).inflate(op.sds()[i]);
+            staticColumns[i] = schema.valueGenerators.staticColumnGens.get(i).inflate(op.sds()[i]);
 
-        Object[] bindings = new Object[schemaSpec.allColumnInSelectOrder.size()];
+        Object[] bindings = new Object[schema.allColumnInSelectOrder.size()];
 
         StringBuilder b = new StringBuilder();
         b.append("UPDATE ")
-         .append(schemaSpec.keyspace)
+         .append(schema.keyspace)
          .append('.')
-         .append(schemaSpec.table);
+         .append(schema.table);
 
-        if (timestamp != -1)
+        if (timestamp != -1 &&
+            (!schema.options.containsKey(TRANSACTIONAL_MODE) ||
+             TransactionalMode.off.toString().equals(schema.options.get(TRANSACTIONAL_MODE))))
         {
             b.append(" USING TIMESTAMP ")
              .append(timestamp)
@@ -147,15 +154,15 @@ public class WriteHelper
         }
 
         int bindingsCount = 0;
-        bindingsCount += addSetStatements(b, bindings, schemaSpec.regularColumns, regularColumns, bindingsCount);
+        bindingsCount += addSetStatements(b, bindings, schema.regularColumns, regularColumns, bindingsCount);
         if (staticColumns.length != 0)
-            bindingsCount += addSetStatements(b, bindings, schemaSpec.staticColumns, staticColumns, bindingsCount);
+            bindingsCount += addSetStatements(b, bindings, schema.staticColumns, staticColumns, bindingsCount);
 
         assert bindingsCount > 0 : "Can not have an UPDATE statement without any updates";
         b.append(" WHERE ");
 
-        bindingsCount += addWhereStatements(b, bindings, schemaSpec.partitionKeys, partitionKey, bindingsCount, true);
-        bindingsCount += addWhereStatements(b, bindings, schemaSpec.clusteringKeys, clusteringKey, bindingsCount, false);
+        bindingsCount += addWhereStatements(b, bindings, schema.partitionKeys, partitionKey, bindingsCount, true);
+        bindingsCount += addWhereStatements(b, bindings, schema.clusteringKeys, clusteringKey, bindingsCount, false);
         b.append(";");
         return new CompiledStatement(b.toString(), adjustArraySize(bindings, bindingsCount));
     }

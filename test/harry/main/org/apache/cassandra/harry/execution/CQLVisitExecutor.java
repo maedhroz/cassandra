@@ -39,11 +39,6 @@ public abstract class CQLVisitExecutor
     private static final Logger logger = LoggerFactory.getLogger(QueryBuildingVisitExecutor.class);
     protected final SchemaSpec schema;
 
-//    protected final String wrapQueryFormat = "BEGIN UNLOGGED BATCH\n%s\nAPPLY BATCH;";
-    protected final String wrapQueryFormat = "BEGIN TRANSACTION\n" +
-                                             "  %s;\n" +
-                                             "COMMIT TRANSACTION;";
-
     protected final DataTracker dataTracker;
     protected final Model model;
     private final QueryBuildingVisitExecutor queryBuilder;

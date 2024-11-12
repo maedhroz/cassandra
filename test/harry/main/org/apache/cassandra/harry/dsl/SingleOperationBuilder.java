@@ -43,7 +43,6 @@ public interface SingleOperationBuilder
     SingleOperationBuilder insert(int pdIdx, int cdIdx, int[] valueIdxs, int[] sValueIdxs);
 
     // TODO: selection
-    // TODO: ASC/DESC
     SingleOperationBuilder selectRowRange(int pdIdx, int lowerBoundRowIdx, int upperBoundRowIdx,
                                           int nonEqFrom, boolean includeLowBound, boolean includeHighBound);
     SingleOperationBuilder selectPartition(int pdIdx);

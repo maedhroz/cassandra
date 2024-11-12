@@ -40,13 +40,27 @@ public class QueryBuildingVisitExecutor extends VisitExecutor
     private static final Logger logger = LoggerFactory.getLogger(QueryBuildingVisitExecutor.class);
     protected final SchemaSpec schema;
 
-    protected final String wrapQueryFormat = "BEGIN TRANSACTION\n" +
-                                             "  %s;\n" +
-                                             "COMMIT TRANSACTION;";
+    protected final String wrapSingleQueryFormat;
+    protected final String wrapQueryFormat;
 
     public QueryBuildingVisitExecutor(SchemaSpec schema)
     {
         this.schema = schema;
+        Object v = schema.options.get(SchemaSpec.Options.TRANSACTIONAL_MODE);
+        if (v == null || v.equals("off"))
+        {
+            wrapSingleQueryFormat = "%s";
+            wrapQueryFormat = "BEGIN UNLOGGED BATCH\n" +
+                              "  %s;\n" +
+                              "APPLY BATCH;";
+        }
+        else
+        {
+            wrapQueryFormat = "BEGIN TRANSACTION\n" +
+                              "  %s;\n" +
+                              "COMMIT TRANSACTION;";
+            wrapSingleQueryFormat = wrapQueryFormat;
+        }
     }
 
     public CompiledStatement compile(Visit visit)
@@ -92,8 +106,10 @@ public class QueryBuildingVisitExecutor extends VisitExecutor
         }
 
         String query = String.join("\n ", statements);
-        if (statements.size() > 1)
-            query = wrapQuery(query);
+        if (statements.size() == 1)
+            query = String.format(wrapSingleQueryFormat, query);
+        else
+            query = String.format(wrapQueryFormat, query);
 
         Object[] bindingsArray = new Object[bindings.size()];
         bindings.toArray(bindingsArray);
@@ -102,11 +118,6 @@ public class QueryBuildingVisitExecutor extends VisitExecutor
 
         compiledStatement = new CompiledStatement(query, bindingsArray);
         assert visitedPds.size() == 1 : String.format("Token aware only works with a single value per token, but got %s", visitedPds);
-    }
-
-    protected String wrapQuery(String query)
-    {
-        return String.format(wrapQueryFormat, query);
     }
 
     protected void operation(Operations.Operation operation)
