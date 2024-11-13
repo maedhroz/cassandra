@@ -20,7 +20,6 @@ package org.apache.cassandra.harry.gen;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import org.apache.cassandra.harry.ColumnSpec;
 import org.apache.cassandra.harry.SchemaSpec;
@@ -29,7 +28,6 @@ public class SchemaGenerators
 {
     public static Generator<SchemaSpec> schemaSpecGen(String ks, String prefix, int expectedValues, Object... options)
     {
-        Map<SchemaSpec.Options, Object> optionsMap = SchemaSpec.optionsMap(options);
         return new Generator<>()
         {
             final Generator<List<ColumnSpec<?>>> regularGen = Generators.repeat(1, 10, regularColumnSpecGen());
@@ -49,7 +47,7 @@ public class SchemaGenerators
                                       ckGen.generate(rng),
                                       regularGen.generate(rng),
                                       staticGen.generate(rng),
-                                      optionsMap
+                                      options
                 );
             };
         };

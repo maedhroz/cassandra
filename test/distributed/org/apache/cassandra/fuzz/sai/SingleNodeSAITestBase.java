@@ -115,7 +115,7 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
         Generator<Integer> globalPkGen = Generators.pick(0, NUM_PARTITIONS);
         Generator<Integer> ckGen = Generators.int32(0, MAX_PARTITION_SIZE);
 
-        withRandom(374452008822041L, rng -> {
+        withRandom(rng -> {
             SchemaSpec schema = schemaGen.generate(rng);
             CassandraRelevantProperties.SAI_INTERSECTION_CLAUSE_LIMIT.setInt(100);
             beforeEach();

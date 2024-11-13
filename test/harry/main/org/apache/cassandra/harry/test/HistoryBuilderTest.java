@@ -19,7 +19,6 @@
 package org.apache.cassandra.harry.test;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 
 import org.junit.Test;
@@ -27,26 +26,26 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.cql3.CQLTester;
-import org.apache.cassandra.harry.checker.ModelChecker;
-import org.apache.cassandra.harry.execution.CQLVisitExecutor;
-import org.apache.cassandra.harry.gen.Generator;
-import org.apache.cassandra.harry.gen.Generators;
 import org.apache.cassandra.harry.ColumnSpec;
-import org.apache.cassandra.harry.dsl.HistoryBuilderHelper;
 import org.apache.cassandra.harry.MagicConstants;
 import org.apache.cassandra.harry.SchemaSpec;
-import org.apache.cassandra.harry.op.Operations;
-import org.apache.cassandra.harry.op.Visit;
+import org.apache.cassandra.harry.checker.ModelChecker;
 import org.apache.cassandra.harry.dsl.HistoryBuilder;
+import org.apache.cassandra.harry.dsl.HistoryBuilderHelper;
 import org.apache.cassandra.harry.dsl.SingleOperationBuilder;
 import org.apache.cassandra.harry.execution.CQLTesterVisitExecutor;
+import org.apache.cassandra.harry.execution.CQLVisitExecutor;
 import org.apache.cassandra.harry.execution.DataTracker;
+import org.apache.cassandra.harry.gen.Generator;
+import org.apache.cassandra.harry.gen.Generators;
 import org.apache.cassandra.harry.gen.SchemaGenerators;
 import org.apache.cassandra.harry.model.QuiescentChecker;
+import org.apache.cassandra.harry.op.Operations;
+import org.apache.cassandra.harry.op.Visit;
 
-import static org.apache.cassandra.harry.checker.TestHelper.withRandom;
 import static org.apache.cassandra.harry.Relations.RelationKind.GTE;
 import static org.apache.cassandra.harry.Relations.RelationKind.LTE;
+import static org.apache.cassandra.harry.checker.TestHelper.withRandom;
 import static org.apache.cassandra.harry.dsl.SingleOperationBuilder.IdxRelation;
 
 public class HistoryBuilderTest extends CQLTester
@@ -71,9 +70,7 @@ public class HistoryBuilderTest extends CQLTester
                                             ColumnSpec.regularColumn("r3", ColumnSpec.asciiType)),
                               Arrays.asList(ColumnSpec.staticColumn("s1", ColumnSpec.asciiType),
                                             ColumnSpec.staticColumn("s2", ColumnSpec.int64Type),
-                                            ColumnSpec.staticColumn("s3", ColumnSpec.asciiType)),
-                              Collections.emptyMap()
-        );
+                                            ColumnSpec.staticColumn("s3", ColumnSpec.asciiType)));
     };
 
     private final Generator<SchemaSpec> simple_schema_with_desc_ck = rng -> {
@@ -90,9 +87,7 @@ public class HistoryBuilderTest extends CQLTester
                                             ColumnSpec.regularColumn("r3", ColumnSpec.asciiType)),
                               Arrays.asList(ColumnSpec.staticColumn("s1", ColumnSpec.asciiType),
                                             ColumnSpec.staticColumn("s2", ColumnSpec.int64Type),
-                                            ColumnSpec.staticColumn("s3", ColumnSpec.asciiType)),
-                              Collections.emptyMap()
-        );
+                                            ColumnSpec.staticColumn("s3", ColumnSpec.asciiType)));
     };
 
     @Test

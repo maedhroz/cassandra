@@ -27,12 +27,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import accord.utils.AsymmetricComparator;
 import accord.utils.Invariants;
+import accord.utils.SortedArrays;
 import org.agrona.collections.IntHashSet;
 import org.apache.cassandra.harry.ColumnSpec;
 import org.apache.cassandra.harry.MagicConstants;
-import org.apache.cassandra.harry.gen.rng.PCGFastPure;
 import org.apache.cassandra.harry.gen.rng.SeedableEntropySource;
+import org.apache.cassandra.utils.ArrayUtils;
 
 /**
  * Invertible generator allows you to provide _any_ data type. Harry is based on the idea that descriptors
@@ -46,7 +48,8 @@ import org.apache.cassandra.harry.gen.rng.SeedableEntropySource;
  * to the searched value. In other words, it trades memory required for storing map of values to CPU required
  * to re-compute the value order.
  *
- * TODO: custom invertible generator for bool, u8, u16, u32, etc, for efficiency.
+ * TODO (expected): custom invertible generator for bool, u8, u16, u32, etc, for efficiency.
+ * TODO (expected): implement support for tuple/vector/udt, and other multi-cell types.
  */
 public class InvertibleGenerator<T> implements Bijections.IndexedBijection<T>
 {
@@ -57,21 +60,19 @@ public class InvertibleGenerator<T> implements Bijections.IndexedBijection<T>
     // TODO (required): switch to use a primitive array; will need to implement a sort comparator for primitive types
     private final List<Long> allocatedDescriptors;
 
-    private final SeedableEntropySource rngSupplier;
     private final Generator<T> gen;
     private final Comparator<T> comparator;
 
     // To avoid <?> erased types
-    public static <T> InvertibleGenerator<T> fromType(long seed, int population, ColumnSpec<T> spec)
+    public static <T> InvertibleGenerator<T> fromType(EntropySource rng, int population, ColumnSpec<T> spec)
     {
-        return new InvertibleGenerator<>(seed, spec.type.typeEntropy(), population, spec.gen, spec.type.comparator());
+        return new InvertibleGenerator<>(rng, spec.type.typeEntropy(), population, spec.gen, spec.type.comparator());
     }
 
-    public InvertibleGenerator(long seed,
+    public InvertibleGenerator(EntropySource rng,
                                /* unsigned */ long typeEntropy,
                                int population,
                                Generator<T> gen,
-                               // TODO (expected): tuple/vector/udt/etc.
                                Comparator<T> comparator)
     {
         Invariants.checkState(population > 0,
@@ -88,42 +89,20 @@ public class InvertibleGenerator<T> implements Bijections.IndexedBijection<T>
         this.gen = gen;
         this.comparator = comparator;
         this.allocatedDescriptors = new ArrayList<>();
-        this.rngSupplier = new SeedableEntropySource();
-        IdxToDescriptor idxToDescriptor = (v) -> PCGFastPure.shuffle(PCGFastPure.advanceState(seed, v, seed));
 
         // Generate a population of _unique_ values. We do not want to store all values, only their hashes.
         IntHashSet hashes = new IntHashSet(population);
-        int idx = 0;
         while (allocatedDescriptors.size() < population)
         {
-            long candidate = idxToDescriptor.descriptor(idx++);
+            long candidate = rng.next();
 
             // Should never allocate these, however improbable that is
             if (MagicConstants.MAGIC_DESCRIPTOR_VALS.contains(candidate))
                 continue;
 
             Object inflated = inflate(candidate);
-            int hash;
-
-            if (inflated.getClass().isArray())
-            {
-                Class<?> klass = inflated.getClass();
-                if (klass == Object[].class) hash = Arrays.hashCode((Object[]) inflated);
-                else if (klass == byte[].class) hash = Arrays.hashCode((byte[]) inflated);
-                else if (klass == char[].class) hash = Arrays.hashCode((char[]) inflated);
-                else if (klass == short[].class) hash = Arrays.hashCode((short[]) inflated);
-                else if (klass == int[].class) hash = Arrays.hashCode((int[]) inflated);
-                else if (klass == long[].class) hash = Arrays.hashCode((long[]) inflated);
-                else if (klass == double[].class) hash = Arrays.hashCode((double[]) inflated);
-                else if (klass == float[].class) hash = Arrays.hashCode((float[]) inflated);
-                else if (klass == boolean[].class) hash = Arrays.hashCode((boolean[]) inflated);
-                else  throw new IllegalArgumentException("Unknown type: " + klass);
-            }
-            else
-            {
-                hash = inflated.hashCode();
-                Invariants.checkState(hash  != System.identityHashCode(inflated));
-            }
+            int hash = ArrayUtils.hashCode(inflated);
+            Invariants.checkState(hash  != System.identityHashCode(inflated), "hashCode was not overridden for type %s", inflated.getClass());
 
             if (hashes.add(hash))
                 allocatedDescriptors.add(candidate);
@@ -162,7 +141,7 @@ public class InvertibleGenerator<T> implements Bijections.IndexedBijection<T>
     {
         Invariants.checkState(!MagicConstants.MAGIC_DESCRIPTOR_VALS.contains(descriptor),
                               String.format("Should not be able to inflate %d, as it's magic value", descriptor));
-        return rngSupplier.computeWithSeed(descriptor, gen::generate);
+        return SeedableEntropySource.computeWithSeed(descriptor, gen::generate);
     }
 
     @Override
@@ -222,18 +201,12 @@ public class InvertibleGenerator<T> implements Bijections.IndexedBijection<T>
             for (int i = start; i < start + 2; i++)
                 nearby.add(inflate(allocatedDescriptors.get(i)));
             throw new IllegalStateException(String.format("Could not find: %s\nNearby objects: %s",
-                                                          toString(value), nearby.stream().map(InvertibleGenerator::toString).collect(Collectors.toList())));
+                                                          ArrayUtils.toString(value), nearby.stream().map(ArrayUtils::toString).collect(Collectors.toList())));
         }
 
         return allocatedDescriptors.get(idx);
     }
 
-    private static String toString(Object obj)
-    {
-        if (obj.getClass().isArray())
-            return Arrays.toString((Object[]) obj);
-        return obj.toString();
-    }
 
     @Override
     public int byteSize()
@@ -249,17 +222,11 @@ public class InvertibleGenerator<T> implements Bijections.IndexedBijection<T>
             mid = (low + high) >>> 1;
             result = comparator.compare(key, inflate(allocatedDescriptors.get(mid)));
             if (result > 0)
-            {
                 low = mid + 1;
-            }
             else if (result == 0)
-            {
                 return mid;
-            }
             else
-            {
                 high = mid - 1;
-            }
         }
         return -mid - (result < 0 ? 1 : 2);
     }
@@ -291,34 +258,5 @@ public class InvertibleGenerator<T> implements Bijections.IndexedBijection<T>
         for (int i = 0; i < allocatedDescriptors.size(); i++)
             descriptorToIdx.put(allocatedDescriptors.get(i), i);
         return Comparator.comparingInt(descriptorToIdx::get);
-    }
-
-    public static Comparator<Object[]> keyComparator(List<ColumnSpec<?>> columns)
-    {
-        return (o1, o2) -> compareKeys(columns, o1, o2);
-    }
-
-    public static int compareKeys(List<ColumnSpec<?>> columns, Object[] v1, Object[] v2)
-    {
-        assert v1.length == v2.length : String.format("Values should be of same length: %d != %d\n%s\n%s",
-                                                      v1.length, v2.length, Arrays.toString(v1), Arrays.toString(v2));
-
-        for (int i = 0; i < v1.length; i++)
-        {
-            int res;
-            ColumnSpec column = columns.get(i);
-            if (column.type.isReversed())
-                res = column.type.comparator().reversed().compare(v1[i], v2[i]);
-            else
-                res = column.type.comparator().compare(v1[i], v2[i]);
-            if (res != 0)
-                return res;
-        }
-        return 0;
-    }
-
-    private interface IdxToDescriptor
-    {
-        long descriptor(long idx);
     }
 }

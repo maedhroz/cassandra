@@ -19,6 +19,7 @@
 package org.apache.cassandra.harry.gen;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -27,6 +28,7 @@ import java.util.stream.Collectors;
 
 import org.apache.cassandra.harry.ColumnSpec;
 import org.apache.cassandra.harry.SchemaSpec;
+import org.apache.cassandra.harry.gen.rng.JdkRandomEntropySource;
 import org.apache.cassandra.harry.util.IteratorsUtil;
 
 import static org.apache.cassandra.harry.gen.InvertibleGenerator.fromType;
@@ -74,6 +76,7 @@ public class ValueGenerators
         List<Comparator<Object>> regularComparators = new ArrayList<>();
         List<Comparator<Object>> staticComparators = new ArrayList<>();
 
+        EntropySource rng = new JdkRandomEntropySource(seed);
         for (int i = 0; i < schema.partitionKeys.size(); i++)
             pkComparators.add((Comparator<Object>) schema.partitionKeys.get(i).type.comparator());
         for (int i = 0; i < schema.clusteringKeys.size(); i++)
@@ -87,12 +90,12 @@ public class ValueGenerators
         for (ColumnSpec<?> column : IteratorsUtil.concat(schema.regularColumns, schema.staticColumns))
         {
             map.computeIfAbsent((Generator<Object>) column.gen(),
-                                (a) -> (InvertibleGenerator<Object>) fromType(seed, populationPerColumn, column));
+                                (a) -> (InvertibleGenerator<Object>) fromType(rng, populationPerColumn, column));
         }
 
         // TODO: empty gen
-        return new ValueGenerators(new InvertibleGenerator<>(seed, cumulativeEntropy(schema.partitionKeys), populationPerColumn, forKeys(schema.partitionKeys), InvertibleGenerator.keyComparator(schema.partitionKeys)),
-                                   new InvertibleGenerator<>(seed, cumulativeEntropy(schema.clusteringKeys), populationPerColumn, forKeys(schema.clusteringKeys), InvertibleGenerator.keyComparator(schema.clusteringKeys)),
+        return new ValueGenerators(new InvertibleGenerator<>(rng, cumulativeEntropy(schema.partitionKeys), populationPerColumn, forKeys(schema.partitionKeys), keyComparator(schema.partitionKeys)),
+                                   new InvertibleGenerator<>(rng, cumulativeEntropy(schema.clusteringKeys), populationPerColumn, forKeys(schema.clusteringKeys), keyComparator(schema.clusteringKeys)),
                                    schema.regularColumns.stream().map(ColumnSpec::gen)
                                                         .map(map::get)
                                                         .collect(Collectors.toList()),
@@ -125,4 +128,27 @@ public class ValueGenerators
         return staticColumnGens.get(i).population();
     }
 
+    private static Comparator<Object[]> keyComparator(List<ColumnSpec<?>> columns)
+    {
+        return (o1, o2) -> compareKeys(columns, o1, o2);
+    }
+
+    public static int compareKeys(List<ColumnSpec<?>> columns, Object[] v1, Object[] v2)
+    {
+        assert v1.length == v2.length : String.format("Values should be of same length: %d != %d\n%s\n%s",
+                                                      v1.length, v2.length, Arrays.toString(v1), Arrays.toString(v2));
+
+        for (int i = 0; i < v1.length; i++)
+        {
+            int res;
+            ColumnSpec column = columns.get(i);
+            if (column.type.isReversed())
+                res = column.type.comparator().reversed().compare(v1[i], v2[i]);
+            else
+                res = column.type.comparator().compare(v1[i], v2[i]);
+            if (res != 0)
+                return res;
+        }
+        return 0;
+    }
 }

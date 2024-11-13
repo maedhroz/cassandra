@@ -44,7 +44,6 @@ public class RangeTombstoneBurnTest extends IntegrationTestBase
         Generator<SchemaSpec> schemaGen = SchemaGenerators.schemaSpecGen(KEYSPACE, "range_tombstone", 100);
         withRandom(rng -> {
             SchemaSpec schema = schemaGen.generate(rng);
-            beforeEach();
             cluster.get(1).nodetool("disableautocompaction");
             cluster.schemaChange(schema.compile());
 

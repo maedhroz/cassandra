@@ -21,11 +21,11 @@ package org.apache.cassandra.distributed.test;
 import java.util.function.Consumer;
 
 import org.junit.AfterClass;
-import org.junit.Before;
 import org.junit.BeforeClass;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import accord.utils.Invariants;
 import org.apache.cassandra.distributed.Cluster;
 import org.apache.cassandra.distributed.api.IInstanceConfig;
 
@@ -33,6 +33,8 @@ public class IntegrationTestBase extends TestBaseImpl
 {
     protected static final Logger logger = LoggerFactory.getLogger(IntegrationTestBase.class);
     protected static Cluster cluster;
+
+    private static boolean initialized = false;
 
     @BeforeClass
     public static void before() throws Throwable
@@ -42,31 +44,24 @@ public class IntegrationTestBase extends TestBaseImpl
 
     protected static void init(int nodes, Consumer<IInstanceConfig> cfg) throws Throwable
     {
+        Invariants.checkState(!initialized);
         cluster = Cluster.build()
                          .withNodes(nodes)
                          .withConfig(cfg)
                          .createWithoutStarting();
-        cluster.setUncaughtExceptionsFilter(t -> {
-            logger.error("Caught exception, reporting during shutdown. Ignoring.", t);
-            return true;
-        });
         cluster.startup();
         cluster = init(cluster);
+        initialized = true;
     }
 
     @AfterClass
     public static void afterClass()
     {
-        cluster.close();
+        if (cluster != null)
+            cluster.close();
     }
 
-    @Before
-    public void beforeEach()
-    {
-        cluster.schemaChange("DROP KEYSPACE IF EXISTS harry");
-        cluster.schemaChange("CREATE KEYSPACE harry WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};");
-    }
-
+    // TODO: meta-randomize this
     public static Consumer<IInstanceConfig> defaultConfig()
     {
         return (cfg) -> {

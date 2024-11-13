@@ -65,11 +65,11 @@ public class SchemaSpec
                       List<ColumnSpec<?>> clusteringKeys,
                       List<ColumnSpec<?>> regularColumns,
                       List<ColumnSpec<?>> staticColumns,
-                      Map<Options, Object> options)
+                      Object... options)
     {
         this.keyspace = keyspace;
         this.table = table;
-        this.options = options;
+        this.options = optionsMap(options);
 
         this.partitionKeys = Collections.unmodifiableList(new ArrayList<>(partitionKeys));
         this.clusteringKeys = Collections.unmodifiableList(new ArrayList<>(clusteringKeys));
@@ -320,6 +320,7 @@ public class SchemaSpec
         return Objects.hash(keyspace, table, partitionKeys, clusteringKeys, regularColumns);
     }
 
+    // TODO (required): add validation for all keys
     public static Map<Options, Object> optionsMap(Object... options)
     {
         if (options.length == 0)
@@ -359,6 +360,7 @@ public class SchemaSpec
 
         return !TransactionalMode.full.toString().equals(mode);
     }
+
     public enum Options
     {
         TRANSACTIONAL_MODE,

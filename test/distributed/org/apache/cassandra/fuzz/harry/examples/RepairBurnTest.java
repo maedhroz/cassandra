@@ -36,8 +36,6 @@ import static org.apache.cassandra.harry.checker.TestHelper.withRandom;
 
 public class RepairBurnTest extends IntegrationTestBase
 {
-    private static final String KEYSPACE = RepairBurnTest.class.getSimpleName().toLowerCase();
-
     @BeforeClass
     public static void before() throws Throwable
     {

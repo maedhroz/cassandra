@@ -26,31 +26,27 @@ import org.apache.cassandra.harry.gen.EntropySource;
 
 public class SeedableEntropySource
 {
-    private final FastThreadLocal<EntropySource> threadLocal = new FastThreadLocal<>();
+    private static final FastThreadLocal<EntropySource> THREAD_LOCAL = new FastThreadLocal<>();
 
-    public <T> T computeWithSeed(long seed, Function<EntropySource, T> fn)
+    public static <T> T computeWithSeed(long seed, Function<EntropySource, T> fn)
     {
-        EntropySource entropySource = threadLocal.get();
-        if (entropySource == null)
-        {
-            entropySource = new JdkRandomEntropySource(0);
-            threadLocal.set(entropySource);
-        }
-
-        entropySource.seed(seed);
-        return fn.apply(entropySource);
+        return fn.apply(entropySource(seed));
     }
 
-    public void doWithSeed(long seed, Consumer<EntropySource> fn)
+    public static void doWithSeed(long seed, Consumer<EntropySource> fn)
     {
-        EntropySource entropySource = threadLocal.get();
+        fn.accept(entropySource(seed));
+    }
+
+    private static EntropySource entropySource(long seed)
+    {
+        EntropySource entropySource = THREAD_LOCAL.get();
         if (entropySource == null)
         {
             entropySource = new JdkRandomEntropySource(0);
-            threadLocal.set(entropySource);
+            THREAD_LOCAL.set(entropySource);
         }
-
         entropySource.seed(seed);
-        fn.accept(entropySource);
+        return entropySource;
     }
 }

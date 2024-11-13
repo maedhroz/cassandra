@@ -32,7 +32,6 @@ import org.apache.cassandra.distributed.shared.ClusterUtils;
 import org.apache.cassandra.distributed.test.TestBaseImpl;
 import org.apache.cassandra.harry.SchemaSpec;
 import org.apache.cassandra.harry.dsl.HistoryBuilder;
-import org.apache.cassandra.harry.dsl.HistoryBuilderHelper;
 import org.apache.cassandra.harry.execution.RingAwareInJvmDTestVisitExecutor;
 import org.apache.cassandra.harry.gen.Generator;
 import org.apache.cassandra.harry.gen.Generators;
@@ -47,7 +46,6 @@ import static org.apache.cassandra.harry.checker.TestHelper.withRandom;
 
 public class AccordHostReplacementTest extends TestBaseImpl
 {
-    private static final String KEYSPACE = "accord_host_replacement_test";
     private static final Generator<TransactionalMode> transactionalModeGen = Generators.pick(Stream.of(TransactionalMode.values()).filter(t -> t.accordIsEnabled).collect(Collectors.toList()));
 
     @Test
@@ -56,7 +54,9 @@ public class AccordHostReplacementTest extends TestBaseImpl
         // start 3 node cluster, then do a host replacement of one of the nodes
         Cluster.Builder clusterBuilder = Cluster.build(3)
                                                 .withConfig(c -> c.with(Feature.values())
-                                                                  .set("accord.shard_count", "1"));
+                                                                  .set("accord.command_store_shard_count", "1")
+                                                                  .set("accord.queue_shard_count", "1")
+                                                );
         TokenSupplier tokenRing = TokenSupplier.evenlyDistributedTokens(3, clusterBuilder.getTokenCount());
         int nodeToReplace = 2;
         clusterBuilder = clusterBuilder.withTokenSupplier((TokenSupplier) node -> tokenRing.tokens(node == 4 ? nodeToReplace : node));
@@ -71,7 +71,6 @@ public class AccordHostReplacementTest extends TestBaseImpl
                                                                                  transactionalModeGen.generate(rng).toString());
                 SchemaSpec schema = schemaGen.generate(rng);
                 Generators.TrackingGenerator<Integer> pkGen = Generators.tracking(Generators.int32(0, Math.min(schema.valueGenerators.pkPopulation(), 1000)));
-                Generator<Integer> ckGen = Generators.int32(0, Math.min(schema.valueGenerators.ckPopulation(), 1000));
 
                 HistoryBuilder history = new HistoryBuilder(schema.valueGenerators);
                 history.customThrowing(() -> {
@@ -81,7 +80,7 @@ public class AccordHostReplacementTest extends TestBaseImpl
                 waitForCMSToQuiesce(cluster, cluster.get(1));
 
                 for (int i = 0; i < 1000; i++)
-                    HistoryBuilderHelper.insertRandomData(schema, pkGen, ckGen, rng, history);
+                    history.insert(pkGen.generate(rng));
                 for (int pk : pkGen.generated())
                     history.selectPartition(pk);
 

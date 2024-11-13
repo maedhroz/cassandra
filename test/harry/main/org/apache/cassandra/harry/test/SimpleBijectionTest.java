@@ -28,6 +28,7 @@ import accord.utils.Invariants;
 import org.apache.cassandra.harry.ColumnSpec;
 import org.apache.cassandra.harry.gen.InvertibleGenerator;
 import org.apache.cassandra.harry.SchemaSpec;
+import org.apache.cassandra.harry.gen.ValueGenerators;
 
 import static org.apache.cassandra.harry.checker.TestHelper.withRandom;
 import static org.apache.cassandra.harry.gen.InvertibleGenerator.MAX_ENTROPY;
@@ -43,9 +44,7 @@ public class SimpleBijectionTest
                 for (ColumnSpec.DataType type : new ColumnSpec.DataType[]{ t, ColumnSpec.ReversedType.cache.get(t) })
                 {
                     ColumnSpec<Object> column = (ColumnSpec<Object>) ColumnSpec.regularColumn("regular", type);
-                    InvertibleGenerator<Object> generator = InvertibleGenerator.fromType(rng.next(),
-                                                                                         100,
-                                                                                         column);
+                    InvertibleGenerator<Object> generator = InvertibleGenerator.fromType(rng,100, column);
 
 
                     Object previous = null;
@@ -73,18 +72,18 @@ public class SimpleBijectionTest
                 List<ColumnSpec<?>> columns = new ArrayList<>();
                 for (int i = 0; i < order.length; i++)
                     columns.add(ColumnSpec.ck("test", ColumnSpec.asciiType, order[i]));
-                InvertibleGenerator<Object[]> generator = new InvertibleGenerator<>(rng.next(),
+                InvertibleGenerator<Object[]> generator = new InvertibleGenerator<>(rng,
                                                                                     MAX_ENTROPY,
                                                                                     100,
                                                                                     SchemaSpec.forKeys(columns),
-                                                                                    (Object[] a, Object[] b) -> InvertibleGenerator.compareKeys(columns, a, b));
+                                                                                    (Object[] a, Object[] b) -> ValueGenerators.compareKeys(columns, a, b));
                 Object[] previous = null;
                 for (int i = 0; i < 100; i++)
                 {
                     long descr = generator.descriptorAt(i);
                     Object[] next = generator.inflate(descr);
                     if (previous != null)
-                        Assert.assertTrue(InvertibleGenerator.compareKeys(columns, next, previous) > 0);
+                        Assert.assertTrue(ValueGenerators.compareKeys(columns, next, previous) > 0);
                     Assert.assertEquals(descr, generator.deflate(next));
                     previous = next;
                 }
