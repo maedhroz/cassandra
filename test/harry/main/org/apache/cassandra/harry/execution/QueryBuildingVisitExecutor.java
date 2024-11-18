@@ -56,10 +56,11 @@ public class QueryBuildingVisitExecutor extends VisitExecutor
         }
         else
         {
+            wrapSingleQueryFormat = "%s";
             wrapQueryFormat = "BEGIN TRANSACTION\n" +
                               "  %s\n" +
                               "COMMIT TRANSACTION;";
-            wrapSingleQueryFormat = wrapQueryFormat;
+
         }
     }
 

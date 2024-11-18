@@ -41,6 +41,7 @@ import org.apache.cassandra.harry.SchemaSpec;
 import org.apache.cassandra.harry.dsl.HistoryBuilder;
 import org.apache.cassandra.harry.dsl.HistoryBuilderHelper;
 import org.apache.cassandra.harry.execution.InJvmDTestVisitExecutor;
+import org.apache.cassandra.harry.gen.EntropySource;
 import org.apache.cassandra.harry.gen.Generator;
 import org.apache.cassandra.harry.gen.Generators;
 import org.apache.cassandra.harry.gen.SchemaGenerators;
@@ -112,11 +113,12 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
 
         Set<Integer> usedPartitions = new HashSet<>();
 
-        Generator<Integer> globalPkGen = Generators.pick(0, NUM_PARTITIONS);
-        Generator<Integer> ckGen = Generators.int32(0, MAX_PARTITION_SIZE);
-
         withRandom(rng -> {
             SchemaSpec schema = schemaGen.generate(rng);
+
+            Generator<Integer> globalPkGen = Generators.int32(0, Math.min(NUM_PARTITIONS, schema.valueGenerators.pkPopulation()));
+            Generator<Integer> ckGen = Generators.int32(0, schema.valueGenerators.ckPopulation());
+
             CassandraRelevantProperties.SAI_INTERSECTION_CLAUSE_LIMIT.setInt(100);
             beforeEach();
             cluster.get(1).nodetool("disableautocompaction");
@@ -193,7 +195,7 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
             }
 
             InJvmDTestVisitExecutor.replay(InJvmDTestVisitExecutor.builder()
-                                                                  .pageSizeSelector(pageSizeSelector())
+                                                                  .pageSizeSelector(pageSizeSelector(rng))
                                                                   .build(schema, history, cluster),
                                            history);
         });
@@ -237,11 +239,11 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
         };
     }
 
-    protected InJvmDTestVisitExecutor.PageSizeSelector pageSizeSelector()
+    protected InJvmDTestVisitExecutor.PageSizeSelector pageSizeSelector(EntropySource rng)
     {
         // Chosing a fetch size has implications for how well this test will excercise paging, short-read protection, and
         // other important parts of the distributed query apparatus. This should be set low enough to ensure a significant
         // number of queries during validation page, but not too low that more expesive queries time out and fail the test.
-        return lts -> 10;
+        return lts -> rng.nextInt(1, 10);
     }
 }
