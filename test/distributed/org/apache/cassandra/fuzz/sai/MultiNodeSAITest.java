@@ -60,7 +60,7 @@ public class MultiNodeSAITest extends SingleNodeSAITest
     @Override
     protected void flush(SchemaSpec schema)
     {
-        cluster.forEach(i -> i.nodetool("flush", schema.keyspace);
+        cluster.forEach(i -> i.nodetool("flush", schema.keyspace));
     }
 
     @Override
@@ -72,7 +72,7 @@ public class MultiNodeSAITest extends SingleNodeSAITest
     @Override
     protected void compact(SchemaSpec schema)
     {
-        cluster.forEach(i -> i.nodetool("compact", schema.keyspace);
+        cluster.forEach(i -> i.nodetool("compact", schema.keyspace));
     }
 
     @Override
