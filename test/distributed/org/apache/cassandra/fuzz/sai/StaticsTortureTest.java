@@ -82,6 +82,7 @@ public class StaticsTortureTest extends IntegrationTestBase
 
 
         cluster.schemaChange(schema.compile());
+        cluster.get(1).nodetool("disableautocompaction");
         cluster.schemaChange(String.format("CREATE INDEX %s_%s_sai_idx ON %s.%s (%s) USING 'sai' " +
                                        "WITH OPTIONS = {'case_sensitive': 'false', 'normalize': 'true', 'ascii': 'true'};",
                                        schema.table,
@@ -170,6 +171,9 @@ public class StaticsTortureTest extends IntegrationTestBase
 
             if (i % 50 == 0)
                 cluster.get(1).nodetool("flush", schema.keyspace, schema.table);
+
+            if (i % 100 == 0)
+                cluster.get(1).nodetool("compact", schema.keyspace, schema.table);
         }
 
         Generator<Integer> ckIdxGen = Generators.int32(0, MAX_PARTITION_SIZE);

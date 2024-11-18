@@ -55,6 +55,7 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
     private static final int OPERATIONS_PER_RUN = 30_000;
     private static final int REPAIR_SKIP = OPERATIONS_PER_RUN / 2;
     private static final int FLUSH_SKIP = OPERATIONS_PER_RUN / 7;
+    private static final int COMPACTION_SKIP = OPERATIONS_PER_RUN / 10;
 
     private static final int NUM_PARTITIONS = OPERATIONS_PER_RUN / 1000;
     protected static final int MAX_PARTITION_SIZE = 10_000;
@@ -121,7 +122,8 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
 
             CassandraRelevantProperties.SAI_INTERSECTION_CLAUSE_LIMIT.setInt(100);
             beforeEach();
-            cluster.get(1).nodetool("disableautocompaction");
+            cluster.forEach(i -> i.nodetool("disableautocompaction"));
+
             cluster.schemaChange(schema.compile());
             Streams.concat(schema.clusteringKeys.stream(),
                            schema.regularColumns.stream(),
@@ -176,6 +178,8 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
                 if (i % REPAIR_SKIP == 0)
                     history.custom(() -> repair(schema), "Repair");
                 else if (i % FLUSH_SKIP == 0)
+                    history.custom(() -> flush(schema), "Flush");
+                else if (i % COMPACTION_SKIP == 0)
                     history.custom(() -> flush(schema), "Flush");
 
                 if (i > 0 && i % 1000 == 0)

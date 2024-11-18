@@ -91,7 +91,6 @@ public class InJvmDTestVisitExecutor extends CQLVisitExecutor
 
     protected List<ResultSetRow> executeWithResult(Visit visit, int node, CompiledStatement statement)
     {
-        logger.info("{}", statement);
         Invariants.checkState(visit.operations.length == 1);
         Object[][] rows;
         if (consistencyLevel == ConsistencyLevel.NODE_LOCAL)
