@@ -31,17 +31,24 @@ public class Visit
     public final Operation[] operations;
     public final Set<Long> visitedPartitions;
 
+    public final boolean selectOnly;
     public Visit(long lts, Operation[] operations)
     {
         Assert.assertTrue(operations.length > 0);
         this.lts = lts;
         this.operations = operations;
         this.visitedPartitions = new HashSet<>();
+        boolean selectOnly = true;
         for (Operation operation : operations)
         {
+            if (selectOnly && !(operation instanceof Operations.SelectStatement))
+                selectOnly = false;
+
             if (operation instanceof Operations.PartitionOperation)
                 visitedPartitions.add(((Operations.PartitionOperation) operation).pd());
+
         }
+        this.selectOnly = selectOnly;
     }
 
     public String toString()

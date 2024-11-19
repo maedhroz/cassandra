@@ -35,11 +35,13 @@ import org.slf4j.LoggerFactory;
 
 import org.apache.cassandra.config.CassandraRelevantProperties;
 import org.apache.cassandra.distributed.Cluster;
+import org.apache.cassandra.distributed.api.ConsistencyLevel;
 import org.apache.cassandra.distributed.api.IInstanceConfig;
 import org.apache.cassandra.distributed.test.TestBaseImpl;
 import org.apache.cassandra.harry.SchemaSpec;
 import org.apache.cassandra.harry.dsl.HistoryBuilder;
 import org.apache.cassandra.harry.dsl.HistoryBuilderHelper;
+import org.apache.cassandra.harry.dsl.ReplayingHistoryBuilder;
 import org.apache.cassandra.harry.execution.InJvmDTestVisitExecutor;
 import org.apache.cassandra.harry.gen.EntropySource;
 import org.apache.cassandra.harry.gen.Generator;
@@ -109,7 +111,7 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
         Generator<SchemaSpec> schemaGen = schemaGenerator();
         Set<Integer> usedPartitions = new HashSet<>();
 
-        withRandom(231265760400000L, rng -> {
+        withRandom(rng -> {
             SchemaSpec schema = schemaGen.generate(rng);
             logger.info(schema.compile());
 
@@ -134,7 +136,11 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
 
             waitForIndexesQueryable(schema);
 
-            HistoryBuilder history = new HistoryBuilder(schema.valueGenerators);
+            HistoryBuilder history = new ReplayingHistoryBuilder(schema.valueGenerators,
+                                                                 (hb) -> InJvmDTestVisitExecutor.builder()
+                                                                                                .pageSizeSelector(pageSizeSelector(rng))
+                                                                                                .consistencyLevel(consistencyLevelSelector())
+                                                                                                .build(schema, hb, cluster));
             List<Integer> partitions = new ArrayList<>();
             for (int j = 0; j < 5; j++)
             {
@@ -194,17 +200,12 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
                     }
                 }
             }
-
-            InJvmDTestVisitExecutor.replay(InJvmDTestVisitExecutor.builder()
-                                                                  .pageSizeSelector(pageSizeSelector(rng))
-                                                                  .build(schema, history, cluster),
-                                           history);
         });
     }
 
     protected Generator<SchemaSpec> schemaGenerator()
     {
-        return SchemaGenerators.schemaSpecGen(KEYSPACE, "basic_sai", MAX_PARTITION_SIZE, SchemaSpec.Options.TRANSACTIONAL_MODE, "full");
+        return SchemaGenerators.schemaSpecGen(KEYSPACE, "basic_sai", MAX_PARTITION_SIZE);
     }
 
     protected void flush(SchemaSpec schema)
@@ -242,6 +243,16 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
                .set("concurrent_writes", 5)
                .set("compaction_throughput_mb_per_sec", 10)
                .set("hinted_handoff_enabled", false);
+        };
+    }
+
+    protected InJvmDTestVisitExecutor.ConsistencyLevelSelector consistencyLevelSelector()
+    {
+        return visit -> {
+            if (visit.selectOnly)
+                return ConsistencyLevel.ALL;
+            else
+                return ConsistencyLevel.NODE_LOCAL;
         };
     }
 

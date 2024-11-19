@@ -18,6 +18,7 @@
 
 package org.apache.cassandra.fuzz.sai;
 
+import org.apache.cassandra.distributed.api.ConsistencyLevel;
 import org.apache.cassandra.harry.SchemaSpec;
 import org.apache.cassandra.harry.execution.InJvmDTestVisitExecutor;
 import org.apache.cassandra.harry.gen.EntropySource;
@@ -35,6 +36,11 @@ public class AccordMultiNodeSAITest extends MultiNodeSAITestBase
     protected Generator<SchemaSpec> schemaGenerator()
     {
         return SchemaGenerators.schemaSpecGen(KEYSPACE, "basic_sai", MAX_PARTITION_SIZE, SchemaSpec.Options.TRANSACTIONAL_MODE, "full");
+    }
+
+    protected InJvmDTestVisitExecutor.ConsistencyLevelSelector consistencyLevelSelector()
+    {
+        return visit -> ConsistencyLevel.SERIAL;
     }
 
     @Override

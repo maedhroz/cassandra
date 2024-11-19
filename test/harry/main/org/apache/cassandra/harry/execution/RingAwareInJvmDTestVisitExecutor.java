@@ -57,7 +57,7 @@ public class RingAwareInJvmDTestVisitExecutor extends InJvmDTestVisitExecutor
                                              NodeSelector nodeSelector,
                                              PageSizeSelector pageSizeSelector,
                                              RetryPolicy retryPolicy,
-                                             ConsistencyLevel consistencyLevel,
+                                             ConsistencyLevelSelector consistencyLevel,
                                              TokenPlacementModel.ReplicationFactor rf)
     {
         super(schema, dataTracker, model, cluster, nodeSelector, pageSizeSelector, retryPolicy, consistencyLevel);

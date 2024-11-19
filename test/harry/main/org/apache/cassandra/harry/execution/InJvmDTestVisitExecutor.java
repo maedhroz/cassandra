@@ -47,7 +47,7 @@ public class InJvmDTestVisitExecutor extends CQLVisitExecutor
     private static final Logger logger = LoggerFactory.getLogger(InJvmDTestVisitExecutor.class);
 
     protected final ICluster<?> cluster;
-    protected final ConsistencyLevel consistencyLevel;
+    protected final ConsistencyLevelSelector consistencyLevel;
 
     protected final NodeSelector nodeSelector;
     protected final PageSizeSelector pageSizeSelector;
@@ -60,7 +60,7 @@ public class InJvmDTestVisitExecutor extends CQLVisitExecutor
                                       NodeSelector nodeSelector,
                                       PageSizeSelector pageSizeSelector,
                                       RetryPolicy retryPolicy,
-                                      ConsistencyLevel consistencyLevel)
+                                      ConsistencyLevelSelector consistencyLevel)
     {
         super(schema, dataTracker, model);
         this.cluster = cluster;
@@ -93,11 +93,12 @@ public class InJvmDTestVisitExecutor extends CQLVisitExecutor
     {
         Invariants.checkState(visit.operations.length == 1);
         Object[][] rows;
+        ConsistencyLevel consistencyLevel = this.consistencyLevel.consistencyLevel(visit);
         if (consistencyLevel == ConsistencyLevel.NODE_LOCAL)
             rows = cluster.get(node).executeInternal(statement.cql(), statement.bindings());
         else
         {
-            int pages = pageSizeSelector.pages(visit.lts);
+            int pages = pageSizeSelector.pages(visit);
             if (pages == PageSizeSelector.NO_PAGING)
                 rows = cluster.coordinator(node).execute(statement.cql(), consistencyLevel, statement.bindings());
             else
@@ -141,6 +142,7 @@ public class InJvmDTestVisitExecutor extends CQLVisitExecutor
 
     protected void executeWithoutResult(Visit visit, int node, CompiledStatement statement)
     {
+        ConsistencyLevel consistencyLevel = this.consistencyLevel.consistencyLevel(visit);
         if (consistencyLevel == ConsistencyLevel.NODE_LOCAL)
             cluster.get(node).executeInternal(statement.cql(), statement.bindings());
         else
@@ -254,7 +256,12 @@ public class InJvmDTestVisitExecutor extends CQLVisitExecutor
     public interface PageSizeSelector
     {
         int NO_PAGING = -1;
-        int pages(long lts);
+        int pages(Visit visit);
+    }
+
+    public interface ConsistencyLevelSelector
+    {
+        ConsistencyLevel consistencyLevel(Visit visit);
     }
 
     public interface RetryPolicy
@@ -269,13 +276,19 @@ public class InJvmDTestVisitExecutor extends CQLVisitExecutor
 
     public static class Builder
     {
-        protected ConsistencyLevel consistencyLevel = ConsistencyLevel.QUORUM;
+        protected ConsistencyLevelSelector consistencyLevel = v -> ConsistencyLevel.QUORUM;
 
         protected NodeSelector nodeSelector = null;
         protected PageSizeSelector pageSizeSelector = (lts) -> 10;
         protected RetryPolicy retryPolicy = (retry) -> false;
 
         public Builder consistencyLevel(ConsistencyLevel consistencyLevel)
+        {
+            this.consistencyLevel = v -> consistencyLevel;
+            return this;
+        }
+
+        public Builder consistencyLevel(ConsistencyLevelSelector consistencyLevel)
         {
             this.consistencyLevel = consistencyLevel;
             return this;

@@ -54,25 +54,40 @@ public abstract class CQLVisitExecutor
     public static void replay(CQLVisitExecutor executor, Model.Replay replay)
     {
         for (Visit visit : replay)
+            executeVisit(visit, executor, replay);
+    }
+
+    public static void executeVisit(Visit visit, CQLVisitExecutor executor, Model.Replay replay)
+    {
+        try
         {
-            while (true)
-            {
-                try
-                {
-                    executor.execute(visit);
-                    break;
-                }
-                catch (Throwable t)
-                {
-                    logger.info("Caught an exception at {} while replaying {}. Operations up to this visit:", visit.lts, visit);
-                    for (Visit rereplay : replay)
-                    {
-                        logger.info("{}", visit);
-                        if (rereplay.lts > visit.lts)
-                            throw t;
-                    }
-                }
-            }
+            executor.execute(visit);
+        }
+        catch (Throwable t)
+        {
+            // Existing issues
+            if (t.getMessage() != null && t.getMessage().contains("class org.apache.cassandra.db.ReadQuery$1 cannot be cast to class org.apache.cassandra.db.SinglePartitionReadQuery$Group"))
+                return;
+
+            replayAfterFailure(visit, executor, replay);
+
+            throw t;
+        }
+    }
+    public static void replayAfterFailure(Visit visit, CQLVisitExecutor executor, Model.Replay replay)
+    {
+        QueryBuildingVisitExecutor queryBuilder = executor.queryBuilder;
+        logger.error("Caught an exception at {} while replaying {}\n{}\n{}\nOperations up to this visit:", queryBuilder.compile(visit), queryBuilder.schema.compile(), visit.lts, visit);
+        long minLts = Math.max(0, visit.lts - 20); // last 20 ops
+        for (Visit rereplay : replay)
+        {
+            if (rereplay.lts < minLts)
+                continue;
+
+            logger.info("{}: {}", rereplay, queryBuilder.compile(rereplay));
+
+            if (rereplay.lts > visit.lts)
+                return;
         }
     }
 
@@ -109,7 +124,7 @@ public abstract class CQLVisitExecutor
     // Lives in a separate method so that it is easier to override it
     protected void executeValidatingVisit(Visit visit, List<Operations.SelectStatement> selects, CompiledStatement compiledStatement)
     {
-        // TODO: Have never tested with multiple
+        // TODO: Have not tested with multiple
         List<ResultSetRow> resultSetRow = executeWithResult(visit, compiledStatement);
         try
         {
