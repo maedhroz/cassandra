@@ -116,8 +116,7 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
                                         "harry", "simplified",
                                         Arrays.asList(ColumnSpec.pk("pk1", ColumnSpec.int64Type, Generators.int64())),
                                         Arrays.asList(ColumnSpec.ck("ck1", ColumnSpec.int64Type, Generators.int64(), false)),
-                                        Arrays.asList(ColumnSpec.regularColumn("v1", ColumnSpec.int64Type),
-                                                      ColumnSpec.regularColumn("v2", ColumnSpec.int64Type)),
+                                        Arrays.asList(ColumnSpec.regularColumn("v1", ColumnSpec.int64Type)),
                                         List.of(ColumnSpec.staticColumn("s1", ColumnSpec.int64Type))));
         });
     }
