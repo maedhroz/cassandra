@@ -44,6 +44,7 @@ import org.apache.cassandra.exceptions.RequestTimeoutException;
 import org.apache.cassandra.harry.dsl.HistoryBuilder;
 import org.apache.cassandra.harry.dsl.ReplayingHistoryBuilder;
 import org.apache.cassandra.harry.execution.InJvmDTestVisitExecutor;
+import org.apache.cassandra.harry.execution.QueryBuildingVisitExecutor;
 import org.apache.cassandra.harry.gen.EntropySource;
 import org.apache.cassandra.harry.gen.Generator;
 import org.apache.cassandra.harry.gen.Generators;
@@ -63,10 +64,10 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
 
     public static class AccordMode
     {
-        public AccordMode(Kind kind, @Nullable TransactionalMode passthroughMode)
+        public AccordMode(Kind kind, @Nullable TransactionalMode transactionalMode)
         {
             this.kind = kind;
-            this.passthroughMode = passthroughMode;
+            this.transactionalMode = transactionalMode;
         }
 
         public enum Kind
@@ -74,7 +75,7 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
 
         public final Kind kind;
         @Nullable
-        public final TransactionalMode passthroughMode;
+        public final TransactionalMode transactionalMode;
     }
 
     private final AccordMode mode;
@@ -121,7 +122,7 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
             org.apache.cassandra.harry.SchemaSpec schema;
             if (mode.kind != AccordMode.Kind.None)
                 schemaGen = SchemaGenerators.schemaSpecGen("harry", "table", 1000,
-                                                           org.apache.cassandra.harry.SchemaSpec.Options.TRANSACTIONAL_MODE, mode.passthroughMode.toString());
+                                                           org.apache.cassandra.harry.SchemaSpec.Options.TRANSACTIONAL_MODE, mode.transactionalMode.toString());
             else
                 schemaGen = SchemaGenerators.schemaSpecGen("harry", "table", 1000);
 
@@ -129,6 +130,7 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
 
             HistoryBuilder harry = new ReplayingHistoryBuilder(schema.valueGenerators,
                                                                hb -> InJvmDTestVisitExecutor.builder()
+                                                                                            .wrapQueries(QueryBuildingVisitExecutor.WrapQueries.TRANSACTION)
                                                                                             .nodeSelector(new InJvmDTestVisitExecutor.NodeSelector()
                                                                                             {
                                                                                                 private final AtomicLong cnt = new AtomicLong();
