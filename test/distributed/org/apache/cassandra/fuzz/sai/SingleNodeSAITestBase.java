@@ -20,6 +20,7 @@ package org.apache.cassandra.fuzz.sai;
 
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -38,6 +39,7 @@ import org.apache.cassandra.distributed.Cluster;
 import org.apache.cassandra.distributed.api.ConsistencyLevel;
 import org.apache.cassandra.distributed.api.IInstanceConfig;
 import org.apache.cassandra.distributed.test.TestBaseImpl;
+import org.apache.cassandra.harry.ColumnSpec;
 import org.apache.cassandra.harry.SchemaSpec;
 import org.apache.cassandra.harry.dsl.HistoryBuilder;
 import org.apache.cassandra.harry.dsl.HistoryBuilderHelper;
@@ -106,101 +108,119 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
     }
 
     @Test
+    public void simplifiedSaiTest()
+    {
+        withRandom(rng -> {
+            basicSaiTest(rng,
+                         new SchemaSpec(rng.next(), 1000,
+                                        "harry", "simplified",
+                                        Arrays.asList(ColumnSpec.pk("pk1", ColumnSpec.int64Type, Generators.int64())),
+                                        Arrays.asList(ColumnSpec.ck("ck1", ColumnSpec.int64Type, Generators.int64(), false)),
+                                        Arrays.asList(ColumnSpec.regularColumn("v1", ColumnSpec.int64Type),
+                                                      ColumnSpec.regularColumn("v2", ColumnSpec.int64Type)),
+                                        List.of(ColumnSpec.staticColumn("s1", ColumnSpec.int64Type))));
+        });
+    }
+
+    @Test
     public void basicSaiTest()
     {
         Generator<SchemaSpec> schemaGen = schemaGenerator();
-        Set<Integer> usedPartitions = new HashSet<>();
-
         withRandom(rng -> {
-            SchemaSpec schema = schemaGen.generate(rng);
-            logger.info(schema.compile());
-
-            Generator<Integer> globalPkGen = Generators.int32(0, Math.min(NUM_PARTITIONS, schema.valueGenerators.pkPopulation()));
-            Generator<Integer> ckGen = Generators.int32(0, schema.valueGenerators.ckPopulation());
-
-            CassandraRelevantProperties.SAI_INTERSECTION_CLAUSE_LIMIT.setInt(100);
-            beforeEach();
-            cluster.forEach(i -> i.nodetool("disableautocompaction"));
-
-            cluster.schemaChange(schema.compile());
-            Streams.concat(schema.clusteringKeys.stream(),
-                           schema.regularColumns.stream(),
-                           schema.staticColumns.stream())
-                   .forEach(column -> {
-                       cluster.schemaChange(String.format("CREATE INDEX %s_sai_idx ON %s.%s (%s) USING 'sai' ",
-                                                          column.name,
-                                                          schema.keyspace,
-                                                          schema.table,
-                                                          column.name));
-                   });
-
-            waitForIndexesQueryable(schema);
-
-            HistoryBuilder history = new ReplayingHistoryBuilder(schema.valueGenerators,
-                                                                 (hb) -> InJvmDTestVisitExecutor.builder()
-                                                                                                .pageSizeSelector(pageSizeSelector(rng))
-                                                                                                .consistencyLevel(consistencyLevelSelector())
-                                                                                                .build(schema, hb, cluster));
-            List<Integer> partitions = new ArrayList<>();
-            for (int j = 0; j < 5; j++)
-            {
-                int picked = globalPkGen.generate(rng);
-                if (usedPartitions.contains(picked))
-                    continue;
-                partitions.add(picked);
-            }
-
-            usedPartitions.addAll(partitions);
-            if (partitions.isEmpty())
-                return;
-
-            Generator<Integer> pkGen = Generators.pick(partitions);
-            for (int i = 0; i < OPERATIONS_PER_RUN; i++)
-            {
-                int partitionIndex = pkGen.generate(rng);
-                HistoryBuilderHelper.insertRandomData(schema, partitionIndex, ckGen.generate(rng), rng,0.5d, history);
-
-                if (rng.nextFloat() > 0.99f)
-                {
-                    int row1 = ckGen.generate(rng);
-                    int row2 = ckGen.generate(rng);
-                    history.deleteRowRange(partitionIndex,
-                                           Math.min(row1, row2),
-                                           Math.max(row1, row2),
-                                           rng.nextInt(schema.clusteringKeys.size()),
-                                           rng.nextBoolean(),
-                                           rng.nextBoolean());
-                }
-
-                if (rng.nextFloat() > 0.995f)
-                    HistoryBuilderHelper.deleteRandomColumns(schema, partitionIndex, ckGen.generate(rng), rng, history);
-
-                if (rng.nextFloat() > 0.9995f)
-                    history.deletePartition(partitionIndex);
-
-                if (i % REPAIR_SKIP == 0)
-                    history.custom(() -> repair(schema), "Repair");
-                else if (i % FLUSH_SKIP == 0)
-                    history.custom(() -> flush(schema), "Flush");
-                else if (i % COMPACTION_SKIP == 0)
-                    history.custom(() -> compact(schema), "Compact");
-
-                if (i > 0 && i % 1000 == 0)
-                {
-                    for (int j = 0; j < 5; j++)
-                    {
-                        List<IdxRelation> regularRelations = HistoryBuilderHelper.generateValueRelations(rng, schema.regularColumns.size(),
-                                                                                                         column -> Math.min(schema.valueGenerators.regularPopulation(column), UNIQUE_CELL_VALUES));
-                        List<IdxRelation> staticRelations = HistoryBuilderHelper.generateValueRelations(rng, schema.staticColumns.size(),
-                                                                                                        column -> Math.min(schema.valueGenerators.staticPopulation(column), UNIQUE_CELL_VALUES));
-                        history.select(pkGen.generate(rng),
-                                       HistoryBuilderHelper.generateClusteringRelations(rng, schema.clusteringKeys.size(), ckGen).toArray(new IdxRelation[0]),
-                                       regularRelations.toArray(new IdxRelation[regularRelations.size()]),
-                                       staticRelations.toArray(new IdxRelation[staticRelations.size()]));
-                    }
-                }
-            }
+            basicSaiTest(rng, schemaGen.generate(rng));
         });
+    }
+
+    private void basicSaiTest(EntropySource rng, SchemaSpec schema)
+    {
+        Set<Integer> usedPartitions = new HashSet<>();
+        logger.info(schema.compile());
+
+        Generator<Integer> globalPkGen = Generators.int32(0, Math.min(NUM_PARTITIONS, schema.valueGenerators.pkPopulation()));
+        Generator<Integer> ckGen = Generators.int32(0, schema.valueGenerators.ckPopulation());
+
+        CassandraRelevantProperties.SAI_INTERSECTION_CLAUSE_LIMIT.setInt(100);
+        beforeEach();
+        cluster.forEach(i -> i.nodetool("disableautocompaction"));
+
+        cluster.schemaChange(schema.compile());
+        Streams.concat(schema.clusteringKeys.stream(),
+                       schema.regularColumns.stream(),
+                       schema.staticColumns.stream())
+               .forEach(column -> {
+                   cluster.schemaChange(String.format("CREATE INDEX %s_sai_idx ON %s.%s (%s) USING 'sai' ",
+                                                      column.name,
+                                                      schema.keyspace,
+                                                      schema.table,
+                                                      column.name));
+               });
+
+        waitForIndexesQueryable(schema);
+
+        HistoryBuilder history = new ReplayingHistoryBuilder(schema.valueGenerators,
+                                                             (hb) -> InJvmDTestVisitExecutor.builder()
+                                                                                            .pageSizeSelector(pageSizeSelector(rng))
+                                                                                            .consistencyLevel(consistencyLevelSelector())
+                                                                                            .build(schema, hb, cluster));
+        List<Integer> partitions = new ArrayList<>();
+        for (int j = 0; j < 5; j++)
+        {
+            int picked = globalPkGen.generate(rng);
+            if (usedPartitions.contains(picked))
+                continue;
+            partitions.add(picked);
+        }
+
+        usedPartitions.addAll(partitions);
+        if (partitions.isEmpty())
+            return;
+
+        Generator<Integer> pkGen = Generators.pick(partitions);
+        for (int i = 0; i < OPERATIONS_PER_RUN; i++)
+        {
+            int partitionIndex = pkGen.generate(rng);
+            HistoryBuilderHelper.insertRandomData(schema, partitionIndex, ckGen.generate(rng), rng, 0.5d, history);
+
+            if (rng.nextFloat() > 0.99f)
+            {
+                int row1 = ckGen.generate(rng);
+                int row2 = ckGen.generate(rng);
+                history.deleteRowRange(partitionIndex,
+                                       Math.min(row1, row2),
+                                       Math.max(row1, row2),
+                                       rng.nextInt(schema.clusteringKeys.size()),
+                                       rng.nextBoolean(),
+                                       rng.nextBoolean());
+            }
+
+            if (rng.nextFloat() > 0.995f)
+                HistoryBuilderHelper.deleteRandomColumns(schema, partitionIndex, ckGen.generate(rng), rng, history);
+
+            if (rng.nextFloat() > 0.9995f)
+                history.deletePartition(partitionIndex);
+
+            if (i % REPAIR_SKIP == 0)
+                history.custom(() -> repair(schema), "Repair");
+            else if (i % FLUSH_SKIP == 0)
+                history.custom(() -> flush(schema), "Flush");
+            else if (i % COMPACTION_SKIP == 0)
+                history.custom(() -> compact(schema), "Compact");
+
+            if (i > 0 && i % 1000 == 0)
+            {
+                for (int j = 0; j < 5; j++)
+                {
+                    List<IdxRelation> regularRelations = HistoryBuilderHelper.generateValueRelations(rng, schema.regularColumns.size(),
+                                                                                                     column -> Math.min(schema.valueGenerators.regularPopulation(column), UNIQUE_CELL_VALUES));
+                    List<IdxRelation> staticRelations = HistoryBuilderHelper.generateValueRelations(rng, schema.staticColumns.size(),
+                                                                                                    column -> Math.min(schema.valueGenerators.staticPopulation(column), UNIQUE_CELL_VALUES));
+                    history.select(pkGen.generate(rng),
+                                   HistoryBuilderHelper.generateClusteringRelations(rng, schema.clusteringKeys.size(), ckGen).toArray(new IdxRelation[0]),
+                                   regularRelations.toArray(new IdxRelation[regularRelations.size()]),
+                                   staticRelations.toArray(new IdxRelation[staticRelations.size()]));
+                }
+            }
+        }
     }
 
     protected Generator<SchemaSpec> schemaGenerator()
