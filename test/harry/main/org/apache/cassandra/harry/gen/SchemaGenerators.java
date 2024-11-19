@@ -26,7 +26,12 @@ import org.apache.cassandra.harry.SchemaSpec;
 
 public class SchemaGenerators
 {
-    public static Generator<SchemaSpec> schemaSpecGen(String ks, String prefix, int expectedValues, Object... options)
+    public static Generator<SchemaSpec> schemaSpecGen(String ks, String prefix, int expectedValues)
+    {
+        return schemaSpecGen(ks, prefix, expectedValues, SchemaSpec.optionsBuilder());
+    }
+
+    public static Generator<SchemaSpec> schemaSpecGen(String ks, String prefix, int expectedValues, SchemaSpec.Options options)
     {
         return new Generator<>()
         {
@@ -47,8 +52,7 @@ public class SchemaGenerators
                                       ckGen.generate(rng),
                                       regularGen.generate(rng),
                                       staticGen.generate(rng),
-                                      options
-                );
+                                      options);
             };
         };
     }

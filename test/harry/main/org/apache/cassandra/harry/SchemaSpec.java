@@ -21,9 +21,7 @@ package org.apache.cassandra.harry;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -38,8 +36,6 @@ import org.apache.cassandra.harry.util.IteratorsUtil;
 import org.apache.cassandra.service.consensus.TransactionalMode;
 import org.apache.cassandra.utils.ByteArrayUtil;
 
-import static org.apache.cassandra.harry.SchemaSpec.Options.SKIP_WRITE_TIMESTAMPS;
-import static org.apache.cassandra.harry.SchemaSpec.Options.TRANSACTIONAL_MODE;
 import static org.apache.cassandra.harry.gen.InvertibleGenerator.MAX_ENTROPY;
 
 public class SchemaSpec
@@ -54,7 +50,19 @@ public class SchemaSpec
 
     public final List<ColumnSpec<?>> allColumnInSelectOrder;
     public final ValueGenerators valueGenerators;
-    public final Map<Options, Object> options;
+    public final Options options;
+
+    public SchemaSpec(long seed,
+                      int populationPerColumn,
+                      String keyspace,
+                      String table,
+                      List<ColumnSpec<?>> partitionKeys,
+                      List<ColumnSpec<?>> clusteringKeys,
+                      List<ColumnSpec<?>> regularColumns,
+                      List<ColumnSpec<?>> staticColumns)
+    {
+        this(seed, populationPerColumn, keyspace, table, partitionKeys, clusteringKeys, regularColumns, staticColumns, optionsBuilder());
+    }
 
     @SuppressWarnings({ "unchecked" })
     public SchemaSpec(long seed,
@@ -65,11 +73,11 @@ public class SchemaSpec
                       List<ColumnSpec<?>> clusteringKeys,
                       List<ColumnSpec<?>> regularColumns,
                       List<ColumnSpec<?>> staticColumns,
-                      Object... options)
+                      Options options)
     {
         this.keyspace = keyspace;
         this.table = table;
-        this.options = optionsMap(options);
+        this.options = options;
 
         this.partitionKeys = Collections.unmodifiableList(new ArrayList<>(partitionKeys));
         this.clusteringKeys = Collections.unmodifiableList(new ArrayList<>(clusteringKeys));
@@ -127,7 +135,7 @@ public class SchemaSpec
         StringBuilder sb = new StringBuilder();
 
         sb.append("CREATE TABLE ");
-        if (options.containsKey(Options.IF_NOT_EXISTS))
+        if (options.ifNotExists())
             sb.append("IF NOT EXISTS ");
 
         sb.append(Symbol.maybeQuote(keyspace))
@@ -158,35 +166,35 @@ public class SchemaSpec
         }
 
         // TODO: test
-        if (options.containsKey(Options.TRACK_LTS))
+        if (options.trackLts())
             sb.append(", ").append("visited_lts list<bigint> static");
 
         sb.append(')');
 
         Runnable appendWith = doOnce(() -> sb.append(" WITH"));
 
-        if (options.containsKey(Options.COMPACT_STORAGE))
+        if (options.compactStorage())
         {
             appendWith.run();
             sb.append(" COMPACT STORAGE AND");
         }
 
-        if (options.containsKey(Options.TRANSACTIONAL_MODE))
+        if (options.transactionalMode() != null)
         {
             appendWith.run();
-            sb.append(" transactional_mode = '").append(options.get(Options.TRANSACTIONAL_MODE).toString()).append("' AND");
+            sb.append(" transactional_mode = '").append(options.transactionalMode()).append("' AND");
         }
 
-        if (options.containsKey(Options.DISABLE_READ_REPAIR))
+        if (options.disableReadRepair())
         {
             appendWith.run();
             sb.append(" read_repair = 'NONE' AND");
         }
 
-        if (options.containsKey(Options.COMPACT_STRATEGY))
+        if (options.compactionStrategy() != null)
         {
             appendWith.run();
-            sb.append(" compaction = {'class': '").append(options.get(Options.COMPACT_STRATEGY)).append("'} AND");
+            sb.append(" compaction = {'class': '").append(options.compactionStrategy()).append("'} AND");
         }
 
         if (!clusteringKeys.isEmpty())
@@ -320,55 +328,133 @@ public class SchemaSpec
         return Objects.hash(keyspace, table, partitionKeys, clusteringKeys, regularColumns);
     }
 
-    // TODO (required): add validation for all keys
-    public static Map<Options, Object> optionsMap(Object... options)
+    public static interface Options
     {
-        if (options.length == 0)
-            return Collections.emptyMap();
+        String transactionalMode();
+        boolean skipWriteTimestamps();
+        boolean disableReadRepair();
+        String compactionStrategy();
+        boolean compactStorage();
+        boolean ifNotExists();
+        boolean trackLts();
 
-        Invariants.checkState(options.length % 2 == 0);
-        Map<Options, Object> optionsMap = new HashMap<>(options.length / 2);
-        for (int i = 0; i < options.length; i+=2)
+        default boolean writeTimestampsAllowed()
         {
-            Options option = (Options) options[i];
-            switch (option)
-            {
-                case TRANSACTIONAL_MODE:
-                    Invariants.checkState(options[i + 1] instanceof String);
-                    Set<String> possible = Arrays.stream(TransactionalMode.values()).map(Object::toString).collect(Collectors.toSet());
-                    String value = (String) options[i + 1];
-                    Invariants.checkState(possible.contains(value),
-                                          "Should have contained one of %s, but got %s", possible, value);
-                    optionsMap.put(option, value);
-                    break;
-                default:
-                    optionsMap.put(option, options[i + 1]);
-                    break;
-            }
+            if (skipWriteTimestamps())
+                return false;
+            if (transactionalMode() == null)
+                return true;
 
+            return !TransactionalMode.full.toString().equals(transactionalMode());
         }
-        return optionsMap;
     }
 
-    public boolean writeTimestampsAllowed()
+    public static OptionsBuilder optionsBuilder()
     {
-        if (options.containsKey(SKIP_WRITE_TIMESTAMPS))
-            return false;
-        Object mode = options.get(TRANSACTIONAL_MODE);
-        if (mode == null)
-            return true;
-
-        return !TransactionalMode.full.toString().equals(mode);
+        return new OptionsBuilder();
     }
 
-    public enum Options
+    public static class OptionsBuilder implements Options
     {
-        TRANSACTIONAL_MODE,
-        SKIP_WRITE_TIMESTAMPS,
-        DISABLE_READ_REPAIR,
-        COMPACT_STRATEGY,
-        COMPACT_STORAGE,
-        TRACK_LTS,
-        IF_NOT_EXISTS
+        private String transactionalMode;
+        private boolean skipWriteTimestamps;
+        private boolean disableReadRepair;
+        private String compactionStrategy;
+        private boolean ifNotExists;
+        private boolean trackLts;
+        private boolean compactStorage;
+
+
+        private OptionsBuilder()
+        {
+        }
+
+        private static final Set<String> TRANSACTIONAL_MODES = Arrays.stream(TransactionalMode.values()).map(Object::toString).collect(Collectors.toSet());
+
+        public OptionsBuilder withTransactionalMode(String mode)
+        {
+            Invariants.checkState(TRANSACTIONAL_MODES.contains(mode),
+                                  "Should have contained one of %s, but got %s", TRANSACTIONAL_MODES, mode);
+            this.transactionalMode = mode;
+            return this;
+        }
+
+        @Override
+        public String transactionalMode()
+        {
+            return transactionalMode;
+        }
+
+        public OptionsBuilder skipWriteTimestamps(boolean v)
+        {
+            this.skipWriteTimestamps = true;
+            return this;
+        }
+
+        @Override
+        public boolean skipWriteTimestamps()
+        {
+            return skipWriteTimestamps;
+        }
+
+        public OptionsBuilder disableReadRepair(boolean v)
+        {
+            this.disableReadRepair = v;
+            return this;
+        }
+
+        @Override
+        public boolean disableReadRepair()
+        {
+            return disableReadRepair;
+        }
+
+        public OptionsBuilder compactionStrategy(String compactionStrategy)
+        {
+            this.compactionStrategy = compactionStrategy;
+            return this;
+        }
+
+        @Override
+        public String compactionStrategy()
+        {
+            return compactionStrategy;
+        }
+
+        public OptionsBuilder withCompactStorage()
+        {
+            this.compactStorage = true;
+            return this;
+        }
+
+        @Override
+        public boolean compactStorage()
+        {
+            return compactStorage;
+        }
+
+        public OptionsBuilder ifNotExists(boolean v)
+        {
+            this.ifNotExists = v;
+            return this;
+        }
+
+        @Override
+        public boolean ifNotExists()
+        {
+            return ifNotExists;
+        }
+
+        public OptionsBuilder trackLts(boolean v)
+        {
+            this.trackLts = v;
+            return this;
+        }
+
+        @Override
+        public boolean trackLts()
+        {
+            return trackLts;
+        }
     }
 }

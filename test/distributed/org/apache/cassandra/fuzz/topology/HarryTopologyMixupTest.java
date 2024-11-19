@@ -41,6 +41,7 @@ import org.apache.cassandra.distributed.Cluster;
 import org.apache.cassandra.distributed.api.IInstanceConfig;
 import org.apache.cassandra.distributed.shared.ClusterUtils;
 import org.apache.cassandra.exceptions.RequestTimeoutException;
+import org.apache.cassandra.harry.SchemaSpec;
 import org.apache.cassandra.harry.dsl.HistoryBuilder;
 import org.apache.cassandra.harry.dsl.ReplayingHistoryBuilder;
 import org.apache.cassandra.harry.execution.InJvmDTestVisitExecutor;
@@ -118,11 +119,11 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
     {
         return (rs, cluster) -> {
             EntropySource rng = new JdkRandomEntropySource(rs.nextLong());
-            Generator<org.apache.cassandra.harry.SchemaSpec> schemaGen;
-            org.apache.cassandra.harry.SchemaSpec schema;
+            Generator<SchemaSpec> schemaGen;
+            SchemaSpec schema;
             if (mode.kind != AccordMode.Kind.None)
                 schemaGen = SchemaGenerators.schemaSpecGen("harry", "table", 1000,
-                                                           org.apache.cassandra.harry.SchemaSpec.Options.TRANSACTIONAL_MODE, mode.transactionalMode.toString());
+                                                           SchemaSpec.optionsBuilder().withTransactionalMode(mode.transactionalMode.toString()));
             else
                 schemaGen = SchemaGenerators.schemaSpecGen("harry", "table", 1000);
 
@@ -226,7 +227,7 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
             long pd = spec.schema.valueGenerators.pkGen.descriptorAt(pkIdx);
             reads.add(new HarryCommand(s -> String.format("Harry Validate pd=%d%s", pd, state.commandNamePostfix()), s -> spec.harry.selectPartition(pkIdx)));
 
-            Object transationalMode = spec.schema.options.get(org.apache.cassandra.harry.SchemaSpec.Options.TRANSACTIONAL_MODE);
+            Object transationalMode = spec.schema.options.transactionalMode();
             if (transationalMode != null && TransactionalMode.full.toString().equals(transationalMode))
                 reads.add(new HarryCommand(s -> String.format("Harry Validate pd=%d%s", pd, state.commandNamePostfix()), s -> spec.harry.selectPartition(pkIdx, Operations.ClusteringOrderBy.DESC)));
         }
@@ -234,7 +235,7 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
         return Property.multistep(reads);
     }
 
-    public static class Spec implements SchemaSpec
+    public static class Spec implements Schema
     {
         private final Generators.TrackingGenerator<Integer> pkGen;
         private final HistoryBuilder harry;
