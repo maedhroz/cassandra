@@ -43,12 +43,12 @@ public abstract class CQLVisitExecutor
     protected final Model model;
     private final QueryBuildingVisitExecutor queryBuilder;
 
-    public CQLVisitExecutor(SchemaSpec schema, DataTracker dataTracker, Model model)
+    public CQLVisitExecutor(SchemaSpec schema, DataTracker dataTracker, Model model, QueryBuildingVisitExecutor queryBuilder)
     {
         this.schema = schema;
         this.dataTracker = dataTracker;
         this.model = model;
-        this.queryBuilder = new QueryBuildingVisitExecutor(schema);
+        this.queryBuilder = queryBuilder;
     }
 
     public static void replay(CQLVisitExecutor executor, Model.Replay replay)

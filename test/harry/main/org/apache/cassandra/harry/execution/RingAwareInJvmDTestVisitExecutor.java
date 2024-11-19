@@ -58,9 +58,10 @@ public class RingAwareInJvmDTestVisitExecutor extends InJvmDTestVisitExecutor
                                              PageSizeSelector pageSizeSelector,
                                              RetryPolicy retryPolicy,
                                              ConsistencyLevelSelector consistencyLevel,
-                                             TokenPlacementModel.ReplicationFactor rf)
+                                             TokenPlacementModel.ReplicationFactor rf,
+                                             QueryBuildingVisitExecutor.WrapQueries wrapQueries)
     {
-        super(schema, dataTracker, model, cluster, nodeSelector, pageSizeSelector, retryPolicy, consistencyLevel);
+        super(schema, dataTracker, model, cluster, nodeSelector, pageSizeSelector, retryPolicy, consistencyLevel, QueryBuildingVisitExecutor.WrapQueries.UNLOGGED_BATCH);
         this.rf = rf;
     }
 
@@ -148,6 +149,13 @@ public class RingAwareInJvmDTestVisitExecutor extends InJvmDTestVisitExecutor
         }
 
         @Override
+        public Builder wrapQueries(QueryBuildingVisitExecutor.WrapQueries wrapQueries)
+        {
+            super.wrapQueries(wrapQueries);
+            return this;
+        }
+
+        @Override
         public Builder consistencyLevel(ConsistencyLevel consistencyLevel)
         {
             super.consistencyLevel(consistencyLevel);
@@ -196,7 +204,7 @@ public class RingAwareInJvmDTestVisitExecutor extends InJvmDTestVisitExecutor
         {
             setDefaults(schema, cluster);
             return new RingAwareInJvmDTestVisitExecutor(schema, tracker, model, cluster,
-                                                        nodeSelector, pageSizeSelector, retryPolicy, consistencyLevel, rf);
+                                                        nodeSelector, pageSizeSelector, retryPolicy, consistencyLevel, rf, wrapQueries);
         }
     }
 }

@@ -45,7 +45,7 @@ public class CQLTesterVisitExecutor extends CQLVisitExecutor
                                   Model model,
                                   Function<CompiledStatement, UntypedResultSet> execute)
     {
-        super(schema, dataTracker, model);
+        super(schema, dataTracker, model, new QueryBuildingVisitExecutor(schema, QueryBuildingVisitExecutor.WrapQueries.UNLOGGED_BATCH));
         this.execute = execute;
     }
 

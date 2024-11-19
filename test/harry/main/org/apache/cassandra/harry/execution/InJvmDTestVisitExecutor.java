@@ -41,6 +41,7 @@ import static org.apache.cassandra.harry.MagicConstants.NIL_DESCR;
 import static org.apache.cassandra.harry.MagicConstants.NIL_KEY;
 import static org.apache.cassandra.harry.MagicConstants.UNKNOWN_DESCR;
 import static org.apache.cassandra.harry.MagicConstants.UNSET_DESCR;
+import static org.apache.cassandra.harry.execution.QueryBuildingVisitExecutor.*;
 
 public class InJvmDTestVisitExecutor extends CQLVisitExecutor
 {
@@ -57,12 +58,14 @@ public class InJvmDTestVisitExecutor extends CQLVisitExecutor
                                       DataTracker dataTracker,
                                       Model model,
                                       ICluster<?> cluster,
+
                                       NodeSelector nodeSelector,
                                       PageSizeSelector pageSizeSelector,
                                       RetryPolicy retryPolicy,
-                                      ConsistencyLevelSelector consistencyLevel)
+                                      ConsistencyLevelSelector consistencyLevel,
+                                      WrapQueries wrapQueries)
     {
-        super(schema, dataTracker, model);
+        super(schema, dataTracker, model, new QueryBuildingVisitExecutor(schema, wrapQueries));
         this.cluster = cluster;
         this.consistencyLevel = consistencyLevel;
 
@@ -281,6 +284,13 @@ public class InJvmDTestVisitExecutor extends CQLVisitExecutor
         protected NodeSelector nodeSelector = null;
         protected PageSizeSelector pageSizeSelector = (lts) -> 10;
         protected RetryPolicy retryPolicy = (retry) -> false;
+        protected WrapQueries wrapQueries = WrapQueries.UNLOGGED_BATCH;
+
+        public Builder wrapQueries(WrapQueries wrapQueries)
+        {
+            this.wrapQueries = wrapQueries;
+            return this;
+        }
 
         public Builder consistencyLevel(ConsistencyLevel consistencyLevel)
         {
@@ -336,7 +346,7 @@ public class InJvmDTestVisitExecutor extends CQLVisitExecutor
             DataTracker tracker = new DataTracker.SequentialDataTracker();
             Model model = new QuiescentChecker(schema.valueGenerators, tracker, replay);
             return new InJvmDTestVisitExecutor(schema, tracker, model, cluster,
-                                               nodeSelector, pageSizeSelector, retryPolicy, consistencyLevel);
+                                               nodeSelector, pageSizeSelector, retryPolicy, consistencyLevel, wrapQueries);
         }
     }
 

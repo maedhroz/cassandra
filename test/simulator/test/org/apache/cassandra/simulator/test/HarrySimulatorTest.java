@@ -395,7 +395,7 @@ public class HarrySimulatorTest
             this.rng = rng;
             this.schema = schema;
             this.insertGen = OperationsGenerators.writeOp(schema);
-            this.queryBuilder = new QueryBuildingVisitExecutor(schema);
+            this.queryBuilder = new QueryBuildingVisitExecutor(schema, QueryBuildingVisitExecutor.WrapQueries.UNLOGGED_BATCH);
             this.model = new QuiescentChecker(schema.valueGenerators, tracker, new Model.Replay()
             {
                 @Override

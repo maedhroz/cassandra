@@ -34,33 +34,18 @@ import org.apache.cassandra.harry.cql.DeleteHelper;
 import org.apache.cassandra.harry.cql.SelectHelper;
 import org.apache.cassandra.harry.cql.WriteHelper;
 import org.apache.cassandra.harry.op.Operations;
+import org.apache.cassandra.stress.StressAction;
 
 public class QueryBuildingVisitExecutor extends VisitExecutor
 {
     private static final Logger logger = LoggerFactory.getLogger(QueryBuildingVisitExecutor.class);
     protected final SchemaSpec schema;
+    protected final WrapQueries wrapQueries;
 
-    protected final String wrapSingleQueryFormat;
-    protected final String wrapQueryFormat;
-
-    public QueryBuildingVisitExecutor(SchemaSpec schema)
+    public QueryBuildingVisitExecutor(SchemaSpec schema, WrapQueries wrapQueries)
     {
         this.schema = schema;
-        Object v = schema.options.get(SchemaSpec.Options.TRANSACTIONAL_MODE);
-        if (v == null || v.equals("off"))
-        {
-            wrapSingleQueryFormat = "%s";
-            wrapQueryFormat = "BEGIN UNLOGGED BATCH\n" +
-                              "  %s\n" +
-                              "APPLY BATCH;";
-        }
-        else
-        {
-            wrapQueryFormat = "BEGIN TRANSACTION\n" +
-                              "  %s\n" +
-                              "COMMIT TRANSACTION;";
-            wrapSingleQueryFormat = wrapQueryFormat;
-        }
+        this.wrapQueries = wrapQueries;
     }
 
     public CompiledStatement compile(Visit visit)
@@ -106,10 +91,6 @@ public class QueryBuildingVisitExecutor extends VisitExecutor
         }
 
         String query = String.join("\n ", statements);
-        if (statements.size() == 1)
-            query = String.format(wrapSingleQueryFormat, query);
-        else
-            query = String.format(wrapQueryFormat, query);
 
         Object[] bindingsArray = new Object[bindings.size()];
         bindings.toArray(bindingsArray);
@@ -123,7 +104,7 @@ public class QueryBuildingVisitExecutor extends VisitExecutor
     protected void operation(Operations.Operation operation)
     {
         if (operation instanceof Operations.PartitionOperation)
-            visitedPds.add(((Operations.PartitionOperation)operation).pd());
+            visitedPds.add(((Operations.PartitionOperation) operation).pd());
         CompiledStatement statement;
         switch (operation.kind())
         {
@@ -163,12 +144,38 @@ public class QueryBuildingVisitExecutor extends VisitExecutor
                 break;
 
             case CUSTOM:
-                ((Operations.CustomRunnableOperation)operation).execute();
+                ((Operations.CustomRunnableOperation) operation).execute();
                 return;
             default:
                 throw new IllegalArgumentException();
         }
         statements.add(statement.cql());
         Collections.addAll(bindings, statement.bindings());
+    }
+
+    private static final String wrapInUnloggedBatchFormat = "BEGIN UNLOGGED BATCH\n" +
+                                                            "  %s\n" +
+                                                            "APPLY BATCH;";
+
+    private static final String wrapInTxnFormat = "BEGIN TRANSACTION\n" +
+                                                  "  %s\n" +
+                                                  "COMMIT TRANSACTION;";
+
+    public interface WrapQueries
+    {
+        WrapQueries UNLOGGED_BATCH = (visit, compiled) -> {
+            if (visit.operations.length == 1)
+                return compiled;
+            return String.format(wrapInUnloggedBatchFormat, compiled);
+        };
+
+        WrapQueries TRANSACTION = (visit, compiled) -> {
+            if (visit.operations.length == 1)
+                return compiled;
+            return String.format(wrapInTxnFormat, compiled);
+        };
+
+
+        String wrap(Visit visit, String compiled);
     }
 }
