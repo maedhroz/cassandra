@@ -270,8 +270,16 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
         return visit -> {
             if (visit.selectOnly)
                 return ConsistencyLevel.ALL;
+
+            // The goal here is to make replicas as out of date as possible, modulo the efforts of repair
+            // and read-repair in the test itself. node_local bypasses Accord which breaks any attempt at testing Accord
+            // so if we are running with Accord use QUORUM (which Accord will ignore since it runs with transactional
+            // mode full).
+            if (withAccord)
+                return ConsistencyLevel.QUORUM;
             else
                 return ConsistencyLevel.NODE_LOCAL;
+
         };
     }
 
