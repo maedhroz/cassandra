@@ -217,13 +217,24 @@ public class ColumnSpec<T>
             return Objects.hash(cqlName);
         }
 
+        public abstract Comparator<T> comparator();
+    }
+
+    public static abstract class ComparableDataType<T extends Comparable<T>> extends DataType<T>
+    {
+        protected ComparableDataType(String cqlName)
+        {
+            super(cqlName);
+        }
+
+        @Override
         public Comparator<T> comparator()
         {
-            return (o1, o2) -> ((Comparable) o1).compareTo(o2);
+            return Comparable::compareTo;
         }
     }
 
-    public static final DataType<Byte> int8Type = new DataType<Byte>("tinyint")
+    public static final DataType<Byte> int8Type = new ComparableDataType<>("tinyint")
     {
         @Override
         public /* unsigned */ long typeEntropy()
@@ -238,7 +249,7 @@ public class ColumnSpec<T>
         }
     };
 
-    public static final DataType<Short> int16Type = new DataType<Short>("smallint")
+    public static final DataType<Short> int16Type = new ComparableDataType<>("smallint")
     {
         @Override
         public /* unsigned */ long typeEntropy()
@@ -253,7 +264,7 @@ public class ColumnSpec<T>
         }
     };
 
-    public static final DataType<Integer> int32Type = new DataType<Integer>("int")
+    public static final DataType<Integer> int32Type = new ComparableDataType<>("int")
     {
         @Override
         public /* unsigned */ long typeEntropy()
@@ -268,7 +279,7 @@ public class ColumnSpec<T>
         }
     };
 
-    public static final DataType<Long> int64Type = new DataType<Long>("bigint")
+    public static final DataType<Long> int64Type = new ComparableDataType<Long>("bigint")
     {
         @Override
         public /* unsigned */ long typeEntropy()
@@ -283,7 +294,7 @@ public class ColumnSpec<T>
         }
     };
 
-    public static final DataType<Boolean> booleanType = new DataType<Boolean>("boolean")
+    public static final DataType<Boolean> booleanType = new ComparableDataType<Boolean>("boolean")
     {
         @Override
         public /* unsigned */ long typeEntropy()
@@ -298,7 +309,7 @@ public class ColumnSpec<T>
         }
     };
 
-    public static final DataType<Float> floatType = new DataType<Float>("float")
+    public static final DataType<Float> floatType = new ComparableDataType<Float>("float")
     {
         @Override
         public /* unsigned */ long typeEntropy()
@@ -313,7 +324,7 @@ public class ColumnSpec<T>
         }
     };
 
-    public static final DataType<Double> doubleType = new DataType<Double>("double")
+    public static final DataType<Double> doubleType = new ComparableDataType<Double>("double")
     {
         @Override
         public /* unsigned */ long typeEntropy()
@@ -328,7 +339,7 @@ public class ColumnSpec<T>
         }
     };
 
-    public static final DataType<ByteBuffer> blobType = new DataType<ByteBuffer>("blob")
+    public static final DataType<ByteBuffer> blobType = new DataType<>("blob")
     {
         @Override
         public /* unsigned */ long typeEntropy()
@@ -348,7 +359,7 @@ public class ColumnSpec<T>
         }
     };
 
-    public static final DataType<String> asciiType = new DataType<String>("ascii")
+    public static final DataType<String> asciiType = new ComparableDataType<>("ascii")
     {
         @Override
         public /* unsigned */ long typeEntropy()
@@ -364,7 +375,7 @@ public class ColumnSpec<T>
     };
 
     // utf8
-    public static final DataType<String> textType = new DataType<String>("text")
+    public static final DataType<String> textType = new DataType<>("text")
     {
         @Override
         public /* unsigned */ long typeEntropy()
@@ -385,7 +396,7 @@ public class ColumnSpec<T>
         }
     };
 
-    public static final DataType<UUID> uuidType = new DataType<UUID>("uuid")
+    public static final DataType<UUID> uuidType = new DataType<>("uuid")
     {
         @Override
         public /* unsigned */ long typeEntropy()
@@ -407,7 +418,7 @@ public class ColumnSpec<T>
         }
     };
 
-    public static final DataType<TimeUUID> timeUuidType = new DataType<TimeUUID>("timeuuid")
+    public static final DataType<TimeUUID> timeUuidType = new ComparableDataType<>("timeuuid")
     {
         @Override
         public /* unsigned */ long typeEntropy()
@@ -422,7 +433,7 @@ public class ColumnSpec<T>
         }
     };
 
-    public static final DataType<Date> timestampType = new DataType<Date>("timestamp")
+    public static final DataType<Date> timestampType = new ComparableDataType<>("timestamp")
     {
         @Override
         public /* unsigned */ long typeEntropy()
@@ -437,7 +448,7 @@ public class ColumnSpec<T>
         }
     };
 
-    public static final DataType<BigInteger> varintType = new DataType<BigInteger>("varint")
+    public static final DataType<BigInteger> varintType = new ComparableDataType<>("varint")
     {
         @Override
         public /* unsigned */ long typeEntropy()
@@ -452,7 +463,7 @@ public class ColumnSpec<T>
         }
     };
 
-    public static final DataType<Long> timeType = new DataType<Long>("time")
+    public static final DataType<Long> timeType = new ComparableDataType<>("time")
     {
         @Override
         public /* unsigned */ long typeEntropy()
@@ -467,7 +478,7 @@ public class ColumnSpec<T>
         }
     };
 
-    public static final DataType<BigDecimal> decimalType = new DataType<BigDecimal>("decimal")
+    public static final DataType<BigDecimal> decimalType = new ComparableDataType<>("decimal")
     {
         @Override
         public /* unsigned */ long typeEntropy()
@@ -482,7 +493,7 @@ public class ColumnSpec<T>
         }
     };
 
-    public static final DataType<InetAddress> inetType = new DataType<InetAddress>("inet")
+    public static final DataType<InetAddress> inetType = new DataType<>("inet")
     {
         @Override
         public /* unsigned */ long typeEntropy()
