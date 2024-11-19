@@ -143,9 +143,9 @@ public class HistoryBuilder implements SingleOperationBuilder, Model.Replay
     }
 
     @Override
-    public SingleOperationBuilder update(int partitionIdx, int rowIdx, int[] valueIdxs, int[] sValueIdxs)
+    public SingleOperationBuilder update(int pdIdx, int rowIdx, int[] valueIdxs, int[] sValueIdxs)
     {
-        singleOpVisitBuilder().update(partitionIdx, rowIdx, valueIdxs, sValueIdxs);
+        singleOpVisitBuilder().update(pdIdx, rowIdx, valueIdxs, sValueIdxs);
         return this;
     }
 
@@ -171,97 +171,104 @@ public class HistoryBuilder implements SingleOperationBuilder, Model.Replay
     }
 
     @Override
-    public SingleOperationBuilder insert(int partitionIdx, int rowIdx, int[] valueIdxs, int[] sValueIdxs)
+    public SingleOperationBuilder insert(int pdIdx, int rowIdx, int[] valueIdxs, int[] sValueIdxs)
     {
-        singleOpVisitBuilder().insert(partitionIdx, rowIdx, valueIdxs, sValueIdxs);
+        singleOpVisitBuilder().insert(pdIdx, rowIdx, valueIdxs, sValueIdxs);
         return this;
     }
 
     @Override
-    public SingleOperationBuilder deleteRowRange(int partitionIdx, int lowerBoundRowIdx, int upperBoundRowIdx,
+    public SingleOperationBuilder deleteRowRange(int pdIdx, int lowerBoundRowIdx, int upperBoundRowIdx,
                                                  int nonEqFrom, boolean includeLowerBound, boolean includeUpperBound)
     {
-        singleOpVisitBuilder().deleteRowRange(partitionIdx, lowerBoundRowIdx, upperBoundRowIdx,
+        singleOpVisitBuilder().deleteRowRange(pdIdx, lowerBoundRowIdx, upperBoundRowIdx,
                                               nonEqFrom, includeLowerBound, includeUpperBound);
         return this;
     }
 
     @Override
-    public SingleOperationBuilder select(int partitionIdx, IdxRelation[] ckRelations, IdxRelation[] regularRelations, IdxRelation[] staticRelations)
+    public SingleOperationBuilder select(int pdIdx, IdxRelation[] ckRelations, IdxRelation[] regularRelations, IdxRelation[] staticRelations)
     {
-        singleOpVisitBuilder().select(partitionIdx, ckRelations, regularRelations, staticRelations);
+        singleOpVisitBuilder().select(pdIdx, ckRelations, regularRelations, staticRelations);
         return this;
     }
 
     @Override
-    public SingleOperationBuilder selectRowRange(int partitionIdx, int lowerBoundRowIdx, int upperBoundRowIdx,
+    public SingleOperationBuilder selectRowRange(int pdIdx, int lowerBoundRowIdx, int upperBoundRowIdx,
                                                  int nonEqFrom, boolean includeLowerBound, boolean includeUpperBound)
     {
-        singleOpVisitBuilder().selectRowRange(partitionIdx, lowerBoundRowIdx, upperBoundRowIdx,
+        singleOpVisitBuilder().selectRowRange(pdIdx, lowerBoundRowIdx, upperBoundRowIdx,
                                               nonEqFrom, includeLowerBound, includeUpperBound);
         return this;
     }
 
     @Override
-    public SingleOperationBuilder selectPartition(int partitionIdx)
+    public SingleOperationBuilder selectPartition(int pdIdx)
     {
-        singleOpVisitBuilder().selectPartition(partitionIdx);
+        singleOpVisitBuilder().selectPartition(pdIdx);
         return this;
     }
 
     @Override
-    public SingleOperationBuilder selectRow(int partitionIdx, int rowIdx)
+    public SingleOperationBuilder selectPartition(int pdIdx, Operations.ClusteringOrderBy orderBy)
     {
-        singleOpVisitBuilder().selectRow(partitionIdx, rowIdx);
+        singleOpVisitBuilder().selectPartition(pdIdx, orderBy);
         return this;
     }
 
     @Override
-    public SingleOperationBuilder selectRowSliceByLowerBound(int partitionIdx, int lowerBoundRowIdx, int nonEqFrom, boolean isEq)
+    public SingleOperationBuilder selectRow(int pdIdx, int rowIdx)
     {
-        singleOpVisitBuilder().selectRowSliceByLowerBound(partitionIdx, lowerBoundRowIdx, nonEqFrom, isEq);
+        singleOpVisitBuilder().selectRow(pdIdx, rowIdx);
         return this;
     }
 
     @Override
-    public SingleOperationBuilder selectRowSliceByUpperBound(int partitionIdx, int upperBoundRowIdx, int nonEqFrom, boolean isEq)
+    public SingleOperationBuilder selectRowSliceByLowerBound(int pdIdx, int lowerBoundRowIdx, int nonEqFrom, boolean isEq)
     {
-        singleOpVisitBuilder().selectRowSliceByUpperBound(partitionIdx, upperBoundRowIdx, nonEqFrom, isEq);
+        singleOpVisitBuilder().selectRowSliceByLowerBound(pdIdx, lowerBoundRowIdx, nonEqFrom, isEq);
         return this;
     }
 
     @Override
-    public SingleOperationBuilder deletePartition(int partitionIdx)
+    public SingleOperationBuilder selectRowSliceByUpperBound(int pdIdx, int upperBoundRowIdx, int nonEqFrom, boolean isEq)
     {
-        singleOpVisitBuilder().deletePartition(partitionIdx);
+        singleOpVisitBuilder().selectRowSliceByUpperBound(pdIdx, upperBoundRowIdx, nonEqFrom, isEq);
         return this;
     }
 
     @Override
-    public SingleOperationBuilder deleteRow(int partitionIdx, int rowIdx)
+    public SingleOperationBuilder deletePartition(int pdIdx)
     {
-        singleOpVisitBuilder().deleteRow(partitionIdx, rowIdx);
+        singleOpVisitBuilder().deletePartition(pdIdx);
         return this;
     }
 
     @Override
-    public SingleOperationBuilder deleteColumns(int partitionIdx, int rowIdx, BitSet regularSelection, BitSet staticSelection)
+    public SingleOperationBuilder deleteRow(int pdIdx, int rowIdx)
     {
-        singleOpVisitBuilder().deleteRow(partitionIdx, rowIdx);
+        singleOpVisitBuilder().deleteRow(pdIdx, rowIdx);
         return this;
     }
 
     @Override
-    public SingleOperationBuilder deleteRowSliceByLowerBound(int partitionIdx, int lowerBoundRowIdx, int nonEqFrom, boolean isEq)
+    public SingleOperationBuilder deleteColumns(int pdIdx, int rowIdx, BitSet regularSelection, BitSet staticSelection)
     {
-        singleOpVisitBuilder().deleteRowSliceByLowerBound(partitionIdx, lowerBoundRowIdx, nonEqFrom, isEq);
+        singleOpVisitBuilder().deleteRow(pdIdx, rowIdx);
         return this;
     }
 
     @Override
-    public SingleOperationBuilder deleteRowSliceByUpperBound(int partitionIdx, int upperBoundRowIdx, int nonEqFrom, boolean isEq)
+    public SingleOperationBuilder deleteRowSliceByLowerBound(int pdIdx, int lowerBoundRowIdx, int nonEqFrom, boolean isEq)
     {
-        singleOpVisitBuilder().deleteRowSliceByUpperBound(partitionIdx, upperBoundRowIdx, nonEqFrom, isEq);
+        singleOpVisitBuilder().deleteRowSliceByLowerBound(pdIdx, lowerBoundRowIdx, nonEqFrom, isEq);
+        return this;
+    }
+
+    @Override
+    public SingleOperationBuilder deleteRowSliceByUpperBound(int pdIdx, int upperBoundRowIdx, int nonEqFrom, boolean isEq)
+    {
+        singleOpVisitBuilder().deleteRowSliceByUpperBound(pdIdx, upperBoundRowIdx, nonEqFrom, isEq);
         return this;
     }
 }

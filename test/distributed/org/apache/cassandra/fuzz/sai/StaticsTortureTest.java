@@ -34,7 +34,6 @@ import org.apache.cassandra.harry.gen.EntropySource;
 import org.apache.cassandra.harry.gen.Generator;
 import org.apache.cassandra.harry.gen.Generators;
 import org.apache.cassandra.harry.gen.rng.JdkRandomEntropySource;
-import org.apache.cassandra.harry.model.TokenPlacementModel;
 import org.apache.cassandra.harry.util.BitSet;
 
 import static org.apache.cassandra.harry.dsl.HistoryBuilderHelper.generateClusteringRelations;
@@ -121,8 +120,6 @@ public class StaticsTortureTest extends IntegrationTestBase
                                        schema.table,
                                        schema.staticColumns.get(2).name));
 
-        TokenPlacementModel.ReplicationFactor rf = new TokenPlacementModel.SimpleReplicationFactor(cluster.size());
-
         Generator<BitSet> regularColumnBitSet = Generators.bitSet(schema.regularColumns.size());
         Generator<BitSet> staticColumnBitSet = Generators.bitSet(schema.staticColumns.size());
         EntropySource rng = new JdkRandomEntropySource(1l);
@@ -132,29 +129,25 @@ public class StaticsTortureTest extends IntegrationTestBase
         });
 
 
-        long[] values = new long[UNIQUE_CELL_VALUES];
-        for (int i = 0; i < values.length; i++)
-            values[i] = rng.next();
-
         for (int i = 0; i < NUM_PARTITIONS; i++)
         {
             history.insert(i, rng.nextInt(5),
-                           new int[]{ rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(values.length),
-                                      rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(values.length),
-                                      rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(values.length)
+                           new int[]{ rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(UNIQUE_CELL_VALUES),
+                                      rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(UNIQUE_CELL_VALUES),
+                                      rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(UNIQUE_CELL_VALUES)
                            },
-                           new int[]{ rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(values.length),
-                                      rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(values.length),
-                                      rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(values.length)
+                           new int[]{ rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(UNIQUE_CELL_VALUES),
+                                      rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(UNIQUE_CELL_VALUES),
+                                      rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(UNIQUE_CELL_VALUES)
                            });
             history.insert(i,rng.nextInt(5),
-                           new int[]{ rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(values.length),
-                                      rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(values.length),
-                                      rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(values.length)
+                           new int[]{ rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(UNIQUE_CELL_VALUES),
+                                      rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(UNIQUE_CELL_VALUES),
+                                      rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(UNIQUE_CELL_VALUES)
                            },
-                           new int[]{ rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(values.length),
-                                      rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(values.length),
-                                      rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(values.length)
+                           new int[]{ rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(UNIQUE_CELL_VALUES),
+                                      rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(UNIQUE_CELL_VALUES),
+                                      rng.nextBoolean() ? MagicConstants.UNSET_IDX : rng.nextInt(UNIQUE_CELL_VALUES)
                            });
 
             if (rng.nextFloat() > 0.9f)

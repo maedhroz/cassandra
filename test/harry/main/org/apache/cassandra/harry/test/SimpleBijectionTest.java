@@ -38,8 +38,8 @@ public class SimpleBijectionTest
     @Test
     public void testOrder()
     {
-        withRandom(974258176332708L, rng -> {
-            for (ColumnSpec.DataType<?> t : ColumnSpec.types)
+        withRandom(rng -> {
+            for (ColumnSpec.DataType<?> t : ColumnSpec.TYPES)
             {
                 for (ColumnSpec.DataType type : new ColumnSpec.DataType[]{ t, ColumnSpec.ReversedType.cache.get(t) })
                 {

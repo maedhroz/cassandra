@@ -65,8 +65,7 @@ public abstract class MultiNodeSAITestBase extends SingleNodeSAITestBase
     @Override
     protected void flush(SchemaSpec schema)
     {
-        cluster.get(1).nodetool("flush", schema.keyspace, schema.table);
-        cluster.get(2).nodetool("flush", schema.keyspace, schema.table);
+        cluster.forEach(i -> i.nodetool("flush", schema.keyspace));
     }
 
     @Override
@@ -78,8 +77,7 @@ public abstract class MultiNodeSAITestBase extends SingleNodeSAITestBase
     @Override
     protected void compact(SchemaSpec schema)
     {
-        cluster.get(1).nodetool("compact", schema.keyspace);
-        cluster.get(2).nodetool("compact", schema.keyspace);
+        cluster.forEach(i -> i.nodetool("compact", schema.keyspace));
     }
 
     @Override

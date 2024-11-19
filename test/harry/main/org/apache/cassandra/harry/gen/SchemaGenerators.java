@@ -55,23 +55,23 @@ public class SchemaGenerators
 
     public static Generator<ColumnSpec<?>> regularColumnSpecGen()
     {
-        return columnSpecGen("regular", ColumnSpec.Kind.REGULAR, Generators.pick(ColumnSpec.types));
+        return columnSpecGen("regular", ColumnSpec.Kind.REGULAR, Generators.pick(ColumnSpec.TYPES));
     }
 
     public static Generator<ColumnSpec<?>> staticColumnSpecGen()
     {
-        return columnSpecGen("static", ColumnSpec.Kind.STATIC, Generators.pick(ColumnSpec.types));
+        return columnSpecGen("static", ColumnSpec.Kind.STATIC, Generators.pick(ColumnSpec.TYPES));
     }
 
     public static Generator<ColumnSpec<?>> pkColumnSpecGen()
     {
-        return columnSpecGen("pk", ColumnSpec.Kind.PARTITION_KEY, Generators.pick(ColumnSpec.types));
+        return columnSpecGen("pk", ColumnSpec.Kind.PARTITION_KEY, Generators.pick(ColumnSpec.TYPES));
     }
 
     public static Generator<ColumnSpec<?>> ckColumnSpecGen()
     {
         List<ColumnSpec.DataType<?>> forwardAndReverse = new ArrayList<>();
-        forwardAndReverse.addAll(ColumnSpec.types);
+        forwardAndReverse.addAll(ColumnSpec.TYPES);
         forwardAndReverse.addAll(ColumnSpec.ReversedType.cache.values());
         return columnSpecGen("ck", ColumnSpec.Kind.CLUSTERING, Generators.pick(forwardAndReverse));
     }

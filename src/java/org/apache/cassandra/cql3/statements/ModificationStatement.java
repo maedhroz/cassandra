@@ -71,6 +71,7 @@ import org.apache.cassandra.db.ConsistencyLevel;
 import org.apache.cassandra.db.DecoratedKey;
 import org.apache.cassandra.db.IMutation;
 import org.apache.cassandra.db.Keyspace;
+import org.apache.cassandra.db.Mutation;
 import org.apache.cassandra.db.ReadExecutionController;
 import org.apache.cassandra.db.RegularAndStaticColumns;
 import org.apache.cassandra.db.SinglePartitionReadCommand;
@@ -837,10 +838,12 @@ public abstract class ModificationStatement implements CQLStatement.SingleKeyspa
         return collector.toMutations(state, local);
     }
 
-    @VisibleForTesting
     public PartitionUpdate getTxnUpdate(ClientState state, QueryOptions options)
     {
         List<? extends IMutation> mutations = getMutations(state, options, false, 0, 0, new Dispatcher.RequestTime(0, 0), true);
+        // TODO: Temporary fix for CASSANDRA-20079d
+        if (mutations.isEmpty())
+            return PartitionUpdate.emptyUpdate(metadata, metadata.partitioner.decorateKey(ByteBufferUtil.EMPTY_BYTE_BUFFER));
         if (mutations.size() != 1)
             throw new IllegalArgumentException("When running withing a transaction, modification statements may only mutate a single partition");
         return Iterables.getOnlyElement(mutations.get(0).getPartitionUpdates());

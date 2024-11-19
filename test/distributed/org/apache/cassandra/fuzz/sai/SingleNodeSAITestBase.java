@@ -106,16 +106,12 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
     @Test
     public void basicSaiTest()
     {
-        Generator<SchemaSpec> schemaGen;
-        if (withAccord)
-            schemaGen = SchemaGenerators.schemaSpecGen(KEYSPACE, "basic_sai", MAX_PARTITION_SIZE, SchemaSpec.Options.TRANSACTIONAL_MODE, "full");
-        else
-            schemaGen = SchemaGenerators.schemaSpecGen(KEYSPACE, "basic_sai", MAX_PARTITION_SIZE);
-
+        Generator<SchemaSpec> schemaGen = schemaGenerator();
         Set<Integer> usedPartitions = new HashSet<>();
 
-        withRandom(rng -> {
+        withRandom(231265760400000L, rng -> {
             SchemaSpec schema = schemaGen.generate(rng);
+            logger.info(schema.compile());
 
             Generator<Integer> globalPkGen = Generators.int32(0, Math.min(NUM_PARTITIONS, schema.valueGenerators.pkPopulation()));
             Generator<Integer> ckGen = Generators.int32(0, schema.valueGenerators.ckPopulation());
@@ -147,6 +143,7 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
                     continue;
                 partitions.add(picked);
             }
+
             usedPartitions.addAll(partitions);
             if (partitions.isEmpty())
                 return;
@@ -180,7 +177,7 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
                 else if (i % FLUSH_SKIP == 0)
                     history.custom(() -> flush(schema), "Flush");
                 else if (i % COMPACTION_SKIP == 0)
-                    history.custom(() -> flush(schema), "Flush");
+                    history.custom(() -> compact(schema), "Compact");
 
                 if (i > 0 && i % 1000 == 0)
                 {
@@ -203,6 +200,11 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
                                                                   .build(schema, history, cluster),
                                            history);
         });
+    }
+
+    protected Generator<SchemaSpec> schemaGenerator()
+    {
+        return SchemaGenerators.schemaSpecGen(KEYSPACE, "basic_sai", MAX_PARTITION_SIZE, SchemaSpec.Options.TRANSACTIONAL_MODE, "full");
     }
 
     protected void flush(SchemaSpec schema)
@@ -248,6 +250,6 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
         // Chosing a fetch size has implications for how well this test will excercise paging, short-read protection, and
         // other important parts of the distributed query apparatus. This should be set low enough to ensure a significant
         // number of queries during validation page, but not too low that more expesive queries time out and fail the test.
-        return lts -> rng.nextInt(1, 10);
+        return lts -> rng.nextInt(1, 20);
     }
 }

@@ -18,6 +18,9 @@
 
 package org.apache.cassandra.harry.execution;
 
+import java.net.InetAddress;
+import java.util.UUID;
+
 public class CompiledStatement
 {
     private final String cql;
@@ -61,8 +64,8 @@ public class CompiledStatement
     public String toString()
     {
         return "CompiledStatement{" +
-               "cql='" + cql + '\'' +
-               ", bindings=" + bindingsToString(bindings) +
+               "cql=execute(\"" + cql.replace("\n", "\" + \n\"") + '\"' +
+               ", " + bindingsToString(bindings) +
                '}';
     }
 
@@ -85,10 +88,37 @@ public class CompiledStatement
                 sb.append("(byte)").append(binding);
             else if (binding instanceof Float)
                 sb.append("(float)").append(binding);
+            else if (binding instanceof Double)
+                sb.append("(double)").append(binding);
             else if (binding instanceof Long)
                 sb.append(binding).append("L");
+            else if (binding instanceof Integer)
+                sb.append("(int)").append(binding);
+            else if (binding instanceof Boolean)
+                sb.append(binding);
+            else if (binding instanceof UUID)
+                sb.append("UUID.fromString(\"").append(binding).append("\")");
+            else if (binding instanceof java.sql.Timestamp)
+                sb.append("new java.sql.Timestamp(").append(((java.sql.Timestamp) binding).getTime()).append("L)");
+            else if (binding instanceof java.sql.Time)
+                sb.append("new java.sql.Time(").append(((java.sql.Time) binding).getTime()).append("L)");
+            else if (binding instanceof java.math.BigInteger)
+                sb.append("new java.math.BigInteger(\"").append(binding).append("\")");
+            else if (binding instanceof java.math.BigDecimal)
+                sb.append("new java.math.BigDecimal(\"").append(binding).append("\")");
+            else if (binding instanceof java.net.InetAddress)
+            {
+                byte[] address = ((InetAddress) binding).getAddress();
+                sb.append("java.net.InetAddress.getByAddress(new byte[]{");
+                for (int i = 0; i < address.length; i++) {
+                    sb.append(address[i]);
+                    if (i < address.length - 1) sb.append(", ");
+                }
+                sb.append("})");
+            }
             else
                 sb.append(binding);
+            // TODO: byte arrays
         }
         return sb.toString();
     }

@@ -72,7 +72,13 @@ import org.apache.cassandra.tcm.transformations.Register;
 import org.apache.cassandra.tcm.transformations.TriggerSnapshot;
 
 import static org.apache.cassandra.distributed.test.log.PlacementSimulator.SimulatedPlacements;
-import static org.apache.cassandra.harry.model.TokenPlacementModel.*;
+import static org.apache.cassandra.harry.model.TokenPlacementModel.DCReplicas;
+import static org.apache.cassandra.harry.model.TokenPlacementModel.Node;
+import static org.apache.cassandra.harry.model.TokenPlacementModel.NtsReplicationFactor;
+import static org.apache.cassandra.harry.model.TokenPlacementModel.ReplicationFactor;
+import static org.apache.cassandra.harry.model.TokenPlacementModel.SimpleReplicationFactor;
+import static org.apache.cassandra.harry.model.TokenPlacementModel.nodeFactory;
+import static org.apache.cassandra.harry.model.TokenPlacementModel.nodeFactoryHumanReadable;
 
 public class MetadataChangeSimulationTest extends CMSTestBase
 {

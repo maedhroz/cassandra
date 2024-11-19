@@ -28,7 +28,10 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TreeMap;
 
-import static org.apache.cassandra.harry.model.TokenPlacementModel.*;
+import static org.apache.cassandra.harry.model.TokenPlacementModel.DCReplicas;
+import static org.apache.cassandra.harry.model.TokenPlacementModel.Node;
+import static org.apache.cassandra.harry.model.TokenPlacementModel.NodeFactory;
+import static org.apache.cassandra.harry.model.TokenPlacementModel.ReplicationFactor;
 
 public class ModelState
 {

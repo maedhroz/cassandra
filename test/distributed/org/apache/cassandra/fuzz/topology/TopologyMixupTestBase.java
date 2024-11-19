@@ -99,7 +99,7 @@ import static org.apache.cassandra.harry.model.TokenPlacementModel.*;
  * <p>
  * {@code for id in $(seq 0 15); do sudo ifconfig lo0 alias "127.0.0.$id"; done;}
  */
-public abstract class TopologyMixupTestBase<S extends TopologyMixupTestBase.TestState> extends TestBaseImpl
+public abstract class TopologyMixupTestBase<S extends TopologyMixupTestBase.SchemaSpec> extends TestBaseImpl
 {
     private static final Logger logger = LoggerFactory.getLogger(TopologyMixupTestBase.class);
 
@@ -140,7 +140,7 @@ public abstract class TopologyMixupTestBase<S extends TopologyMixupTestBase.Test
                                    state -> state.cluster.get(toCoordinate).nodetoolResult("repair", state.testState.keyspace(), state.testState.table(), "--force").asserts().success());
     }
 
-    private static <S extends TestState> Command<State<S>, Void, ?> repairCommand(int toCoordinate, String ks, String... tables) {
+    private static <S extends SchemaSpec> Command<State<S>, Void, ?> repairCommand(int toCoordinate, String ks, String... tables) {
         return new SimpleCommand<>(state -> "nodetool repair " + ks + (tables.length == 0 ? "" : " " + Arrays.asList(tables)) + " from node" + toCoordinate + state.commandNamePostfix(),
                 state -> {
                     if (tables.length == 0) {
@@ -465,13 +465,13 @@ public abstract class TopologyMixupTestBase<S extends TopologyMixupTestBase.Test
         return set;
     }
 
-    public interface TestState
+    public interface SchemaSpec
     {
         String table();
         String keyspace();
     }
 
-    protected interface CommandGen<S extends TestState>
+    protected interface CommandGen<S extends SchemaSpec>
     {
         Command<State<S>, Void, ?> apply(RandomSource rs, State<S> state);
     }
@@ -505,7 +505,7 @@ public abstract class TopologyMixupTestBase<S extends TopologyMixupTestBase.Test
         }
     }
 
-    protected static class State<S extends TestState> implements AutoCloseable
+    protected static class State<S extends SchemaSpec> implements AutoCloseable
     {
         final TopologyHistory topologyHistory;
         final Cluster cluster;

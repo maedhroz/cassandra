@@ -27,14 +27,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import accord.utils.Invariants;
-import org.apache.cassandra.distributed.Cluster;
 import org.apache.cassandra.distributed.api.ConsistencyLevel;
+import org.apache.cassandra.distributed.api.ICluster;
 import org.apache.cassandra.harry.ColumnSpec;
 import org.apache.cassandra.harry.SchemaSpec;
-import org.apache.cassandra.harry.op.Visit;
-import org.apache.cassandra.harry.op.Operations;
 import org.apache.cassandra.harry.model.Model;
 import org.apache.cassandra.harry.model.QuiescentChecker;
+import org.apache.cassandra.harry.op.Operations;
+import org.apache.cassandra.harry.op.Visit;
 
 import static org.apache.cassandra.harry.MagicConstants.LTS_UNKNOWN;
 import static org.apache.cassandra.harry.MagicConstants.NIL_DESCR;
@@ -46,7 +46,7 @@ public class InJvmDTestVisitExecutor extends CQLVisitExecutor
 {
     private static final Logger logger = LoggerFactory.getLogger(InJvmDTestVisitExecutor.class);
 
-    protected final Cluster cluster;
+    protected final ICluster<?> cluster;
     protected final ConsistencyLevel consistencyLevel;
 
     protected final NodeSelector nodeSelector;
@@ -56,7 +56,7 @@ public class InJvmDTestVisitExecutor extends CQLVisitExecutor
     protected InJvmDTestVisitExecutor(SchemaSpec schema,
                                       DataTracker dataTracker,
                                       Model model,
-                                      Cluster cluster,
+                                      ICluster<?> cluster,
                                       NodeSelector nodeSelector,
                                       PageSizeSelector pageSizeSelector,
                                       RetryPolicy retryPolicy,
@@ -97,8 +97,12 @@ public class InJvmDTestVisitExecutor extends CQLVisitExecutor
             rows = cluster.get(node).executeInternal(statement.cql(), statement.bindings());
         else
         {
-            rows = iterToArr(cluster.coordinator(node)
-                                    .executeWithPaging(statement.cql(), consistencyLevel, pageSizeSelector.pages(visit.lts), statement.bindings()));
+            int pages = pageSizeSelector.pages(visit.lts);
+            if (pages == PageSizeSelector.NO_PAGING)
+                rows = cluster.coordinator(node).execute(statement.cql(), consistencyLevel, statement.bindings());
+            else
+                rows = iterToArr(cluster.coordinator(node)
+                                        .executeWithPaging(statement.cql(), consistencyLevel, pages, statement.bindings()));
         }
 
         if (logger.isTraceEnabled())
@@ -249,6 +253,7 @@ public class InJvmDTestVisitExecutor extends CQLVisitExecutor
 
     public interface PageSizeSelector
     {
+        int NO_PAGING = -1;
         int pages(long lts);
     }
 
@@ -294,7 +299,7 @@ public class InJvmDTestVisitExecutor extends CQLVisitExecutor
             return this;
         }
 
-        protected void setDefaults(SchemaSpec schema, Cluster cluster)
+        protected void setDefaults(SchemaSpec schema, ICluster<?> cluster)
         {
             if (nodeSelector == null)
             {
@@ -312,7 +317,7 @@ public class InJvmDTestVisitExecutor extends CQLVisitExecutor
             }
         }
 
-        public InJvmDTestVisitExecutor build(SchemaSpec schema, Model.Replay replay, Cluster cluster)
+        public InJvmDTestVisitExecutor build(SchemaSpec schema, Model.Replay replay, ICluster<?> cluster)
         {
             setDefaults(schema, cluster);
             DataTracker tracker = new DataTracker.SequentialDataTracker();

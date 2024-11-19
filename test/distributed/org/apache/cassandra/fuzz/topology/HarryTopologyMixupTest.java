@@ -41,7 +41,6 @@ import org.apache.cassandra.distributed.Cluster;
 import org.apache.cassandra.distributed.api.IInstanceConfig;
 import org.apache.cassandra.distributed.shared.ClusterUtils;
 import org.apache.cassandra.exceptions.RequestTimeoutException;
-import org.apache.cassandra.harry.SchemaSpec;
 import org.apache.cassandra.harry.dsl.HistoryBuilder;
 import org.apache.cassandra.harry.dsl.ReplayingHistoryBuilder;
 import org.apache.cassandra.harry.execution.InJvmDTestVisitExecutor;
@@ -50,6 +49,7 @@ import org.apache.cassandra.harry.gen.Generator;
 import org.apache.cassandra.harry.gen.Generators;
 import org.apache.cassandra.harry.gen.SchemaGenerators;
 import org.apache.cassandra.harry.gen.rng.JdkRandomEntropySource;
+import org.apache.cassandra.harry.op.Operations;
 import org.apache.cassandra.service.consensus.TransactionalMode;
 import org.apache.cassandra.utils.AssertionUtils;
 import org.assertj.core.api.Condition;
@@ -109,7 +109,7 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
         if (((HarryState) state).numInserts > 0)
         {
             for (Integer pkIdx : state.testState.pkGen.generated())
-                state.testState.history.selectPartition(pkIdx);
+                state.testState.harry.selectPartition(pkIdx);
         }
     }
 
@@ -117,11 +117,11 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
     {
         return (rs, cluster) -> {
             EntropySource rng = new JdkRandomEntropySource(rs.nextLong());
-            Generator<SchemaSpec> schemaGen;
+            Generator<org.apache.cassandra.harry.SchemaSpec> schemaGen;
             org.apache.cassandra.harry.SchemaSpec schema;
             if (mode.kind != AccordMode.Kind.None)
                 schemaGen = SchemaGenerators.schemaSpecGen("harry", "table", 1000,
-                                                           SchemaSpec.Options.TRANSACTIONAL_MODE, mode.passthroughMode.toString());
+                                                           org.apache.cassandra.harry.SchemaSpec.Options.TRANSACTIONAL_MODE, mode.passthroughMode.toString());
             else
                 schemaGen = SchemaGenerators.schemaSpecGen("harry", "table", 1000);
 
@@ -161,7 +161,7 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
                                                                                                 }
                                                                                                 try
                                                                                                 {
-                                                                                                    var nodes = cluster.stream().filter(i -> !i.isShutdown()).mapToInt(i -> i.config().num()).toArray();
+                                                                                                    int[] nodes = cluster.stream().filter(i -> !i.isShutdown()).mapToInt(i -> i.config().num()).toArray();
                                                                                                     logger.warn("Timeout for txn {}; debug info\n{}", id, ClusterUtils.queryTxnStateAsString(cluster, id, nodes));
                                                                                                 }
                                                                                                 catch (Throwable t3)
@@ -196,7 +196,7 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
     private static CommandGen<Spec> cqlOperations(Spec spec)
     {
         Command<State<Spec>, Void, ?> insert = new HarryCommand(state -> "Harry Insert" + state.commandNamePostfix(), state -> {
-            spec.history.insert();
+            spec.harry.insert();
             ((HarryState) state).numInserts++;
         });
         return (rs, state) -> {
@@ -222,21 +222,25 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
         for (Integer pkIdx : spec.pkGen.generated())
         {
             long pd = spec.schema.valueGenerators.pkGen.descriptorAt(pkIdx);
-            reads.add(new HarryCommand(s -> String.format("Harry Validate pd=%d%s", pd, state.commandNamePostfix()), s -> spec.history.selectPartition(pkIdx)));
+            reads.add(new HarryCommand(s -> String.format("Harry Validate pd=%d%s", pd, state.commandNamePostfix()), s -> spec.harry.selectPartition(pkIdx)));
+
+            Object transationalMode = spec.schema.options.get(org.apache.cassandra.harry.SchemaSpec.Options.TRANSACTIONAL_MODE);
+            if (transationalMode != null && TransactionalMode.full.toString().equals(transationalMode))
+                reads.add(new HarryCommand(s -> String.format("Harry Validate pd=%d%s", pd, state.commandNamePostfix()), s -> spec.harry.selectPartition(pkIdx, Operations.ClusteringOrderBy.DESC)));
         }
         reads.add(new HarryCommand(s -> "Reset Harry Write State" + state.commandNamePostfix(), s -> ((HarryState) s).numInserts = 0));
         return Property.multistep(reads);
     }
 
-    public static class Spec implements TestState
+    public static class Spec implements SchemaSpec
     {
         private final Generators.TrackingGenerator<Integer> pkGen;
-        private final HistoryBuilder history;
-        private final SchemaSpec schema;
+        private final HistoryBuilder harry;
+        private final org.apache.cassandra.harry.SchemaSpec schema;
 
-        public Spec(HistoryBuilder history, SchemaSpec schema)
+        public Spec(HistoryBuilder history, org.apache.cassandra.harry.SchemaSpec schema)
         {
-            this.history = history;
+            this.harry = history;
             this.schema = schema;
             this.pkGen = Generators.tracking(Generators.int32(0, schema.valueGenerators.pkPopulation()));
         }

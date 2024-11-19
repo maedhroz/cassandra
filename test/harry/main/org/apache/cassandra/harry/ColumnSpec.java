@@ -23,6 +23,7 @@ import java.math.BigInteger;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
@@ -140,6 +141,11 @@ public class ColumnSpec<T>
     public static <T> ColumnSpec<T> ck(String name, DataType<T> type, Generator<T> gen, boolean isReversed)
     {
         return new ColumnSpec(name, isReversed ? ReversedType.getInstance(type) : type, gen, Kind.CLUSTERING);
+    }
+
+    public static <T> ColumnSpec<T> ck(String name, DataType<T> type)
+    {
+        return ck(name, type, false);
     }
 
     public static <T> ColumnSpec<T> ck(String name, DataType<T> type, boolean isReversed)
@@ -338,13 +344,7 @@ public class ColumnSpec<T>
 
         public Comparator<ByteBuffer> comparator()
         {
-            return new Comparator<ByteBuffer>()
-            {
-                public int compare(ByteBuffer o1, ByteBuffer o2)
-                {
-                    return ByteBufferUtil.compareUnsigned(o1, o2);
-                }
-            };
+            return ByteBufferUtil::compareUnsigned;
         }
     };
 
@@ -381,13 +381,7 @@ public class ColumnSpec<T>
         @Override
         public Comparator<String> comparator()
         {
-            return new Comparator<String>()
-            {
-                public int compare(String o1, String o2)
-                {
-                    return ByteArrayUtil.compareUnsigned(o1.getBytes(), o2.getBytes());
-                }
-            };
+            return (o1, o2) -> ByteArrayUtil.compareUnsigned(o1.getBytes(), o2.getBytes());
         }
     };
 
@@ -408,14 +402,8 @@ public class ColumnSpec<T>
         public Comparator<UUID> comparator()
         {
             // TODO: avoid serialization to match C* order
-            return new Comparator<UUID>()
-            {
-                public int compare(UUID o1, UUID o2)
-                {
-                    return UUIDType.instance.compare(UUIDType.instance.decompose(o1),
-                                                     UUIDType.instance.decompose(o2));
-                }
-            };
+            return (o1, o2) -> UUIDType.instance.compare(UUIDType.instance.decompose(o1),
+                                                         UUIDType.instance.decompose(o2));
         }
     };
 
@@ -519,34 +507,40 @@ public class ColumnSpec<T>
         }
     };
 
-    public static final List<DataType<?>> types = new ArrayList<>()
-    {{
-        add(int8Type);
-        add(int16Type);
-        add(int32Type);
-        add(int64Type);
-        add(floatType);
-        add(doubleType);
-        // TODO: SAI tests seem to fail with boolean
-        // add(booleanType);
-        add(asciiType);
-        add(textType);
-        // TODO: blob is not supported in SAI
-        // add(blobType);
-        add(uuidType);
-        add(timestampType);
-        // TODO: SAI test fails due to TimeSerializer#toString in tracing
-        //  add(timeType);
-        add(varintType);
-        add(decimalType);
-        add(inetType);
-        // TODO: compose proper value
-        // add(timeUuidType);
-    }};
+    public static final List<DataType<?>> TYPES;
+
+    static
+    {
+        List<DataType<?>> types = new ArrayList<>()
+        {{
+            add(int8Type);
+            add(int16Type);
+            add(int32Type);
+            add(int64Type);
+            add(floatType);
+            add(doubleType);
+            // TODO: SAI tests seem to fail with boolean
+            // add(booleanType);
+            add(asciiType);
+            add(textType);
+            // TODO: blob is not supported in SAI
+            // add(blobType);
+            add(uuidType);
+            add(timestampType);
+            // TODO: SAI test fails due to TimeSerializer#toString in tracing
+            //  add(timeType);
+            add(varintType);
+            add(decimalType);
+            add(inetType);
+            // TODO: compose proper value
+            // add(timeUuidType);
+        }};
+        TYPES = Collections.unmodifiableList(types);
+    }
 
     public static Generator<DataType<?>> regularColumnTypeGen()
     {
-        return Generators.pick(types);
+        return Generators.pick(TYPES);
     }
 
     public static Generator<DataType<?>> clusteringColumnTypeGen()
@@ -558,7 +552,7 @@ public class ColumnSpec<T>
     {
         public static final Map<DataType<?>, ReversedType<?>> cache = new HashMap<>()
         {{
-            for (DataType<?> type : types)
+            for (DataType<?> type : TYPES)
                 put(type, new ReversedType<>(type));
         }};
 

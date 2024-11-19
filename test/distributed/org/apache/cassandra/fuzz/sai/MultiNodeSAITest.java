@@ -18,66 +18,10 @@
 
 package org.apache.cassandra.fuzz.sai;
 
-import org.junit.Before;
-import org.junit.BeforeClass;
-
-import org.apache.cassandra.distributed.Cluster;
-import org.apache.cassandra.distributed.test.sai.SAIUtil;
-import org.apache.cassandra.harry.SchemaSpec;
-
-import static org.apache.cassandra.distributed.api.Feature.GOSSIP;
-import static org.apache.cassandra.distributed.api.Feature.NETWORK;
-
-public class MultiNodeSAITest extends SingleNodeSAITest
+public class MultiNodeSAITest extends MultiNodeSAITestBase
 {
-    @BeforeClass
-    public static void before() throws Throwable
+    public MultiNodeSAITest()
     {
-        cluster = Cluster.build()
-                         .withNodes(2)
-                         // At lower fetch sizes, queries w/ hundreds or thousands of matches can take a very long time.
-                         .withConfig(defaultConfig().andThen(c -> c.set("range_request_timeout", "180s")
-                                                                   .set("read_request_timeout", "180s")
-                                                                   .set("native_transport_timeout", "180s")
-                                                                   .set("slow_query_log_timeout", "180s")
-                                                                   .with(GOSSIP).with(NETWORK)))
-                         .createWithoutStarting();
-        cluster.setUncaughtExceptionsFilter(t -> {
-            logger.error("Caught exception, reporting during shutdown. Ignoring.", t);
-            return true;
-        });
-        cluster.startup();
-        cluster = init(cluster);
-    }
-
-    @Before
-    public void beforeEach()
-    {
-        cluster.schemaChange("DROP KEYSPACE IF EXISTS harry");
-        cluster.schemaChange("CREATE KEYSPACE harry WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 2};");
-    }
-
-    @Override
-    protected void flush(SchemaSpec schema)
-    {
-        cluster.forEach(i -> i.nodetool("flush", schema.keyspace));
-    }
-
-    @Override
-    protected void repair(SchemaSpec schema)
-    {
-        cluster.get(1).nodetool("repair", schema.keyspace);
-    }
-
-    @Override
-    protected void compact(SchemaSpec schema)
-    {
-        cluster.forEach(i -> i.nodetool("compact", schema.keyspace));
-    }
-
-    @Override
-    protected void waitForIndexesQueryable(SchemaSpec schema)
-    {
-        SAIUtil.waitForIndexQueryable(cluster, schema.keyspace);
+        super(false);
     }
 }

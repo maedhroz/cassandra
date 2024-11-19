@@ -502,6 +502,17 @@ class SingleOperationVisitBuilder implements SingleOperationBuilder
     }
 
     @Override
+    public SingleOperationBuilder selectPartition(int pdIdx, Operations.ClusteringOrderBy orderBy)
+    {
+        long pd = valueGenerators.pkGen.descriptorAt(pdIdx);
+        opIdCounter++;
+
+        operations.add(new Operations.SelectPartition(lts, pd, orderBy));
+        build();
+        return this;
+    }
+
+    @Override
     public SingleOperationBuilder selectRow(int pdIdx, int rowIdx)
     {
         long pd = valueGenerators.pkGen.descriptorAt(pdIdx);

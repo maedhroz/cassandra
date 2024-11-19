@@ -32,6 +32,7 @@ import org.apache.cassandra.distributed.shared.ClusterUtils;
 import org.apache.cassandra.distributed.test.TestBaseImpl;
 import org.apache.cassandra.harry.SchemaSpec;
 import org.apache.cassandra.harry.dsl.HistoryBuilder;
+import org.apache.cassandra.harry.dsl.ReplayingHistoryBuilder;
 import org.apache.cassandra.harry.execution.RingAwareInJvmDTestVisitExecutor;
 import org.apache.cassandra.harry.gen.Generator;
 import org.apache.cassandra.harry.gen.Generators;
@@ -72,11 +73,7 @@ public class AccordHostReplacementTest extends TestBaseImpl
                 SchemaSpec schema = schemaGen.generate(rng);
                 Generators.TrackingGenerator<Integer> pkGen = Generators.tracking(Generators.int32(0, Math.min(schema.valueGenerators.pkPopulation(), 1000)));
 
-                HistoryBuilder history = new HistoryBuilder(schema.valueGenerators);
-                history.customThrowing(() -> {
-                    cluster.schemaChange(format("CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 3};", KEYSPACE));
-                    cluster.schemaChange(schema.compile());
-                }, "Setup");
+                HistoryBuilder history = historyBuilder(schema, cluster);
                 waitForCMSToQuiesce(cluster, cluster.get(1));
 
                 for (int i = 0; i < 1000; i++)
@@ -91,13 +88,21 @@ public class AccordHostReplacementTest extends TestBaseImpl
 
                 for (int pk : pkGen.generated())
                     history.selectPartition(pk);
-
-                RingAwareInJvmDTestVisitExecutor.replay(RingAwareInJvmDTestVisitExecutor.builder()
-                                                                                        .replicationFactor(new TokenPlacementModel.SimpleReplicationFactor(2))
-                                                                                        .consistencyLevel(ConsistencyLevel.ALL)
-                                                                                        .build(schema, history, cluster),
-                                                        history);
             });
         }
+    }
+
+    private static HistoryBuilder historyBuilder(SchemaSpec schema, Cluster cluster)
+    {
+        HistoryBuilder history = new ReplayingHistoryBuilder(schema.valueGenerators,
+                                                             hb -> RingAwareInJvmDTestVisitExecutor.builder()
+                                                                                                   .replicationFactor(new TokenPlacementModel.SimpleReplicationFactor(2))
+                                                                                                   .consistencyLevel(ConsistencyLevel.ALL)
+                                                                                                   .build(schema, hb, cluster));
+        history.customThrowing(() -> {
+            cluster.schemaChange(format("CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 3};", KEYSPACE));
+            cluster.schemaChange(schema.compile());
+        }, "Setup");
+        return history;
     }
 }

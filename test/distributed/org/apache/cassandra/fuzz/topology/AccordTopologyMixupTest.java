@@ -175,7 +175,7 @@ public class AccordTopologyMixupTest extends TopologyMixupTestBase<AccordTopolog
         });
     }
 
-    public static class Spec implements TestState
+    public static class Spec implements SchemaSpec
     {
         private final TransactionalMode mode;
         private final boolean enableMigration;

@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 import accord.utils.Invariants;
 import org.apache.cassandra.distributed.Cluster;
 import org.apache.cassandra.distributed.api.ConsistencyLevel;
+import org.apache.cassandra.distributed.api.ICluster;
 import org.apache.cassandra.distributed.api.ICoordinator;
 import org.apache.cassandra.distributed.api.IInstance;
 import org.apache.cassandra.harry.SchemaSpec;
@@ -52,7 +53,7 @@ public class RingAwareInJvmDTestVisitExecutor extends InJvmDTestVisitExecutor
     private RingAwareInJvmDTestVisitExecutor(SchemaSpec schema,
                                              DataTracker dataTracker,
                                              Model model,
-                                             Cluster cluster,
+                                             ICluster<?> cluster,
                                              NodeSelector nodeSelector,
                                              PageSizeSelector pageSizeSelector,
                                              RetryPolicy retryPolicy,
@@ -65,7 +66,7 @@ public class RingAwareInJvmDTestVisitExecutor extends InJvmDTestVisitExecutor
 
     protected TokenPlacementModel.ReplicatedRanges getRing()
     {
-        IInstance node = cluster.firstAlive();
+        IInstance node = ((Cluster)cluster).firstAlive();
         ICoordinator coordinator = node.coordinator();
         List<TokenPlacementModel.Node> other = TokenPlacementModel.peerStateToNodes(coordinator.execute("select peer, tokens, data_center, rack from system.peers", ConsistencyLevel.ONE));
         List<TokenPlacementModel.Node> self = TokenPlacementModel.peerStateToNodes(coordinator.execute("select broadcast_address, tokens, data_center, rack from system.local", ConsistencyLevel.ONE));
@@ -175,7 +176,7 @@ public class RingAwareInJvmDTestVisitExecutor extends InJvmDTestVisitExecutor
         }
 
         @Override
-        protected void setDefaults(SchemaSpec schema, Cluster cluster)
+        protected void setDefaults(SchemaSpec schema, ICluster<?> cluster)
         {
             super.setDefaults(schema, cluster);
             if (this.rf == null)
@@ -184,14 +185,14 @@ public class RingAwareInJvmDTestVisitExecutor extends InJvmDTestVisitExecutor
             }
         }
 
-        public RingAwareInJvmDTestVisitExecutor build(SchemaSpec schema, Model.Replay replay, Cluster cluster)
+        public RingAwareInJvmDTestVisitExecutor build(SchemaSpec schema, Model.Replay replay, ICluster<?> cluster)
         {
             DataTracker tracker = new DataTracker.SequentialDataTracker();
             Model model = new QuiescentChecker(schema.valueGenerators, tracker, replay);
             return build(schema, tracker, model, cluster);
         }
 
-        public RingAwareInJvmDTestVisitExecutor build(SchemaSpec schema, DataTracker tracker, Model model, Cluster cluster)
+        public RingAwareInJvmDTestVisitExecutor build(SchemaSpec schema, DataTracker tracker, Model model, ICluster<?> cluster)
         {
             setDefaults(schema, cluster);
             return new RingAwareInJvmDTestVisitExecutor(schema, tracker, model, cluster,
