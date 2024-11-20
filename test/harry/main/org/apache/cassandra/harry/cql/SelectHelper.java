@@ -171,7 +171,7 @@ public class SelectHelper
                 builder.withColumnSelection(spec.name, spec.type.asServerType());
             }
 
-            if (selection.includeTimestamp())
+            if (selection.includeTimestamps())
             {
                 for (ColumnSpec<?> spec : schema.staticColumns)
                 {

@@ -31,57 +31,21 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 
-import org.apache.cassandra.harry.gen.rng.JdkRandomEntropySource;
+import accord.utils.Invariants;
 import org.apache.cassandra.harry.util.BitSet;
 import org.apache.cassandra.locator.InetAddressAndPort;
 import org.apache.cassandra.utils.TimeUUID;
 
 public class Generators
 {
-    /**
-     * Create a generator that will produce _at most_ N values.
-     *
-     * Since type T may contain less entropy than requested population, it is
-     * not guaranteed to produce exactly N values.
-     */
-    public static <T> Generator<T> population(Generator<T> gen, int population)
-    {
-        return new Generator<T>()
-        {
-            final long[] seeds = new long[population];
-            final EntropySource local = new JdkRandomEntropySource(0L);
-            boolean initialized = false;
-            @Override
-            public T generate(EntropySource rng)
-            {
-                // Generate a fixed number of seeds
-                if (!initialized)
-                {
-                    for (int i = 0; i < population; i++)
-                        seeds[i] = rng.next();
-                    initialized = true;
-                }
-
-                // pick a seed to generate an item from
-                local.seed(seeds[rng.nextInt(0, population)]);
-
-                return gen.generate(local);
-            }
-        };
-    }
-
     public static Generator<BitSet> bitSet(int size)
     {
-        return new Generator<BitSet>()
-        {
-            public BitSet generate(EntropySource rng)
-            {
-                BitSet bitSet = BitSet.allUnset(size);
-                for (int i = 0; i < size; i++)
-                    if (rng.nextBoolean())
-                        bitSet.set(i);
-                return bitSet;
-            }
+        return rng -> {
+            BitSet bitSet = BitSet.allUnset(size);
+            for (int i = 0; i < size; i++)
+                if (rng.nextBoolean())
+                    bitSet.set(i);
+            return bitSet;
         };
     }
 
@@ -186,7 +150,20 @@ public class Generators
 
     public static Generator<UUID> uuidGen()
     {
-        return rng -> new UUID(rng.next(), rng.next());
+        return rng -> {
+            long msb = rng.next();
+            // Adopted from JDK code, UUID#randomUUID
+            // randomBytes[6]  &= 0x0f;  /* clear version        */
+            msb &= ~(0xFL << 12);
+            // randomBytes[6]  |= 0x40;  /* set to version 4     */
+            msb |= (0x40L << 8);
+            long lsb = rng.next();
+            // randomBytes[8]  &= 0x3f;  /* clear variant        */
+            lsb &= ~(0x3L << 62);
+            // randomBytes[8]  |= 0x80;  /* set to IETF variant  */
+            lsb |= (0x2L << 62);
+            return new UUID(msb, lsb);
+        };
     }
 
     public static Generator<BigInteger> bigInt()
@@ -305,6 +282,7 @@ public class Generators
             {
                 T v = delegate.generate(rng);
                 int hashCode = v.hashCode();
+                Invariants.checkState(hashCode != System.identityHashCode(v), "hashCode was not overridden for type %s", v.getClass());
                 if (hashCodes.contains(hashCode))
                     continue;
                 hashCodes.add(hashCode);
@@ -415,7 +393,7 @@ public class Generators
         return pick(Arrays.asList(ts));
     }
 
-    public static <T> Generator<List<T>> repeat(int minSize, int maxSize, Generator<T> gen)
+    public static <T> Generator<List<T>> list(int minSize, int maxSize, Generator<T> gen)
     {
         return rng -> {
             List<T> objects = new ArrayList<>();
@@ -429,17 +407,12 @@ public class Generators
 
     public static Generator<Object[]> zipArray(Generator<?>... gens)
     {
-        return new Generator<Object[]>()
-        {
-            @Override
-            public Object[] generate(EntropySource rng)
-            {
-                Object[] objects = new Object[gens.length];
-                for (int i = 0; i < objects.length; i++)
-                    objects[i] = gens[i].generate(rng);
+        return rng -> {
+            Object[] objects = new Object[gens.length];
+            for (int i = 0; i < objects.length; i++)
+                objects[i] = gens[i].generate(rng);
 
-                return objects;
-            }
+            return objects;
         };
     }
 

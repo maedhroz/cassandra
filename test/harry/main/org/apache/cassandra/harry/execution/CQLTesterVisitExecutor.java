@@ -159,10 +159,10 @@ public class CQLTesterVisitExecutor extends CQLVisitExecutor
         }
 
         long[] regularLts = LTS_UNKNOWN;
-        if (selection.includeTimestamp())
+        if (selection.includeTimestamps())
             throw new IllegalStateException("not implemented for CQL Tester");
         long[] staticLts = LTS_UNKNOWN;
-        if (selection.includeTimestamp())
+        if (selection.includeTimestamps())
             throw new IllegalStateException("not implemented for CQL Tester");
 
         return new ResultSetRow(pd, cd, staticColumns, staticLts, regularColumns, regularLts);

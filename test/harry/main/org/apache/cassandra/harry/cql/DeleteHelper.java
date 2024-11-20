@@ -43,7 +43,7 @@ public class DeleteHelper
          .append(".")
          .append(Symbol.maybeQuote(schema.table));
 
-        if (timestamp != -1 && schema.options.writeTimestampsAllowed())
+        if (timestamp != -1 && schema.options.addWriteTimestamps())
             b.append(" USING TIMESTAMP ").append(timestamp);
 
         b.append(" WHERE ");
@@ -74,7 +74,7 @@ public class DeleteHelper
          .append(".")
          .append(Symbol.maybeQuote(schema.table));
 
-        if (timestamp != -1 && schema.options.writeTimestampsAllowed())
+        if (timestamp != -1 && schema.options.addWriteTimestamps())
             b.append(" USING TIMESTAMP ").append(timestamp);
 
         b.append(" WHERE ");
@@ -132,7 +132,7 @@ public class DeleteHelper
          .append(".")
          .append(Symbol.maybeQuote(schema.table));
 
-        if (timestamp != -1 && schema.options.writeTimestampsAllowed())
+        if (timestamp != -1 && schema.options.addWriteTimestamps())
             b.append(" USING TIMESTAMP ").append(timestamp);
 
         b.append(" WHERE ");
@@ -166,7 +166,7 @@ public class DeleteHelper
          .append(".")
          .append(Symbol.maybeQuote(schema.table));
 
-        if (timestamp != -1 && schema.options.writeTimestampsAllowed())
+        if (timestamp != -1 && schema.options.addWriteTimestamps())
             b.append(" USING TIMESTAMP ").append(timestamp);
 
         b.append(" WHERE ");

@@ -31,6 +31,7 @@ import accord.utils.Invariants;
 import org.apache.cassandra.distributed.api.ConsistencyLevel;
 import org.apache.cassandra.distributed.api.ICluster;
 import org.apache.cassandra.harry.ColumnSpec;
+import org.apache.cassandra.harry.MagicConstants;
 import org.apache.cassandra.harry.SchemaSpec;
 import org.apache.cassandra.harry.model.Model;
 import org.apache.cassandra.harry.model.QuiescentChecker;
@@ -245,10 +246,26 @@ public class InJvmDTestVisitExecutor extends CQLVisitExecutor
             }
         }
 
-        if (selection.includeTimestamp())
-            throw new IllegalStateException("not implemented for CQL Tester");
-        if (selection.includeTimestamp())
-            throw new IllegalStateException("not implemented for CQL Tester");
+        if (selection.includeTimestamps())
+        {
+            long[] slts = new long[schema.staticColumns.size()];
+            Arrays.fill(slts, MagicConstants.NO_TIMESTAMP);
+            for (int i = 0, sltsBase = schema.allColumnInSelectOrder.size(); i < slts.length && sltsBase + i < result.length; i++)
+            {
+                Object v = result[schema.allColumnInSelectOrder.size() + i];
+                if (v != null)
+                    slts[i] = (long) v;
+            }
+
+            long[] lts = new long[schema.regularColumns.size()];
+            Arrays.fill(lts, MagicConstants.NO_TIMESTAMP);
+            for (int i = 0, ltsBase = schema.allColumnInSelectOrder.size() + slts.length; i < lts.length && ltsBase + i < result.length; i++)
+            {
+                Object v = result[ltsBase + i];
+                if (v != null)
+                    lts[i] = (long) v;
+            }
+        }
 
         return new ResultSetRow(pd, cd, staticColumns, staticLts, regularColumns, regularLts);
     }

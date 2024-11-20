@@ -35,10 +35,10 @@ public class SchemaGenerators
     {
         return new Generator<>()
         {
-            final Generator<List<ColumnSpec<?>>> regularGen = Generators.repeat(1, 10, regularColumnSpecGen());
-            final Generator<List<ColumnSpec<?>>> staticGen = Generators.repeat(1, 10, staticColumnSpecGen());
-            final Generator<List<ColumnSpec<?>>> ckGen = Generators.repeat(1, 10, ckColumnSpecGen());
-            final Generator<List<ColumnSpec<?>>> pkGen = Generators.repeat(1, 10, pkColumnSpecGen());
+            final Generator<List<ColumnSpec<?>>> regularGen = Generators.list(1, 10, regularColumnSpecGen());
+            final Generator<List<ColumnSpec<?>>> staticGen = Generators.list(1, 10, staticColumnSpecGen());
+            final Generator<List<ColumnSpec<?>>> ckGen = Generators.list(1, 10, ckColumnSpecGen());
+            final Generator<List<ColumnSpec<?>>> pkGen = Generators.list(1, 10, pkColumnSpecGen());
 
             int counter = 0;
             public SchemaSpec generate(EntropySource rng)

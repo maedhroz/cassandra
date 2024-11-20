@@ -20,6 +20,7 @@ package org.apache.cassandra.fuzz.topology;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
@@ -122,8 +123,12 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
             Generator<SchemaSpec> schemaGen;
             SchemaSpec schema;
             if (mode.kind != AccordMode.Kind.None)
+            {
                 schemaGen = SchemaGenerators.schemaSpecGen("harry", "table", 1000,
-                                                           SchemaSpec.optionsBuilder().withTransactionalMode(mode.transactionalMode));
+                                                           SchemaSpec.optionsBuilder()
+                                                                     .withTransactionalMode(mode.transactionalMode)
+                                                                     .addWriteTimestamps(!isWriteTimeFromAccord(mode.transactionalMode)));
+            }
             else
                 schemaGen = SchemaGenerators.schemaSpecGen("harry", "table", 1000);
 
@@ -279,5 +284,10 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
         {
             config.set("metadata_snapshot_frequency", 5);
         }
+    }
+
+    private static boolean isWriteTimeFromAccord(TransactionalMode transactionalMode)
+    {
+        return transactionalMode != null && transactionalMode.writesThroughAccord;
     }
 }

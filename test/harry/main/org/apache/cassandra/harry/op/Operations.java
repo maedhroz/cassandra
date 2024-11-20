@@ -453,7 +453,7 @@ public class Operations
     {
         // TODO: allow expressions here
         Collection<ColumnSpec<?>> columns();
-        boolean includeTimestamp();
+        boolean includeTimestamps();
         boolean isWildcard();
 
         boolean selects(ColumnSpec<?> column);
@@ -498,7 +498,7 @@ public class Operations
         }
 
         @Override
-        public boolean includeTimestamp()
+        public boolean includeTimestamps()
         {
             return false;
         }
@@ -528,7 +528,7 @@ public class Operations
         }
 
         @Override
-        public boolean includeTimestamp()
+        public boolean includeTimestamps()
         {
             return includeTimestamp;
         }

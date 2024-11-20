@@ -349,24 +349,12 @@ public class SchemaSpec
     public static interface Options
     {
         String transactionalMode();
-        boolean skipWriteTimestamps();
+        boolean addWriteTimestamps();
         boolean disableReadRepair();
         String compactionStrategy();
         boolean compactStorage();
         boolean ifNotExists();
         boolean trackLts();
-
-        default boolean writeTimestampsAllowed()
-        {
-            //
-            return skipWriteTimestamps();
-//            if (skipWriteTimestamps())
-//                return false;
-//            if (transactionalMode() == null)
-//                return true;
-//
-//            return !TransactionalMode.full.toString().equals(transactionalMode());
-        }
     }
 
     public static OptionsBuilder optionsBuilder()
@@ -377,7 +365,7 @@ public class SchemaSpec
     public static class OptionsBuilder implements Options
     {
         private String transactionalMode = null;
-        private boolean skipWriteTimestamps = false;
+        private boolean addWriteTimestamps = true;
         private boolean disableReadRepair = false;
         private String compactionStrategy = null;
         private boolean ifNotExists = false;
@@ -400,16 +388,16 @@ public class SchemaSpec
             return transactionalMode;
         }
 
-        public OptionsBuilder skipWriteTimestamps(boolean v)
+        public OptionsBuilder addWriteTimestamps(boolean v)
         {
-            this.skipWriteTimestamps = true;
+            this.addWriteTimestamps = true;
             return this;
         }
 
         @Override
-        public boolean skipWriteTimestamps()
+        public boolean addWriteTimestamps()
         {
-            return skipWriteTimestamps;
+            return addWriteTimestamps;
         }
 
         public OptionsBuilder disableReadRepair(boolean v)

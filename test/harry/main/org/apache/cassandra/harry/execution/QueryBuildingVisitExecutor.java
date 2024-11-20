@@ -168,11 +168,7 @@ public class QueryBuildingVisitExecutor extends VisitExecutor
             return String.format(wrapInUnloggedBatchFormat, compiled);
         };
 
-        WrapQueries TRANSACTION = (visit, compiled) -> {
-            if (visit.operations.length == 1)
-                return compiled;
-            return String.format(wrapInTxnFormat, compiled);
-        };
+        WrapQueries TRANSACTION = (visit, compiled) -> String.format(wrapInTxnFormat, compiled);
 
 
         String wrap(Visit visit, String compiled);

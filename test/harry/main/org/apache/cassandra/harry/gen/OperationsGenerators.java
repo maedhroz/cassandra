@@ -25,9 +25,10 @@ public class OperationsGenerators
 {
     public static Generator<Long> lts()
     {
-        return new Generator<Long>()
+        return new Generator<>()
         {
             long counter = 0;
+
             @Override
             public Long generate(EntropySource rng)
             {
@@ -41,9 +42,10 @@ public class OperationsGenerators
     {
         int population = schema.valueGenerators.pkPopulation();
 
-        return new Generator<Long>()
+        return new Generator<>()
         {
             int counter = 0;
+
             @Override
             public Long generate(EntropySource rng)
             {
@@ -56,9 +58,10 @@ public class OperationsGenerators
     {
         int population = schema.valueGenerators.ckPopulation();
 
-        return new Generator<Long>()
+        return new Generator<>()
         {
             int counter = 0;
+
             @Override
             public Long generate(EntropySource rng)
             {
@@ -77,7 +80,7 @@ public class OperationsGenerators
                                           Generator<Long> pdGen,
                                           Generator<Long> cdGen)
     {
-        return (rng) -> (lts) -> {
+        return (rng) -> {
             long pd = pdGen.generate(rng);
             long cd = cdGen.generate(rng);
 
@@ -94,11 +97,11 @@ public class OperationsGenerators
                 sds[i] = schema.valueGenerators.staticColumnGens.get(i).descriptorAt(idx);
             }
 
-            return new Operations.WriteOp(lts, pd, cd, vds, sds, Operations.Kind.INSERT);
+            return (lts) -> new Operations.WriteOp(lts, pd, cd, vds, sds, Operations.Kind.INSERT);
         };
     }
 
-    public static interface ToOp
+    public interface ToOp
     {
         Operations.Operation toOp(long lts);
     }

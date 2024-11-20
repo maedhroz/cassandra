@@ -88,7 +88,7 @@ public class WriteHelper
         }
 
         b.append(")");
-        if (timestamp != -1 && schema.options.writeTimestampsAllowed())
+        if (timestamp != -1 && schema.options.addWriteTimestamps())
         {
             b.append(" USING TIMESTAMP ")
              .append(timestamp);
@@ -139,7 +139,7 @@ public class WriteHelper
          .append('.')
          .append(schema.table);
 
-        if (timestamp != -1 && schema.options.writeTimestampsAllowed())
+        if (timestamp != -1 && schema.options.addWriteTimestamps())
         {
             b.append(" USING TIMESTAMP ")
              .append(timestamp)

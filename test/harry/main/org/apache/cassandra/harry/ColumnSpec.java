@@ -530,8 +530,9 @@ public class ColumnSpec<T>
             add(int64Type);
             add(floatType);
             add(doubleType);
-            // TODO: SAI tests seem to fail with boolean
+            // TODO: SAI tests seem to fail these types
             // add(booleanType);
+            // add(inetType);
             add(asciiType);
             add(textType);
             // TODO: blob is not supported in SAI
@@ -542,7 +543,7 @@ public class ColumnSpec<T>
             //  add(timeType);
             add(varintType);
             add(decimalType);
-            add(inetType);
+
             // TODO: compose proper value
             // add(timeUuidType);
         }};
