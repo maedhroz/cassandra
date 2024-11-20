@@ -233,7 +233,7 @@ public class SelectHelper
     private static CompiledStatement toCompiled(Select select)
     {
         // Select does not add ';' by default, but CompiledStatement expects this
-        String cql = select.toCQL().replace("\n", "") + ";";
+        String cql = select.toCQL().replace("\n", " ") + ";";
         Object[] bindingsArr = select.binds();
         return new CompiledStatement(cql, bindingsArr);
     }

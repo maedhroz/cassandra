@@ -19,7 +19,6 @@
 package org.apache.cassandra.harry.execution;
 
 import java.net.InetAddress;
-import java.util.Date;
 import java.util.UUID;
 
 import org.apache.cassandra.distributed.api.ConsistencyLevel;

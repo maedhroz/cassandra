@@ -35,6 +35,7 @@ import org.apache.cassandra.harry.cql.WriteHelper;
 import org.apache.cassandra.harry.op.Operations;
 import org.apache.cassandra.harry.op.Visit;
 
+// TODO: this class can be substantially improved by removing internal mutable state
 public class QueryBuildingVisitExecutor extends VisitExecutor
 {
     private static final Logger logger = LoggerFactory.getLogger(QueryBuildingVisitExecutor.class);
@@ -47,7 +48,7 @@ public class QueryBuildingVisitExecutor extends VisitExecutor
         this.wrapQueries = wrapQueries;
     }
 
-    public CompiledStatement compile(Visit visit)
+    public BuiltQuery compile(Visit visit)
     {
         beginLts(visit.lts);
         for (Operations.Operation op : visit.operations)
@@ -59,7 +60,30 @@ public class QueryBuildingVisitExecutor extends VisitExecutor
 
         // TODO: try inducing timeouts and checking non-propagation or discovery
         endLts(visit.lts);
-        return compiledStatement;
+
+        if (!statements.isEmpty())
+        {
+            Object[] bindingsArray = new Object[bindings.size()];
+            bindings.toArray(bindingsArray);
+            BuiltQuery query = new BuiltQuery(selects,
+                                   wrapQueries.wrap(visit, String.join("\n ", statements)),
+                                   bindingsArray);
+            clear();
+            return query;
+        }
+
+        Invariants.checkState(bindings.isEmpty() && visitedPds.isEmpty() && selects.isEmpty());
+        return null;
+    }
+
+    public static class BuiltQuery extends CompiledStatement
+    {
+        protected final List<Operations.SelectStatement> selects;
+        public BuiltQuery(List<Operations.SelectStatement> selects, String cql, Object... bindings)
+        {
+            super(cql, bindings);
+            this.selects = selects;
+        }
     }
 
     /**
@@ -69,16 +93,14 @@ public class QueryBuildingVisitExecutor extends VisitExecutor
     private final List<Object> bindings = new ArrayList<>();
     private final Set<Long> visitedPds = new HashSet<>();
 
-    protected List<Operations.SelectStatement> selects = new ArrayList<>();
-    private CompiledStatement compiledStatement = null;
+    private List<Operations.SelectStatement> selects = null;
 
     protected void beginLts(long lts)
     {
         statements.clear();
         bindings.clear();
         visitedPds.clear();
-        selects.clear();
-        compiledStatement = null;
+        selects = new ArrayList<>();
     }
 
     protected void endLts(long lts)
@@ -89,15 +111,15 @@ public class QueryBuildingVisitExecutor extends VisitExecutor
             return;
         }
 
-        String query = String.join("\n ", statements);
+        assert visitedPds.size() == 1 : String.format("Token aware only works with a single value per token, but got %s", visitedPds);
+    }
 
-        Object[] bindingsArray = new Object[bindings.size()];
-        bindings.toArray(bindingsArray);
+    private void clear()
+    {
         statements.clear();
         bindings.clear();
-
-        compiledStatement = new CompiledStatement(query, bindingsArray);
-        assert visitedPds.size() == 1 : String.format("Token aware only works with a single value per token, but got %s", visitedPds);
+        visitedPds.clear();
+        selects = null;
     }
 
     protected void operation(Operations.Operation operation)

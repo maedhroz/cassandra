@@ -129,7 +129,7 @@ public abstract class CQLVisitExecutor
     public void execute(Visit visit)
     {
         dataTracker.begin(visit);
-        CompiledStatement compiledStatement = queryBuilder.compile(visit);
+        QueryBuildingVisitExecutor.BuiltQuery compiledStatement = queryBuilder.compile(visit);
         // All operations are not touching any data
         if (compiledStatement == null)
         {
@@ -137,7 +137,7 @@ public abstract class CQLVisitExecutor
             return;
         }
 
-        List<Operations.SelectStatement> selects = queryBuilder.selects;
+        List<Operations.SelectStatement> selects = compiledStatement.selects;
         if (selects.isEmpty())
         {
             executeMutatingVisit(visit, compiledStatement);
