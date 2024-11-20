@@ -68,7 +68,7 @@ public class AccordHostReplacementTest extends TestBaseImpl
 
             withRandom(rng -> {
                 Generator<SchemaSpec> schemaGen = SchemaGenerators.schemaSpecGen(KEYSPACE, "host_replace", 1000,
-                                                                                 SchemaSpec.optionsBuilder().withTransactionalMode(transactionalModeGen.generate(rng).toString()));
+                                                                                 SchemaSpec.optionsBuilder().withTransactionalMode(transactionalModeGen.generate(rng)));
                 SchemaSpec schema = schemaGen.generate(rng);
                 Generators.TrackingGenerator<Integer> pkGen = Generators.tracking(Generators.int32(0, Math.min(schema.valueGenerators.pkPopulation(), 1000)));
 
@@ -95,7 +95,7 @@ public class AccordHostReplacementTest extends TestBaseImpl
     {
         HistoryBuilder history = new ReplayingHistoryBuilder(schema.valueGenerators,
                                                              hb -> RingAwareInJvmDTestVisitExecutor.builder()
-                                                                                                   .replicationFactor(new TokenPlacementModel.SimpleReplicationFactor(2))
+                                                                                                   .replicationFactor(new TokenPlacementModel.SimpleReplicationFactor(3))
                                                                                                    .consistencyLevel(ConsistencyLevel.ALL)
                                                                                                    .build(schema, hb, cluster));
         history.customThrowing(() -> {

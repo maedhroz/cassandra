@@ -20,15 +20,17 @@ package org.apache.cassandra.harry.execution;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import accord.utils.Invariants;
+import org.apache.cassandra.distributed.api.ConsistencyLevel;
 import org.apache.cassandra.harry.SchemaSpec;
-import org.apache.cassandra.harry.op.Visit;
-import org.apache.cassandra.harry.op.Operations;
 import org.apache.cassandra.harry.model.Model;
+import org.apache.cassandra.harry.op.Operations;
+import org.apache.cassandra.harry.op.Visit;
 
 /**
  *
@@ -77,21 +79,33 @@ public abstract class CQLVisitExecutor
     public static void replayAfterFailure(Visit visit, CQLVisitExecutor executor, Model.Replay replay)
     {
         QueryBuildingVisitExecutor queryBuilder = executor.queryBuilder;
-        logger.error("Caught an exception at {} while replaying {}\n{}\n{}\nOperations up to this visit:", queryBuilder.compile(visit), queryBuilder.schema.compile(), visit.lts, visit);
-        long minLts = Math.max(0, visit.lts - 20); // last 20 ops
+        logger.error("Caught an exception at {} while replaying {}\ncluster.schemaChange(\"{}\");\nOperations _for this partition_ up to this visit:",
+                     visit, queryBuilder.compile(visit),
+                     queryBuilder.schema.compile());
         for (Visit rereplay : replay)
         {
-            if (rereplay.lts < minLts)
-                continue;
-
-            logger.info("{}: {}", rereplay, queryBuilder.compile(rereplay));
+            String str = "";
+            CompiledStatement cs = queryBuilder.compile(rereplay);
+            if (cs != null)
+                str = cs.dump(ConsistencyLevel.QUORUM);
+            logger.info("/*{}*/ {}", rereplay, str);
 
             if (rereplay.lts > visit.lts)
                 return;
         }
     }
 
-    public final void execute(Visit visit)
+    private static boolean intersects(Set<?> set1, Set<?> set2)
+    {
+        for (Object o : set1)
+        {
+            if (set2.contains(o))
+                return true;
+        }
+        return false;
+    }
+
+    public void execute(Visit visit)
     {
         dataTracker.begin(visit);
         CompiledStatement compiledStatement = queryBuilder.compile(visit);

@@ -220,7 +220,7 @@ public class ColumnSpec<T>
         public abstract Comparator<T> comparator();
     }
 
-    public static abstract class ComparableDataType<T extends Comparable<T>> extends DataType<T>
+    public static abstract class ComparableDataType<T extends Comparable<? super T>> extends DataType<T>
     {
         protected ComparableDataType(String cqlName)
         {

@@ -136,8 +136,8 @@ public abstract class TopologyMixupTestBase<S extends TopologyMixupTestBase.Sche
     // common commands
     private Command<State<S>, Void, ?> repairCommand(int toCoordinate)
     {
-        return new SimpleCommand<>(state -> "nodetool repair " + state.testState.keyspace() + ' ' + state.testState.table() + " from node" + toCoordinate + state.commandNamePostfix(),
-                                   state -> state.cluster.get(toCoordinate).nodetoolResult("repair", state.testState.keyspace(), state.testState.table(), "--force").asserts().success());
+        return new SimpleCommand<>(state -> "nodetool repair " + state.schema.keyspace() + ' ' + state.schema.table() + " from node" + toCoordinate + state.commandNamePostfix(),
+                                   state -> state.cluster.get(toCoordinate).nodetoolResult("repair", state.schema.keyspace(), state.schema.table(), "--force").asserts().success());
     }
 
     private static <S extends Schema> Command<State<S>, Void, ?> repairCommand(int toCoordinate, String ks, String... tables) {
@@ -509,7 +509,7 @@ public abstract class TopologyMixupTestBase<S extends TopologyMixupTestBase.Sche
     {
         final TopologyHistory topologyHistory;
         final Cluster cluster;
-        final S testState;
+        final S schema;
         final List<BiFunction<State<S>, Gen<Command<State<S>, Void, ?>>, Gen<Command<State<S>, Void, ?>>>> commandsTransformers = new ArrayList<>();
         final List<Runnable> preActions = new CopyOnWriteArrayList<>();
         final AtomicLong currentEpoch = new AtomicLong();
@@ -672,8 +672,8 @@ public abstract class TopologyMixupTestBase<S extends TopologyMixupTestBase.Sche
                 // ring must know about the up nodes
             });
             preActions.add(() -> cluster.checkAndResetUncaughtExceptions());
-            this.testState = schemaSpecGen.apply(rs, cluster);
-            statementGen = cqlOperationsGen.apply(testState);
+            this.schema = schemaSpecGen.apply(rs, cluster);
+            statementGen = cqlOperationsGen.apply(schema);
 
             removeTypeGen = REMOVE_TYPE_DISTRIBUTION.next(rs);
 

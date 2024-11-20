@@ -110,8 +110,8 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
         if (cause != null) return;
         if (((HarryState) state).numInserts > 0)
         {
-            for (Integer pkIdx : state.testState.pkGen.generated())
-                state.testState.harry.selectPartition(pkIdx);
+            for (Integer pkIdx : state.schema.pkGen.generated())
+                state.schema.harry.selectPartition(pkIdx);
         }
     }
 
@@ -123,57 +123,60 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
             SchemaSpec schema;
             if (mode.kind != AccordMode.Kind.None)
                 schemaGen = SchemaGenerators.schemaSpecGen("harry", "table", 1000,
-                                                           SchemaSpec.optionsBuilder().withTransactionalMode(mode.transactionalMode.toString()));
+                                                           SchemaSpec.optionsBuilder().withTransactionalMode(mode.transactionalMode));
             else
                 schemaGen = SchemaGenerators.schemaSpecGen("harry", "table", 1000);
 
             schema = schemaGen.generate(rng);
 
             HistoryBuilder harry = new ReplayingHistoryBuilder(schema.valueGenerators,
-                                                               hb -> InJvmDTestVisitExecutor.builder()
-                                                                                            .wrapQueries(QueryBuildingVisitExecutor.WrapQueries.TRANSACTION)
-                                                                                            .nodeSelector(new InJvmDTestVisitExecutor.NodeSelector()
-                                                                                            {
-                                                                                                private final AtomicLong cnt = new AtomicLong();
+                                                               hb -> {
+                                                                   InJvmDTestVisitExecutor.Builder builder = InJvmDTestVisitExecutor.builder();
+                                                                   if (mode.kind == AccordMode.Kind.Direct)
+                                                                       builder = builder.wrapQueries(QueryBuildingVisitExecutor.WrapQueries.TRANSACTION);
+                                                                   return builder.nodeSelector(new InJvmDTestVisitExecutor.NodeSelector()
+                                                                                 {
+                                                                                     private final AtomicLong cnt = new AtomicLong();
 
-                                                                                                @Override
-                                                                                                public int select(long lts)
-                                                                                                {
-                                                                                                    for (int i = 0; i < 42; i++)
-                                                                                                    {
-                                                                                                        int selected = (int) (cnt.getAndIncrement() % cluster.size() + 1);
-                                                                                                        if (!cluster.get(selected).isShutdown())
-                                                                                                            return selected;
-                                                                                                    }
-                                                                                                    throw new IllegalStateException("Unable to find an alive instance");
-                                                                                                }
-                                                                                            })
-                                                                                            .retryPolicy(t -> {
-                                                                                                t = Throwables.getRootCause(t);
-                                                                                                if (!TIMEOUT_CHECKER.matches(t))
-                                                                                                    return false;
+                                                                                     @Override
+                                                                                     public int select(long lts)
+                                                                                     {
+                                                                                         for (int i = 0; i < 42; i++)
+                                                                                         {
+                                                                                             int selected = (int) (cnt.getAndIncrement() % cluster.size() + 1);
+                                                                                             if (!cluster.get(selected).isShutdown())
+                                                                                                 return selected;
+                                                                                         }
+                                                                                         throw new IllegalStateException("Unable to find an alive instance");
+                                                                                     }
+                                                                                 })
+                                                                                 .retryPolicy(t -> {
+                                                                                     t = Throwables.getRootCause(t);
+                                                                                     if (!TIMEOUT_CHECKER.matches(t))
+                                                                                         return false;
 
-                                                                                                TxnId id;
-                                                                                                try
-                                                                                                {
-                                                                                                    id = TxnId.parse(t.getMessage());
-                                                                                                }
-                                                                                                catch (Throwable t2)
-                                                                                                {
-                                                                                                    return true;
-                                                                                                }
-                                                                                                try
-                                                                                                {
-                                                                                                    int[] nodes = cluster.stream().filter(i -> !i.isShutdown()).mapToInt(i -> i.config().num()).toArray();
-                                                                                                    logger.warn("Timeout for txn {}; debug info\n{}", id, ClusterUtils.queryTxnStateAsString(cluster, id, nodes));
-                                                                                                }
-                                                                                                catch (Throwable t3)
-                                                                                                {
-                                                                                                    t.addSuppressed(t3);
-                                                                                                }
-                                                                                                return false;
-                                                                                            })
-                                                                                            .build(schema, hb, cluster));
+                                                                                     TxnId id;
+                                                                                     try
+                                                                                     {
+                                                                                         id = TxnId.parse(t.getMessage());
+                                                                                     }
+                                                                                     catch (Throwable t2)
+                                                                                     {
+                                                                                         return true;
+                                                                                     }
+                                                                                     try
+                                                                                     {
+                                                                                         int[] nodes = cluster.stream().filter(i -> !i.isShutdown()).mapToInt(i -> i.config().num()).toArray();
+                                                                                         logger.warn("Timeout for txn {}; debug info\n{}", id, ClusterUtils.queryTxnStateAsString(cluster, id, nodes));
+                                                                                     }
+                                                                                     catch (Throwable t3)
+                                                                                     {
+                                                                                         t.addSuppressed(t3);
+                                                                                     }
+                                                                                     return false;
+                                                                                 })
+                                                                                 .build(schema, hb, cluster);
+                                                               });
             cluster.schemaChange(String.format("CREATE KEYSPACE %s WITH replication = {'class': 'SimpleStrategy', 'replication_factor' : 3};", schema.keyspace));
             cluster.schemaChange(schema.compile());
             waitForCMSToQuiesce(cluster, cluster.get(1));
@@ -219,7 +222,7 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
 
     private static Command<State<Spec>, Void, ?> validateAll(State<Spec> state)
     {
-        Spec spec = state.testState;
+        Spec spec = state.schema;
         List<Command<State<Spec>, Void, ?>> reads = new ArrayList<>();
 
         for (Integer pkIdx : spec.pkGen.generated())
@@ -229,7 +232,7 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
 
             Object transationalMode = spec.schema.options.transactionalMode();
             if (transationalMode != null && TransactionalMode.full.toString().equals(transationalMode))
-                reads.add(new HarryCommand(s -> String.format("Harry Validate pd=%d%s", pd, state.commandNamePostfix()), s -> spec.harry.selectPartition(pkIdx, Operations.ClusteringOrderBy.DESC)));
+                reads.add(new HarryCommand(s -> String.format("Harry Reverse Validate pd=%d%s", pd, state.commandNamePostfix()), s -> spec.harry.selectPartition(pkIdx, Operations.ClusteringOrderBy.DESC)));
         }
         reads.add(new HarryCommand(s -> "Reset Harry Write State" + state.commandNamePostfix(), s -> ((HarryState) s).numInserts = 0));
         return Property.multistep(reads);
@@ -239,11 +242,11 @@ public class HarryTopologyMixupTest extends TopologyMixupTestBase<HarryTopologyM
     {
         private final Generators.TrackingGenerator<Integer> pkGen;
         private final HistoryBuilder harry;
-        private final org.apache.cassandra.harry.SchemaSpec schema;
+        private final SchemaSpec schema;
 
-        public Spec(HistoryBuilder history, org.apache.cassandra.harry.SchemaSpec schema)
+        public Spec(HistoryBuilder harry, SchemaSpec schema)
         {
-            this.harry = history;
+            this.harry = harry;
             this.schema = schema;
             this.pkGen = Generators.tracking(Generators.int32(0, schema.valueGenerators.pkPopulation()));
         }

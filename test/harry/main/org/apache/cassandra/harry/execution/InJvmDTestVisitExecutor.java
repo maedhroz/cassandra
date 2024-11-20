@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.function.Function;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -81,7 +82,11 @@ public class InJvmDTestVisitExecutor extends CQLVisitExecutor
         {
             try
             {
-                return executeWithResult(visit, nodeSelector.select(visit.lts), statement);
+                ConsistencyLevel consistencyLevel = this.consistencyLevel.consistencyLevel(visit);
+                int pageSize = PageSizeSelector.NO_PAGING;
+                if (consistencyLevel != ConsistencyLevel.NODE_LOCAL)
+                    pageSize = pageSizeSelector.pages(visit);
+                return executeWithResult(visit, nodeSelector.select(visit.lts), pageSize, statement, consistencyLevel);
             }
             catch (Throwable t)
             {
@@ -92,21 +97,19 @@ public class InJvmDTestVisitExecutor extends CQLVisitExecutor
         }
     }
 
-    protected List<ResultSetRow> executeWithResult(Visit visit, int node, CompiledStatement statement)
+    protected List<ResultSetRow> executeWithResult(Visit visit, int node, int pageSize, CompiledStatement statement, ConsistencyLevel consistencyLevel)
     {
         Invariants.checkState(visit.operations.length == 1);
         Object[][] rows;
-        ConsistencyLevel consistencyLevel = this.consistencyLevel.consistencyLevel(visit);
         if (consistencyLevel == ConsistencyLevel.NODE_LOCAL)
             rows = cluster.get(node).executeInternal(statement.cql(), statement.bindings());
         else
         {
-            int pages = pageSizeSelector.pages(visit);
-            if (pages == PageSizeSelector.NO_PAGING)
+            if (pageSize == PageSizeSelector.NO_PAGING)
                 rows = cluster.coordinator(node).execute(statement.cql(), consistencyLevel, statement.bindings());
             else
                 rows = iterToArr(cluster.coordinator(node)
-                                        .executeWithPaging(statement.cql(), consistencyLevel, pages, statement.bindings()));
+                                        .executeWithPaging(statement.cql(), consistencyLevel, pageSize, statement.bindings()));
         }
 
         if (logger.isTraceEnabled())
@@ -130,7 +133,8 @@ public class InJvmDTestVisitExecutor extends CQLVisitExecutor
         {
             try
             {
-                executeWithoutResult(visit, nodeSelector.select(visit.lts), statement);
+                ConsistencyLevel consistencyLevel = this.consistencyLevel.consistencyLevel(visit);
+                executeWithoutResult(visit, nodeSelector.select(visit.lts), statement, consistencyLevel);
                 return;
             }
             catch (Throwable t)
@@ -140,12 +144,10 @@ public class InJvmDTestVisitExecutor extends CQLVisitExecutor
                 throw t;
             }
         }
-
     }
 
-    protected void executeWithoutResult(Visit visit, int node, CompiledStatement statement)
+    protected void executeWithoutResult(Visit visit, int node, CompiledStatement statement, ConsistencyLevel consistencyLevel)
     {
-        ConsistencyLevel consistencyLevel = this.consistencyLevel.consistencyLevel(visit);
         if (consistencyLevel == ConsistencyLevel.NODE_LOCAL)
             cluster.get(node).executeInternal(statement.cql(), statement.bindings());
         else
@@ -347,6 +349,50 @@ public class InJvmDTestVisitExecutor extends CQLVisitExecutor
             Model model = new QuiescentChecker(schema.valueGenerators, tracker, replay);
             return new InJvmDTestVisitExecutor(schema, tracker, model, cluster,
                                                nodeSelector, pageSizeSelector, retryPolicy, consistencyLevel, wrapQueries);
+        }
+
+        public InJvmDTestVisitExecutor build(SchemaSpec schema, ICluster<?> cluster, Function<Builder, InJvmDTestVisitExecutor> overrides)
+        {
+            setDefaults(schema, cluster);
+            return overrides.apply(this);
+        }
+
+        /**
+         * WARNING: highly experimental
+         */
+        public InJvmDTestVisitExecutor doubleWriting(SchemaSpec schema, Model.Replay replay, ICluster<?> cluster, String secondTable)
+        {
+            setDefaults(schema, cluster);
+            DataTracker tracker = new DataTracker.SequentialDataTracker();
+            Model model = new QuiescentChecker(schema.valueGenerators, tracker, replay);
+            return new InJvmDTestVisitExecutor(schema, tracker, model, cluster,
+                                               nodeSelector, pageSizeSelector, retryPolicy, consistencyLevel, wrapQueries)
+            {
+                @Override
+                protected List<ResultSetRow> executeWithResult(Visit visit, int node, int pageSize, CompiledStatement statement, ConsistencyLevel consistencyLevel)
+                {
+                    List<ResultSetRow> rows = super.executeWithResult(visit, node, pageSize, statement, consistencyLevel);
+                    List<ResultSetRow> secondOpinion = super.executeWithResult(visit, node, pageSize, statement.withSchema(schema.keyspace, schema.table,
+                                                                                                                           schema.keyspace, secondTable),
+                                                                               consistencyLevel);
+                    if (!rows.equals(secondOpinion))
+                    {
+                        logger.debug("Second opinion: ");
+                        for (ResultSetRow resultSetRow : secondOpinion)
+                            logger.debug(resultSetRow.toString(schema.valueGenerators));
+                    }
+                    return rows;
+                }
+
+                @Override
+                protected void executeWithoutResult(Visit visit, int node, CompiledStatement statement, ConsistencyLevel consistencyLevel)
+                {
+                    super.executeWithoutResult(visit, node, statement, consistencyLevel);
+                    super.executeWithoutResult(visit, node, statement.withSchema(schema.keyspace, schema.table,
+                                                                                 schema.keyspace, secondTable),
+                                               consistencyLevel);
+                }
+            };
         }
     }
 

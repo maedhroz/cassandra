@@ -19,15 +19,11 @@
 package org.apache.cassandra.harry;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
-import accord.utils.Invariants;
 import org.apache.cassandra.cql3.ast.Symbol;
 import org.apache.cassandra.harry.gen.Generator;
 import org.apache.cassandra.harry.gen.Generators;
@@ -172,38 +168,60 @@ public class SchemaSpec
         sb.append(')');
 
         Runnable appendWith = doOnce(() -> sb.append(" WITH"));
+        boolean shouldAppendAnd = false;
 
         if (options.compactStorage())
         {
             appendWith.run();
-            sb.append(" COMPACT STORAGE AND");
+            sb.append(" COMPACT STORAGE");
+            shouldAppendAnd = true;
         }
 
         if (options.transactionalMode() != null)
         {
             appendWith.run();
-            sb.append(" transactional_mode = '").append(options.transactionalMode()).append("' AND");
+            if (shouldAppendAnd)
+                sb.append(" AND");
+            sb.append(" transactional_mode = '").append(options.transactionalMode()).append('\'');
+            shouldAppendAnd = true;
         }
 
         if (options.disableReadRepair())
         {
             appendWith.run();
-            sb.append(" read_repair = 'NONE' AND");
+            if (shouldAppendAnd)
+                sb.append(" AND");
+            sb.append(" read_repair = 'NONE' ");
+            shouldAppendAnd = true;
         }
 
         if (options.compactionStrategy() != null)
         {
             appendWith.run();
-            sb.append(" compaction = {'class': '").append(options.compactionStrategy()).append("'} AND");
+            if (shouldAppendAnd)
+                sb.append(" AND");
+            sb.append(" compaction = {'class': '").append(options.compactionStrategy()).append("'}");
+            shouldAppendAnd = true;
         }
 
         if (!clusteringKeys.isEmpty())
         {
             appendWith.run();
-            sb.append(getClusteringOrderCql())
-              .append(';');
+            if (shouldAppendAnd)
+            {
+                sb.append(" AND");
+                shouldAppendAnd = false;
+            }
+            sb.append(getClusteringOrderCql());
         }
 
+        if (shouldAppendAnd)
+        {
+            sb.append(" AND");
+            shouldAppendAnd = false;
+        }
+
+        sb.append(';');
         return sb.toString();
     }
 
@@ -340,12 +358,14 @@ public class SchemaSpec
 
         default boolean writeTimestampsAllowed()
         {
-            if (skipWriteTimestamps())
-                return false;
-            if (transactionalMode() == null)
-                return true;
-
-            return !TransactionalMode.full.toString().equals(transactionalMode());
+            //
+            return skipWriteTimestamps();
+//            if (skipWriteTimestamps())
+//                return false;
+//            if (transactionalMode() == null)
+//                return true;
+//
+//            return !TransactionalMode.full.toString().equals(transactionalMode());
         }
     }
 
@@ -356,26 +376,21 @@ public class SchemaSpec
 
     public static class OptionsBuilder implements Options
     {
-        private String transactionalMode;
-        private boolean skipWriteTimestamps;
-        private boolean disableReadRepair;
-        private String compactionStrategy;
-        private boolean ifNotExists;
-        private boolean trackLts;
-        private boolean compactStorage;
-
+        private String transactionalMode = null;
+        private boolean skipWriteTimestamps = false;
+        private boolean disableReadRepair = false;
+        private String compactionStrategy = null;
+        private boolean ifNotExists = false;
+        private boolean trackLts = false;
+        private boolean compactStorage = false;
 
         private OptionsBuilder()
         {
         }
 
-        private static final Set<String> TRANSACTIONAL_MODES = Arrays.stream(TransactionalMode.values()).map(Object::toString).collect(Collectors.toSet());
-
-        public OptionsBuilder withTransactionalMode(String mode)
+        public OptionsBuilder withTransactionalMode(TransactionalMode mode)
         {
-            Invariants.checkState(TRANSACTIONAL_MODES.contains(mode),
-                                  "Should have contained one of %s, but got %s", TRANSACTIONAL_MODES, mode);
-            this.transactionalMode = mode;
+            this.transactionalMode = mode.toString();
             return this;
         }
 

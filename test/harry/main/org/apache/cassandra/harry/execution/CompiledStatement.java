@@ -19,7 +19,10 @@
 package org.apache.cassandra.harry.execution;
 
 import java.net.InetAddress;
+import java.util.Date;
 import java.util.UUID;
+
+import org.apache.cassandra.distributed.api.ConsistencyLevel;
 
 public class CompiledStatement
 {
@@ -69,6 +72,14 @@ public class CompiledStatement
                '}';
     }
 
+    public String dump(ConsistencyLevel cl)
+    {
+        return String.format("cluster.coordinator(1).execute(\"%s\", ConsistencyLevel.%s, %s);",
+                             cql.replace("\n", "\" + \n\""),
+                             cl.toString(),
+                             bindingsToString(bindings));
+    }
+
     public static String bindingsToString(Object... bindings)
     {
         StringBuilder sb = new StringBuilder();
@@ -102,6 +113,12 @@ public class CompiledStatement
                 sb.append("new java.sql.Timestamp(").append(((java.sql.Timestamp) binding).getTime()).append("L)");
             else if (binding instanceof java.sql.Time)
                 sb.append("new java.sql.Time(").append(((java.sql.Time) binding).getTime()).append("L)");
+            else if (binding instanceof java.util.Date)
+            {
+                sb.append("new java.util.Date(")
+                  .append(((java.util.Date) binding).getTime())
+                  .append("L)");
+            }
             else if (binding instanceof java.math.BigInteger)
                 sb.append("new java.math.BigInteger(\"").append(binding).append("\")");
             else if (binding instanceof java.math.BigDecimal)

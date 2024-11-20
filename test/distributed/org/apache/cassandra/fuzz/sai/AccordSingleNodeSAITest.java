@@ -19,10 +19,9 @@
 package org.apache.cassandra.fuzz.sai;
 
 import org.apache.cassandra.harry.SchemaSpec;
-import org.apache.cassandra.harry.execution.InJvmDTestVisitExecutor;
-import org.apache.cassandra.harry.gen.EntropySource;
 import org.apache.cassandra.harry.gen.Generator;
 import org.apache.cassandra.harry.gen.SchemaGenerators;
+import org.apache.cassandra.service.consensus.TransactionalMode;
 
 public class AccordSingleNodeSAITest extends SingleNodeSAITestBase
 {
@@ -34,13 +33,6 @@ public class AccordSingleNodeSAITest extends SingleNodeSAITestBase
     @Override
     protected Generator<SchemaSpec> schemaGenerator()
     {
-        return SchemaGenerators.schemaSpecGen(KEYSPACE, "basic_sai", MAX_PARTITION_SIZE, SchemaSpec.optionsBuilder().withTransactionalMode("full"));
-    }
-
-    @Override
-    protected InJvmDTestVisitExecutor.PageSizeSelector pageSizeSelector(EntropySource rng)
-    {
-        // Accord does not support paging
-        return lts -> InJvmDTestVisitExecutor.PageSizeSelector.NO_PAGING;
+        return SchemaGenerators.schemaSpecGen(KEYSPACE, "basic_sai", MAX_PARTITION_SIZE, SchemaSpec.optionsBuilder().withTransactionalMode(TransactionalMode.full));
     }
 }

@@ -29,12 +29,11 @@ import org.slf4j.LoggerFactory;
 
 import accord.utils.Invariants;
 import org.apache.cassandra.harry.SchemaSpec;
-import org.apache.cassandra.harry.op.Visit;
 import org.apache.cassandra.harry.cql.DeleteHelper;
 import org.apache.cassandra.harry.cql.SelectHelper;
 import org.apache.cassandra.harry.cql.WriteHelper;
 import org.apache.cassandra.harry.op.Operations;
-import org.apache.cassandra.stress.StressAction;
+import org.apache.cassandra.harry.op.Visit;
 
 public class QueryBuildingVisitExecutor extends VisitExecutor
 {

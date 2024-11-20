@@ -100,7 +100,11 @@ public class RingAwareInJvmDTestVisitExecutor extends InJvmDTestVisitExecutor
                                      .filter((n) -> n.config().broadcastAddress().toString().contains(replica.node().id()))
                                      .findFirst()
                                      .get();
-                List<ResultSetRow> resultSetRow = executeWithResult(visit, instance.config().num(), statement);
+                ConsistencyLevel consistencyLevel = this.consistencyLevel.consistencyLevel(visit);
+                int pageSize = PageSizeSelector.NO_PAGING;
+                if (consistencyLevel != ConsistencyLevel.NODE_LOCAL)
+                    pageSize = pageSizeSelector.pages(visit);
+                List<ResultSetRow> resultSetRow = executeWithResult(visit, instance.config().num(), pageSize, statement, consistencyLevel);
                 model.validate(selects.get(0), resultSetRow);
             }
         }
@@ -124,7 +128,7 @@ public class RingAwareInJvmDTestVisitExecutor extends InJvmDTestVisitExecutor
                                      .filter((n) -> n.config().broadcastAddress().toString().contains(replica.node().id()))
                                      .findFirst()
                                      .get();
-                executeWithoutResult(visit, instance.config().num(), statement);
+                executeWithoutResult(visit, instance.config().num(), statement, consistencyLevel.consistencyLevel(visit));
             }
         }
         catch (Throwable t)
