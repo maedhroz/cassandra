@@ -388,9 +388,9 @@ public class SchemaSpec
             return transactionalMode;
         }
 
-        public OptionsBuilder addWriteTimestamps(boolean v)
+        public OptionsBuilder addWriteTimestamps(boolean newValue)
         {
-            this.addWriteTimestamps = true;
+            this.addWriteTimestamps = newValue;
             return this;
         }
 
@@ -400,9 +400,9 @@ public class SchemaSpec
             return addWriteTimestamps;
         }
 
-        public OptionsBuilder disableReadRepair(boolean v)
+        public OptionsBuilder disableReadRepair(boolean newValue)
         {
-            this.disableReadRepair = v;
+            this.disableReadRepair = newValue;
             return this;
         }
 
