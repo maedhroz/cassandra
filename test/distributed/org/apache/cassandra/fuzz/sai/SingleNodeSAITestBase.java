@@ -87,10 +87,6 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
                          .withNodes(nodes)
                          .withConfig(cfg)
                          .createWithoutStarting();
-        cluster.setUncaughtExceptionsFilter(t -> {
-            logger.error("Caught exception, reporting during shutdown. Ignoring.", t);
-            return true;
-        });
         cluster.startup();
         cluster = init(cluster);
     }
@@ -125,7 +121,7 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
     public void basicSaiTest()
     {
         Generator<SchemaSpec> schemaGen = schemaGenerator();
-        withRandom(rng -> {
+        withRandom(266907366424458L, rng -> {
             basicSaiTest(rng, schemaGen.generate(rng));
         });
     }
@@ -143,15 +139,17 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
         cluster.forEach(i -> i.nodetool("disableautocompaction"));
 
         cluster.schemaChange(schema.compile());
+        cluster.schemaChange(schema.compile().replace(schema.keyspace + "." + schema.table,
+                                                      schema.keyspace + ".debug_table"));
         Streams.concat(schema.clusteringKeys.stream(),
                        schema.regularColumns.stream(),
                        schema.staticColumns.stream())
                .forEach(column -> {
-                   cluster.schemaChange(String.format("CREATE INDEX %s_sai_idx ON %s.%s (%s) USING 'sai' ",
-                                                      column.name,
-                                                      schema.keyspace,
-                                                      schema.table,
-                                                      column.name));
+                       cluster.schemaChange(String.format("CREATE INDEX %s_sai_idx ON %s.%s (%s) USING 'sai' ",
+                                                          column.name,
+                                                          schema.keyspace,
+                                                          schema.table,
+                                                          column.name));
                });
 
         waitForIndexesQueryable(schema);
@@ -160,7 +158,7 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
                                                              (hb) -> InJvmDTestVisitExecutor.builder()
                                                                                             .pageSizeSelector(pageSizeSelector(rng))
                                                                                             .consistencyLevel(consistencyLevelSelector())
-                                                                                            .build(schema, hb, cluster));
+                                                                                            .doubleWriting(schema, hb, cluster, "debug_table"));
         List<Integer> partitions = new ArrayList<>();
         for (int j = 0; j < 5; j++)
         {
