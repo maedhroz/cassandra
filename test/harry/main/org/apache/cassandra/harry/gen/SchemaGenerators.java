@@ -19,7 +19,9 @@
 package org.apache.cassandra.harry.gen;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.function.LongFunction;
 
 import org.apache.cassandra.harry.ColumnSpec;
 import org.apache.cassandra.harry.SchemaSpec;
@@ -92,6 +94,18 @@ public class SchemaGenerators
                 int idx = counter++;
                 return new ColumnSpec(prefix + idx, type, gen, kind);
             }
+        };
+    }
+
+    public static LongFunction<SchemaSpec> trivialSchema(String ks, String table, int population)
+    {
+        return (seed) -> {
+            return new SchemaSpec(seed, population,
+                                  ks, table,
+                                  Arrays.asList(ColumnSpec.pk("pk1", ColumnSpec.int64Type, Generators.int64())),
+                                  Arrays.asList(ColumnSpec.ck("ck1", ColumnSpec.int64Type, Generators.int64(), false)),
+                                  Arrays.asList(ColumnSpec.regularColumn("v1", ColumnSpec.int64Type)),
+                                  List.of(ColumnSpec.staticColumn("s1", ColumnSpec.int64Type)));
         };
     }
 }

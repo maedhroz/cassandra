@@ -20,7 +20,6 @@ package org.apache.cassandra.fuzz.sai;
 
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -39,7 +38,6 @@ import org.apache.cassandra.distributed.Cluster;
 import org.apache.cassandra.distributed.api.ConsistencyLevel;
 import org.apache.cassandra.distributed.api.IInstanceConfig;
 import org.apache.cassandra.distributed.test.TestBaseImpl;
-import org.apache.cassandra.harry.ColumnSpec;
 import org.apache.cassandra.harry.SchemaSpec;
 import org.apache.cassandra.harry.dsl.HistoryBuilder;
 import org.apache.cassandra.harry.dsl.HistoryBuilderHelper;
@@ -108,12 +106,7 @@ public abstract class SingleNodeSAITestBase extends TestBaseImpl
     {
         withRandom(rng -> {
             basicSaiTest(rng,
-                         new SchemaSpec(rng.next(), 1000,
-                                        "harry", "simplified",
-                                        Arrays.asList(ColumnSpec.pk("pk1", ColumnSpec.int64Type, Generators.int64())),
-                                        Arrays.asList(ColumnSpec.ck("ck1", ColumnSpec.int64Type, Generators.int64(), false)),
-                                        Arrays.asList(ColumnSpec.regularColumn("v1", ColumnSpec.int64Type)),
-                                        List.of(ColumnSpec.staticColumn("s1", ColumnSpec.int64Type))));
+                         SchemaGenerators.trivialSchema("harry", "simplified", 1000).apply(rng.next()));
         });
     }
 
