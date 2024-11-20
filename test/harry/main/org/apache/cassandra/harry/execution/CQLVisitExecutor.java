@@ -76,19 +76,40 @@ public abstract class CQLVisitExecutor
             throw t;
         }
     }
+
+    public enum ResultDumpMode
+    {
+        PARTITION,
+        LAST_50
+    }
+
     public static void replayAfterFailure(Visit visit, CQLVisitExecutor executor, Model.Replay replay)
     {
         QueryBuildingVisitExecutor queryBuilder = executor.queryBuilder;
         logger.error("Caught an exception at {} while replaying {}\ncluster.schemaChange(\"{}\");\nOperations _for this partition_ up to this visit:",
                      visit, queryBuilder.compile(visit),
                      queryBuilder.schema.compile());
+
+        // Configurable yet hardcoded for a person who is trying to generate repro
+        ResultDumpMode mode = ResultDumpMode.PARTITION;
+        long minLts = 0;
+        if (mode == ResultDumpMode.LAST_50)
+             minLts = Math.max(0, visit.lts - 20);
         for (Visit rereplay : replay)
         {
+            if (rereplay.lts < minLts)
+                continue;
+
+            // Skip if this visit was for a different partition
+            if (mode == ResultDumpMode.PARTITION && !intersects(visit.visitedPartitions, rereplay.visitedPartitions))
+                continue;
+
             String str = "";
             CompiledStatement cs = queryBuilder.compile(rereplay);
             if (cs != null)
                 str = cs.dump(ConsistencyLevel.QUORUM);
-            logger.info("/*{}*/ {}", rereplay, str);
+            // Using println here deliberately to avoid logger output
+            System.out.printf("/*%s*/ %s%n", rereplay, str);
 
             if (rereplay.lts > visit.lts)
                 return;
