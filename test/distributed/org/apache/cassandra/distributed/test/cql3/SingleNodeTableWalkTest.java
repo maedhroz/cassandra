@@ -29,6 +29,7 @@ import java.util.NavigableSet;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
@@ -64,6 +65,7 @@ import org.apache.cassandra.distributed.test.sai.SAIUtil;
 import org.apache.cassandra.harry.model.BytesPartitionState;
 import org.apache.cassandra.schema.ColumnMetadata;
 import org.apache.cassandra.schema.TableMetadata;
+import org.apache.cassandra.service.consensus.TransactionalMode;
 import org.apache.cassandra.utils.ASTGenerators;
 import org.apache.cassandra.utils.AbstractTypeGenerators;
 import org.apache.cassandra.utils.AbstractTypeGenerators.TypeGenBuilder;
@@ -94,6 +96,19 @@ public class SingleNodeTableWalkTest extends StatefulASTBase
     private static final Logger logger = LoggerFactory.getLogger(SingleNodeTableWalkTest.class);
 
     protected static boolean READ_AFTER_WRITE = false;
+
+    @Nullable
+    private final TransactionalMode transactionalMode;
+
+    public SingleNodeTableWalkTest()
+    {
+        this(null);
+    }
+
+    protected SingleNodeTableWalkTest(@Nullable TransactionalMode transactionalMode)
+    {
+        this.transactionalMode = transactionalMode;
+    }
 
     protected void preCheck(Cluster cluster, Property.StatefulBuilder builder)
     {
@@ -387,19 +402,22 @@ public class SingleNodeTableWalkTest extends StatefulASTBase
         //TODO (correctness): the id isn't correct... this is what we use to create the table, so would miss the actual ID
         // Defaults may also be incorrect, but given this is the same version it "shouldn't"
         //TODO (coverage): partition is defined at the cluster level, so have to hard code in this model as the table is changed rather than cluster being recreated... this limits coverage
-        return toGen(new TableMetadataBuilder()
-                     .withTableKinds(TableMetadata.Kind.REGULAR)
-                     .withParams(b -> b.withKnownMemtables()
-                                       .withCaching()
-                                       .withCompaction()
-                                       .withCompression())
-                     .withKeyspaceName(ks).withTableName("tbl")
-                     .withSimpleColumnNames()
-                     .withDefaultTypeGen(supportedTypes(rs))
-                     .withPrimaryColumnTypeGen(supportedPrimaryColumnTypes(rs))
-                     .withPartitioner(Murmur3Partitioner.instance)
-                     .build())
-               .next(rs);
+        var metadata = toGen(new TableMetadataBuilder()
+                             .withTableKinds(TableMetadata.Kind.REGULAR)
+                             .withParams(b -> b.withKnownMemtables()
+                                               .withCaching()
+                                               .withCompaction()
+                                               .withCompression())
+                             .withKeyspaceName(ks).withTableName("tbl")
+                             .withSimpleColumnNames()
+                             .withDefaultTypeGen(supportedTypes(rs))
+                             .withPrimaryColumnTypeGen(supportedPrimaryColumnTypes(rs))
+                             .withPartitioner(Murmur3Partitioner.instance)
+                             .build())
+                       .next(rs);
+        if (transactionalMode != null)
+            metadata = metadata.withSwapped(metadata.params.unbuild().transactionalMode(transactionalMode).build());
+        return metadata;
     }
 
     private List<CreateIndexDDL.Indexer> columnSupportsIndexing(TableMetadata metadata, ColumnMetadata col)

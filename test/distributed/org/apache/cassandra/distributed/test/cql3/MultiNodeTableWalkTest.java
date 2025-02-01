@@ -19,27 +19,30 @@
 package org.apache.cassandra.distributed.test.cql3;
 
 import java.io.IOException;
-
 import javax.annotation.Nullable;
 
 import accord.utils.Property;
 import accord.utils.RandomSource;
 import org.apache.cassandra.distributed.Cluster;
 import org.apache.cassandra.distributed.api.ConsistencyLevel;
-import org.apache.cassandra.schema.TableMetadata;
+import org.apache.cassandra.distributed.api.IInvokableInstance;
 import org.apache.cassandra.service.consensus.TransactionalMode;
-import org.apache.cassandra.service.reads.repair.ReadRepairStrategy;
 
-public class MultiNodeTokenConflictTest extends SingleNodeTokenConflictTest
+public class MultiNodeTableWalkTest extends SingleNodeTableWalkTest
 {
-    protected MultiNodeTokenConflictTest(@Nullable TransactionalMode transactionalMode)
+    /**
+     * This field lets the test run as if it was multiple nodes, but actually runs against a single node.
+     * This behavior is desirable when this test fails to see if the issue can be reproduced on single node as well.
+     */
+    private boolean mockMultiNode = true;
+
+    public MultiNodeTableWalkTest()
     {
-        super(transactionalMode);
     }
 
-    public MultiNodeTokenConflictTest()
+    protected MultiNodeTableWalkTest(@Nullable TransactionalMode transactionalMode)
     {
-        super();
+        super(transactionalMode);
     }
 
     @Override
@@ -49,22 +52,18 @@ public class MultiNodeTokenConflictTest extends SingleNodeTokenConflictTest
         // Example: builder.withSeed(42L);
         // CQL operations may have opertors such as +, -, and / (example 4 + 4), to "apply" them to get a constant value
         // CQL_DEBUG_APPLY_OPERATOR = true;
-    }
-
-    @Override
-    protected TableMetadata defineTable(RandomSource rs, String ks)
-    {
-        TableMetadata tbl = super.defineTable(rs, ks);
-        // disable RR for now, should make RR testing its own class
-        return tbl.unbuild().params(tbl.params.unbuild().readRepair(ReadRepairStrategy.NONE).build()).build();
+        // Sometimes It's useful to validate that the error is localized to mutliple nodes rather than single node,
+        // so uncomment the below to allow running the test as a single node
+        // mockMultiNode = true;
     }
 
     @Override
     protected Cluster createCluster() throws IOException
     {
-        return createCluster(3, c -> {
+        return createCluster(mockMultiNode ? 1 : 3, c -> {
             c.set("range_request_timeout", "180s")
              .set("read_request_timeout", "180s")
+             .set("transaction_timeout", "180s")
              .set("write_request_timeout", "180s")
              .set("native_transport_timeout", "180s")
              .set("slow_query_log_timeout", "180s");
@@ -77,11 +76,30 @@ public class MultiNodeTokenConflictTest extends SingleNodeTokenConflictTest
         return new MultiNodeState(rs, cluster);
     }
 
-    private class MultiNodeState extends State
+    public class MultiNodeState extends State
     {
-        MultiNodeState(RandomSource rs, Cluster cluster)
+        public MultiNodeState(RandomSource rs, Cluster cluster)
         {
             super(rs, cluster);
+        }
+
+        @Override
+        protected boolean isMultiNode()
+        {
+            // When a seed fails its useful to rerun the test as a single node to see if the issue persists... but doing so corrupts the random history!
+            // To avoid that, this method hard codes that the test is multi node...
+            return true;
+        }
+
+        @Override
+        protected IInvokableInstance selectInstance(RandomSource rs)
+        {
+            if (mockMultiNode)
+            {
+                rs.nextInt(0, 3); // needed to avoid breaking random history
+                return cluster.get(1);
+            }
+            return super.selectInstance(rs);
         }
 
         @Override
