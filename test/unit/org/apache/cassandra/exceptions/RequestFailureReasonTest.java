@@ -37,7 +37,10 @@ public class RequestFailureReasonTest
     { 7, "READ_TOO_MANY_INDEXES" },
     { 8, "NOT_CMS" },
     { 9, "INVALID_ROUTING" },
-    { 10, "COORDINATOR_BEHIND" }
+    { 10, "COORDINATOR_BEHIND" },
+    { 11, "RETRY_ON_DIFFERENT_TRANSACTION_SYSTEM" },
+    { 12, "BOOTING" },
+    { 13, "ACCORD_DISABLED" }
     };
 
     @Test

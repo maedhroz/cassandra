@@ -36,13 +36,13 @@ public enum RequestFailureReason
     READ_SIZE                             (4),
     NODE_DOWN                             (5),
     INDEX_NOT_AVAILABLE                   (6),
-    NOT_CMS                               (7),
-    INVALID_ROUTING                       (8),
-    COORDINATOR_BEHIND                    (9),
-    READ_TOO_MANY_INDEXES                 (10),
+    READ_TOO_MANY_INDEXES                 (7),
+    NOT_CMS                               (8),
+    INVALID_ROUTING                       (9),
+    COORDINATOR_BEHIND                    (10),
     RETRY_ON_DIFFERENT_TRANSACTION_SYSTEM (11),
     BOOTING                               (12),
-    UNKNOWN_TOPOLOGY                      (13)
+    ACCORD_DISABLED                       (13)
     ;
 
     static
