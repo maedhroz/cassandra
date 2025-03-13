@@ -182,6 +182,6 @@ public class TimeConstraintsTest
 
     private static ColumnMetadata getColumnOfType(AbstractType<?> type)
     {
-        return new ColumnMetadata("a", "b", columnIdentifier, type, -1, REGULAR, null);
+        return new ColumnMetadata("a", "b", columnIdentifier, type, -1, -1, REGULAR, null);
     }
 }
