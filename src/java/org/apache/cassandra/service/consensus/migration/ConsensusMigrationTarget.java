@@ -22,6 +22,8 @@ import com.google.common.primitives.SignedBytes;
 
 import org.apache.cassandra.service.consensus.TransactionalMode;
 
+import static org.apache.cassandra.utils.LocalizeString.toLowerCaseLocalized;
+
 public enum ConsensusMigrationTarget
 {
     paxos(0),
@@ -41,7 +43,7 @@ public enum ConsensusMigrationTarget
 
     public static ConsensusMigrationTarget fromString(String targetProtocol)
     {
-        return ConsensusMigrationTarget.valueOf(targetProtocol.toLowerCase());
+        return ConsensusMigrationTarget.valueOf(toLowerCaseLocalized(targetProtocol));
     }
 
     public static ConsensusMigrationTarget fromValue(byte value)

@@ -29,6 +29,7 @@ import org.apache.cassandra.service.consensus.migration.TransactionalMigrationFr
 import org.apache.cassandra.tcm.ClusterMetadata;
 
 import static com.google.common.base.Preconditions.checkState;
+import static org.apache.cassandra.utils.LocalizeString.toLowerCaseLocalized;
 
 /*
  * Configure the transactional behavior of a table. Enables accord on a table and defines how it mixes with non-serial writes
@@ -126,7 +127,7 @@ public enum TransactionalMode
         this.nonSerialWritesThroughAccord = nonSerialWritesThroughAccord;
         this.nonSerialReadsThroughAccord = nonSerialReadsThroughAccord;
         this.blockingReadRepairThroughAccord = blockingReadRepairThroughAccord;
-        this.cqlParam = String.format("transactional_mode = '%s'", this.name().toLowerCase());
+        this.cqlParam = String.format("transactional_mode = '%s'", toLowerCaseLocalized(this.name()));
         checkState(this.name().startsWith("test_") || (nonSerialReadsThroughAccord && nonSerialWritesThroughAccord) || !nonSerialReadsThroughAccord, "Doesn't make sense to do non-SERIAL reads through Accord without also doing non-SERIAL writes through Accord");
     }
 
@@ -229,7 +230,7 @@ public enum TransactionalMode
 
     public static TransactionalMode fromString(String name)
     {
-        return valueOf(name.toLowerCase());
+        return valueOf(toLowerCaseLocalized(name));
     }
 
     public boolean isTestMode()

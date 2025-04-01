@@ -36,6 +36,9 @@ import org.apache.cassandra.io.util.DataOutputPlus;
 import org.apache.cassandra.tcm.serialization.MetadataSerializer;
 import org.apache.cassandra.tcm.serialization.Version;
 
+import static org.apache.cassandra.utils.LocalizeString.toLowerCaseLocalized;
+import static org.apache.cassandra.utils.LocalizeString.toUpperCaseLocalized;
+
 public interface FastPathStrategy
 {
     enum Kind
@@ -66,7 +69,7 @@ public interface FastPathStrategy
         @Nullable
         public static Kind fromString(String s)
         {
-            return LOOKUP.get(s.toUpperCase());
+            return LOOKUP.get(toUpperCaseLocalized(s));
         }
 
         @Nullable
@@ -118,7 +121,7 @@ public interface FastPathStrategy
 
     static FastPathStrategy tableStrategyFromString(String s)
     {
-        s = s.toLowerCase().trim();
+        s = toLowerCaseLocalized(s).trim();
         if (s.equals("keyspace"))
             return InheritKeyspaceFastPathStrategy.instance;
         if (s.equals("simple"))
@@ -129,7 +132,7 @@ public interface FastPathStrategy
 
     static FastPathStrategy keyspaceStrategyFromString(String s)
     {
-        s = s.toLowerCase().trim();
+        s = toLowerCaseLocalized(s).trim();
         if (s.equals("simple"))
             return SimpleFastPathStrategy.instance;
 

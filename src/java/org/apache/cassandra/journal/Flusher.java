@@ -45,6 +45,7 @@ import static org.apache.cassandra.concurrent.InfiniteLoopExecutor.SimulatorSafe
 import static org.apache.cassandra.concurrent.Interruptible.State.NORMAL;
 import static org.apache.cassandra.concurrent.Interruptible.State.SHUTTING_DOWN;
 import static org.apache.cassandra.journal.Params.FlushMode.PERIODIC;
+import static org.apache.cassandra.utils.LocalizeString.toLowerCaseLocalized;
 import static org.apache.cassandra.utils.MonotonicClock.Global.preciseTime;
 import static org.apache.cassandra.utils.Simulate.With.GLOBAL_CLOCK;
 import static org.apache.cassandra.utils.Simulate.With.LOCK_SUPPORT;
@@ -94,7 +95,7 @@ final class Flusher<K, V>
 
     void start()
     {
-        String flushExecutorName = journal.name + "-disk-flusher-" + params.flushMode().toString().toLowerCase();
+        String flushExecutorName = journal.name + "-disk-flusher-" + toLowerCaseLocalized(params.flushMode().toString());
         flushStartedAt = clock.now();
         flushExecutor = executorFactory().infiniteLoop(flushExecutorName, new FlushRunnable(), SAFE, NON_DAEMON, SYNCHRONIZED);
     }

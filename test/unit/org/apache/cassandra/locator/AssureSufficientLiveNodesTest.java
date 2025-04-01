@@ -41,7 +41,6 @@ import org.apache.cassandra.CassandraTestBase;
 import org.apache.cassandra.CassandraTestBase.PrepareServerNoRegister;
 import org.apache.cassandra.CassandraTestBase.UseMurmur3Partitioner;
 import org.apache.cassandra.SchemaLoader;
-import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.db.Keyspace;
 import org.apache.cassandra.dht.Murmur3Partitioner;
 import org.apache.cassandra.dht.Token;

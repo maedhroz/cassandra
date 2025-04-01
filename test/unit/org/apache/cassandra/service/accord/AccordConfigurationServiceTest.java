@@ -62,7 +62,6 @@ import org.apache.cassandra.schema.Schema;
 import org.apache.cassandra.schema.TableId;
 import org.apache.cassandra.schema.TableMetadata;
 import org.apache.cassandra.schema.Tables;
-import org.apache.cassandra.service.accord.api.AccordAgent;
 import org.apache.cassandra.service.accord.journal.AccordTopologyUpdate;
 import org.apache.cassandra.tcm.ClusterMetadata;
 import org.apache.cassandra.tcm.ValidatingClusterMetadataService;

@@ -53,6 +53,7 @@ import org.apache.cassandra.schema.Views.ViewsDiff;
 import static com.google.common.collect.Iterables.any;
 import static java.lang.String.format;
 import static org.apache.cassandra.db.TypeSizes.sizeof;
+import static org.apache.cassandra.utils.LocalizeString.toLowerCaseLocalized;
 
 /**
  * An immutable representation of keyspace metadata (name, params, tables, types, and functions).
@@ -369,7 +370,7 @@ public final class KeyspaceMetadata implements SchemaElement
             if (params.fastPath != null)
             {
                 builder.append("  AND fast_path = '")
-                       .append(params.fastPath.toString().toLowerCase())
+                       .append(toLowerCaseLocalized(params.fastPath.toString()))
                        .append("'");
             }
 

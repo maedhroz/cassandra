@@ -142,7 +142,7 @@ public class DistributedSchema implements MetadataValue<DistributedSchema>
 
     public TableMetadata getTableMetadata(String keyspace, String cf)
     {
-        var ks = keyspaces.getNullable(keyspace);
+        KeyspaceMetadata ks = keyspaces.getNullable(keyspace);
         return ks == null ? null : ks.tables.getNullable(cf);
     }
 

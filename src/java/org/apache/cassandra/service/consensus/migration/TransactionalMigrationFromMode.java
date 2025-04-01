@@ -20,6 +20,8 @@ package org.apache.cassandra.service.consensus.migration;
 
 import org.apache.cassandra.service.consensus.TransactionalMode;
 
+import static org.apache.cassandra.utils.LocalizeString.toLowerCaseLocalized;
+
 /**
  * This tracks the state of a migration either from Paxos -> Accord, Accord [interop mode a] -> Accord [interop mode b] or Accord -> Paxos.
  * The `TransactionalMode` associated with each transition from a system is how interoperability should be achieved during the migration with various performance/safety tradeoffs.
@@ -65,7 +67,7 @@ public enum TransactionalMigrationFromMode
 
     public static TransactionalMigrationFromMode fromString(String name)
     {
-        return valueOf(name.toLowerCase());
+        return valueOf(toLowerCaseLocalized(name));
     }
 
     public boolean migratingFromAccord()
@@ -95,6 +97,6 @@ public enum TransactionalMigrationFromMode
 
     public String asCqlParam()
     {
-        return String.format("transactional_migration_from = '%s'", this.name().toLowerCase());
+        return String.format("transactional_migration_from = '%s'", toLowerCaseLocalized(this.name()));
     }
 }
