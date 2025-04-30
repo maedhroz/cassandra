@@ -20,6 +20,7 @@ package org.apache.cassandra.index.sai.cql;
 
 import org.junit.Test;
 
+import org.HdrHistogram.Histogram;
 import org.apache.cassandra.cql3.restrictions.StatementRestrictions;
 import org.apache.cassandra.index.IndexBuildInProgressException;
 import org.apache.cassandra.index.sai.SAITester;
@@ -423,4 +424,128 @@ public class AllowFilteringTest extends SAITester
         execute("SELECT * FROM %s WHERE v=0");
         execute("SELECT * FROM %s WHERE v=0 ALLOW FILTERING");
     }
+
+    @Test
+    public void testNextKeyPerfClusteringIndexSliceFilter()
+    {
+        createTable("CREATE TABLE %S (" +
+                    "pk int, " +
+                    "ck int, " +
+                    "val text, " +
+                    "PRIMARY KEY (pk, ck))");
+
+        createIndex("CREATE CUSTOM INDEX ON %s(val) USING 'StorageAttachedIndex'");
+
+        int pk = 1;
+        for (int ck = 0; ck < 10000; ck++)
+        {
+            execute("INSERT INTO %s (pk, ck, val) VALUES (?, ?, ?)", pk, ck, "hello1");
+        }
+
+        int pk1 = 2;
+        for (int ck = 0; ck < 100; ck++)
+        {
+            execute("INSERT INTO %s (pk, ck, val) VALUES (?, ?, ?)", pk1, ck, "hello2");
+        }
+
+        flush();
+
+        Histogram histogram = new Histogram(4);
+
+
+        for (int i = 0; i < 10000; i++)
+        {
+            long start = System.nanoTime();
+            execute("SELECT * FROM %s WHERE val = 'hello1' AND ck > 9000 ALLOW FILTERING");
+            histogram.recordValue(System.nanoTime() - start);
+
+            if (i % 1000 == 0)
+            {
+                System.out.println("50th: " + histogram.getValueAtPercentile(0.5));
+                System.out.println("95th: " + histogram.getValueAtPercentile(0.95));
+                System.out.println("99th: " + histogram.getValueAtPercentile(0.99));
+            }
+        }
+
+        // Functionality check
+        assertRowCount(execute("SELECT * FROM %s WHERE val = 'hello1' AND ck > 9000 ALLOW FILTERING"),999);
+    }
+
+
+    @Test
+    public void testNextKeyPerfClusteringIndexNamesFilter()
+    {
+        createTable("CREATE TABLE %S (" +
+                    "pk int," +
+                    "ck int," +
+                    "v int," +
+                    "PRIMARY KEY (pk, ck))");
+
+        createIndex("CREATE CUSTOM INDEX ON %s(v) USING 'StorageAttachedIndex'");
+
+        int pk = 1;
+        for (int ck = 0; ck < 20000; ck++)
+        {
+            int v = ck + 10;
+            execute("INSERT INTO %s (pk, ck, v) VALUES (?, ?, ?)", pk, ck, v);
+        }
+
+        int pk1 = 2;
+        for (int ck = 0; ck < 100; ck++)
+        {
+            int v = ck;
+            execute("INSERT INTO %s (pk, ck, v) VALUES (?, ?, ?)", pk1, ck, v);
+        }
+
+        Histogram histogram = new Histogram(4);
+
+        for (int i = 0; i < 10000; i++)
+        {
+            long start = System.nanoTime();
+            execute("SELECT * FROM %s WHERE pk = 1 AND ck = 15000 AND v > 9000 ALLOW FILTERING");
+            histogram.recordValue(System.nanoTime() - start);
+
+            if (i % 1000 == 0)
+            {
+                System.out.println("50th: " + histogram.getValueAtPercentile(0.5));
+                System.out.println("95th: " + histogram.getValueAtPercentile(0.95));
+                System.out.println("99th: " + histogram.getValueAtPercentile(0.99));
+            }
+        }
+
+        assertRowCount(execute("SELECT * FROM %s WHERE pk = 1 AND ck = 9999 AND v > 10003 ALLOW FILTERING"),1);
+    }
+
+    @Test
+    public void testNextKeyClusteringIndexNamesFilter()
+    {
+        createTable("CREATE TABLE %S (" +
+                    "pk int," +
+                    "ck int," +
+                    "v int," +
+                    "PRIMARY KEY (pk, ck))");
+
+        createIndex("CREATE CUSTOM INDEX ON %s(v) USING 'StorageAttachedIndex'");
+
+        int pk = 1;
+        for (int ck = 0; ck < 10; ck++)
+        {
+            int v = ck + 1000;
+            System.out.printf("INSERT INTO " +  pk + " "  + ck + " " + v);
+            execute("INSERT INTO %s (pk, ck, v) VALUES (?, ?, ?)", pk, ck, v);
+        }
+
+        int pk1 = 2;
+        for (int ck = 0; ck < 100; ck++)
+        {
+            int v = ck;
+            execute("INSERT INTO %s (pk, ck, v) VALUES (?, ?, ?)", pk1, ck, v);
+        }
+
+        assertRowCount(execute("SELECT * FROM %s WHERE pk = 1 AND ck = 5 AND v > 1004 ALLOW FILTERING"),1);
+        assertRowCount(execute("SELECT * FROM %s WHERE pk = 1 AND ck = 5 AND v > 1004 AND V < 20000 ALLOW FILTERING"),1);
+
+
+    }
+
 }
