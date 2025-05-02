@@ -42,7 +42,6 @@ import org.apache.cassandra.db.PartitionPosition;
 import org.apache.cassandra.db.ReadCommand;
 import org.apache.cassandra.db.ReadExecutionController;
 import org.apache.cassandra.db.RegularAndStaticColumns;
-import org.apache.cassandra.db.Slice;
 import org.apache.cassandra.db.Slices;
 import org.apache.cassandra.db.filter.ClusteringIndexFilter;
 import org.apache.cassandra.db.filter.ClusteringIndexNamesFilter;
@@ -146,6 +145,7 @@ public class StorageAttachedIndexSearcher implements Index.Searcher
         private final PrimaryKey firstPrimaryKey;
         private final PrimaryKey lastPrimaryKey;
         private final Iterator<DataRange> keyRanges;
+        private final DataRange firstDataRange;
         private AbstractBounds<PartitionPosition> currentKeyRange;
 
         private final KeyRangeIterator resultKeyIterator;
@@ -154,15 +154,14 @@ public class StorageAttachedIndexSearcher implements Index.Searcher
         private final PrimaryKey.Factory keyFactory;
         private final boolean topK;
         private final int partitionRowBatchSize;
-        private final DataRange currentDataRange;
 
         private PrimaryKey lastKey;
 
         private ResultRetriever(ReadExecutionController executionController, boolean topK)
         {
             this.keyRanges = queryController.dataRanges().iterator();
-            this.currentDataRange = keyRanges.next();
-            this.currentKeyRange = currentDataRange.keyRange();
+            this.firstDataRange = keyRanges.next();
+            this.currentKeyRange = firstDataRange.keyRange();
             this.resultKeyIterator = Operation.buildIterator(queryController);
             this.filterTree = Operation.buildFilter(queryController, queryController.usesStrictFiltering());
             this.executionController = executionController;
@@ -185,7 +184,52 @@ public class StorageAttachedIndexSearcher implements Index.Searcher
             // We can't put this code in the constructor because it may throw and the caller
             // may not be prepared for that.
             if (lastKey == null)
-                resultKeyIterator.skipTo(firstPrimaryKey);
+            {
+                PrimaryKey skipTarget = firstPrimaryKey;
+                ClusteringComparator comparator = command.metadata().comparator;
+
+                // If there are no clusterings, the first data range selects an entire partitions, or we have static
+                // expressions, don't bother trying to skip forward within the partition.
+                if (comparator.size() > 0 && !firstDataRange.selectsAllPartition() && !command.rowFilter().hasStaticExpression())
+                {
+                    // Only attempt to skip if the first data range covers a single partition.
+                    if (currentKeyRange.left.equals(currentKeyRange.right) && currentKeyRange.left instanceof DecoratedKey)
+                    {
+                        DecoratedKey decoratedKey = (DecoratedKey) currentKeyRange.left;
+                        ClusteringIndexFilter filter = firstDataRange.clusteringIndexFilter(decoratedKey);
+
+                        if (filter instanceof ClusteringIndexSliceFilter)
+                        {
+                            Slices slices = ((ClusteringIndexSliceFilter) filter).requestedSlices();
+
+                            if (!slices.isEmpty())
+                            {
+                                ClusteringBound<?> startBound = slices.get(0).start();
+
+                                if (!startBound.isEmpty())
+                                {
+                                    ByteBuffer[] rawValues = startBound.getBufferArray();
+
+                                    if (rawValues.length == comparator.size())
+                                        skipTarget = keyFactory.create(decoratedKey, Clustering.make(rawValues));
+                                }
+                            }
+                        }
+                        else if (filter instanceof ClusteringIndexNamesFilter)
+                        {
+                            ClusteringIndexNamesFilter namesFilter = (ClusteringIndexNamesFilter) filter;
+
+                            if (!namesFilter.requestedRows().isEmpty())
+                            {
+                                Clustering<?> skipClustering = namesFilter.requestedRows().iterator().next();
+                                skipTarget = keyFactory.create(decoratedKey, skipClustering);
+                            }
+                        }
+                    }
+                }
+
+                resultKeyIterator.skipTo(skipTarget);
+            }
 
             // Theoretically we wouldn't need this if the caller of computeNext always ran the
             // returned iterators to the completion. Unfortunately, we have no control over the caller behavior here.
@@ -301,9 +345,6 @@ public class StorageAttachedIndexSearcher implements Index.Searcher
                 if (key == null)
                     break;
 
-                if ((!(lastKey == null) && lastKey.equals(key)))
-                    break;
-
                 if (queryController.doesNotSelect(key) || key.equals(lastKey, false))
                     continue;
 
@@ -318,85 +359,10 @@ public class StorageAttachedIndexSearcher implements Index.Searcher
          */
         private @Nullable PrimaryKey nextKey()
         {
-            while (resultKeyIterator.hasNext())
-            {
-                PrimaryKey key = resultKeyIterator.next();
-
-                if (!isWithinUpperBound(key))
-                    return null;
-
-                ClusteringIndexFilter filter = currentDataRange.clusteringIndexFilter(key.partitionKey());
-
-                if (filter instanceof ClusteringIndexNamesFilter)
-                {
-                    ClusteringIndexNamesFilter namesFilter = (ClusteringIndexNamesFilter) filter;
-
-                    // Check if query targets a fixed partition
-                    AbstractBounds<PartitionPosition> keyRange = currentDataRange.keyRange();
-                    if (!(keyRange.left instanceof DecoratedKey) || !(keyRange.right instanceof DecoratedKey))
-                        return key;
-                    if (!((DecoratedKey) keyRange.left).getKey().equals(((DecoratedKey) keyRange.right).getKey()))
-                        return key;
-
-                    // If no clustering columns, fallback to normal behavior
-                    if (queryController.metadata().comparator.size() == 0)
-                        return key;
-
-                    if (!namesFilter.requestedRows().isEmpty())
-                    {
-                        Clustering<?> target = namesFilter.requestedRows().iterator().next();
-                        PrimaryKey jumpKey = keyFactory.create(key.partitionKey(), target);
-                        resultKeyIterator.skipTo(jumpKey);
-
-                        if (resultKeyIterator.hasNext())
-                        {
-                            PrimaryKey jumped = resultKeyIterator.peek();
-                            if (jumped.partitionKey().equals(key.partitionKey())  && isWithinUpperBound(jumped))
-                                return jumpKey;
-                        }
-                    }
-                }
-
-                if (filter instanceof ClusteringIndexSliceFilter)
-                {
-                    ClusteringIndexSliceFilter sliceFilter = (ClusteringIndexSliceFilter) filter;
-                    Slices slices = sliceFilter.requestedSlices();
-
-                    if (slices != null && !slices.isEmpty())
-                    {
-                        // Checking all the slices in the query i.e. column1 > X AND column2 < Y
-                        for (Slice slice : slices)
-                        {
-                            ClusteringBound<?> startBound = slice.start();
-
-                            if (startBound == null || startBound.isEmpty())
-                                continue;
-
-                            Object raw = startBound.getRawValues();
-                            if (raw instanceof ByteBuffer[])
-                            {
-                                ByteBuffer[] rawValues = (ByteBuffer[]) raw;
-                                int expectedSize = queryController.metadata().comparator.size();
-
-                                if (rawValues.length == expectedSize)
-                                {
-                                    Clustering<?> sliceStart = Clustering.make(rawValues);
-                                    ClusteringComparator comparator = queryController.metadata().comparator;
-
-                                    if (comparator.compare(key.clustering(), sliceStart) < 0)
-                                    {
-                                        PrimaryKey jumpKey = keyFactory.create(key.partitionKey(), sliceStart);
-                                        resultKeyIterator.skipTo(jumpKey);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                // No optimization , return normally
-                return key;
-            }
-            return null;
+            if (!resultKeyIterator.hasNext())
+                return null;
+            PrimaryKey key = resultKeyIterator.next();
+            return isWithinUpperBound(key) ? key : null;
         }
 
         /**
