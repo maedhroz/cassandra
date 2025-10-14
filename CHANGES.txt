@@ -1,4 +1,5 @@
 5.1
+ * Extend nodetool verify to (optionally) validate SAI files (CASSANDRA-20949)
  * Add DDL Guardrail enabling administrators to disallow creation/modification of keyspaces with durable_writes = false (CASSANDRA-20913)
  * Optimize Counter, Meter and Histogram metrics using thread local counters (CASSANDRA-20250)
  * Update snakeyaml to 2.4 (CASSANDRA-20928)
