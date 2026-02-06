@@ -174,22 +174,31 @@ public class DeleteHelper
         List<Object> bindings = new ArrayList<>();
 
         Object[] pk = schema.valueGenerators.pkGen().inflate(delete.pd());
-        Object[] lowBound = schema.valueGenerators.ckGen().inflate(delete.lowerBound());
-        Object[] highBound = schema.valueGenerators.ckGen().inflate(delete.upperBound());
 
         RelationWriter writer = new RelationWriter(b, bindings::add);
 
         for (int i = 0; i < pk.length; i++)
             writer.write(schema.partitionKeys.get(i), Relations.RelationKind.EQ, pk[i]);
-        for (int i = 0; i < delete.lowerBoundRelation().length; i++)
+        if (delete.lowerBoundRelation() != null)
         {
-            Relations.RelationKind kind;
-            kind = delete.lowerBoundRelation()[i];
-            if (kind != null)
-                writer.write(schema.clusteringKeys.get(i), kind, lowBound[i]);
-            kind = delete.upperBoundRelation()[i];
-            if (kind != null)
-                writer.write(schema.clusteringKeys.get(i), kind, highBound[i]);
+            Object[] lowBound = schema.valueGenerators.ckGen().inflate(delete.lowerBound());
+            for (int i = 0; i < delete.lowerBoundRelation().length; i++)
+            {
+                Relations.RelationKind kind = delete.lowerBoundRelation()[i];
+                if (kind != null)
+                    writer.write(schema.clusteringKeys.get(i), kind, lowBound[i]);
+            }
+        }
+
+        if (delete.upperBoundRelation() != null)
+        {
+            Object[] highBound = schema.valueGenerators.ckGen().inflate(delete.upperBound());
+            for (int i = 0; i < delete.upperBoundRelation().length; i++)
+            {
+                Relations.RelationKind kind = delete.upperBoundRelation()[i];
+                if (kind != null)
+                    writer.write(schema.clusteringKeys.get(i), kind, highBound[i]);
+            }
         }
 
         b.append(";");
