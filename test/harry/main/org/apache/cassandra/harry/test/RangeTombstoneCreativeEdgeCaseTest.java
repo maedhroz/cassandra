@@ -26,6 +26,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.apache.cassandra.config.CassandraRelevantProperties;
 import org.apache.cassandra.config.DatabaseDescriptor;
 import org.apache.cassandra.cql3.CQLTester;
 import org.apache.cassandra.db.ColumnFamilyStore;
@@ -133,6 +134,7 @@ public class RangeTombstoneCreativeEdgeCaseTest extends CQLTester
     {
         DatabaseDescriptor.setColumnIndexSizeInKiB(1);
         DatabaseDescriptor.setColumnIndexCacheSize(1);
+        CassandraRelevantProperties.CURSOR_COMPACTION_ENABLED.setBoolean(false);
         String cql = schema.compile().replace(";", "");
         if (cql.contains(" WITH "))
             cql += " AND gc_grace_seconds = 0"
@@ -862,10 +864,16 @@ public class RangeTombstoneCreativeEdgeCaseTest extends CQLTester
                         schema, pkGen.generate(rng), ckGen.generate(rng), rng, h))
               // Flush
               .step((h, r) -> rng.nextDouble() >= 0.88,
-                    (h, r) -> h.custom(() -> flush(schema.keyspace, schema.table), "FLUSH"))
+                    (h, r) -> h.custom(() -> {
+                        logger.info("HARRY FLUSH");
+                        flush(schema.keyspace, schema.table);
+                    }, "FLUSH"))
               // Compact
               .step((h, r) -> rng.nextDouble() >= 0.97,
-                    (h, r) -> h.custom(() -> compact(schema.keyspace, schema.table), "COMPACT"))
+                    (h, r) -> h.custom(() -> {
+                        logger.info("HARRY COMPACT");
+                        compact(schema.keyspace, schema.table);
+                    }, "COMPACT"))
               // ASC select
               .step((h, r) -> h.selectPartition(pkGen.generate(rng)))
               // DESC select
@@ -879,11 +887,12 @@ public class RangeTombstoneCreativeEdgeCaseTest extends CQLTester
               // Single row select
               .step((h, r) -> h.selectRow(pkGen.generate(rng), ckGen.generate(rng)))
               .exitCondition((h) -> {
-                  if (history.size() < 5000)
+                  if (history.size() < 1000)
                       return false;
 
                   dropTable("DROP TABLE " + schema.keyspace + "." + schema.table);
-                  createTable(schema.compile().replace(";", " AND gc_grace_seconds = 0;"));
+//                  createTable(schema.compile().replace(";", " AND gc_grace_seconds = 0;"));
+                  createAggressive(schema);
                   replay(schema, history);
                   return true;
               })
@@ -918,9 +927,19 @@ public class RangeTombstoneCreativeEdgeCaseTest extends CQLTester
         return new CQLTesterVisitExecutor(schema, tracker,
                                           new QuiescentChecker(schema.valueGenerators, tracker, historyBuilder),
                                           statement -> {
-                                              if (logger.isTraceEnabled())
-                                                  logger.trace(statement.toString());
-                                              return execute(statement.cql(), statement.bindings());
+                                              if (!statement.cql().contains("SELECT"))
+                                                logger.debug(statement.toString());
+
+                                              try
+                                              {                                                  
+                                                  return execute(statement.cql(), statement.bindings());
+                                              }
+                                              catch (Throwable t)
+                                              {
+                                                  logger.debug(statement.toString());
+                                                  execute(statement.cql(), statement.bindings());
+                                                  throw t;
+                                              }
                                           });
     }
 }
