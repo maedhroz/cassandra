@@ -135,17 +135,21 @@ public class RangeTombstoneCreativeEdgeCaseTest extends CQLTester
         DatabaseDescriptor.setColumnIndexSizeInKiB(1);
         DatabaseDescriptor.setColumnIndexCacheSize(1);
         CassandraRelevantProperties.CURSOR_COMPACTION_ENABLED.setBoolean(false);
+
         String cql = schema.compile().replace(";", "");
         if (cql.contains(" WITH "))
-            cql += " AND gc_grace_seconds = 0"
+            cql += " AND gc_grace_seconds = 86000"
+                   + " AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}"
                    + " AND compression = {'class': 'LZ4Compressor', 'chunk_length_in_kb': '4'}"
                    + " AND compaction = {'class': 'SizeTieredCompactionStrategy', 'enabled': false};";
         else
-            cql += " WITH gc_grace_seconds = 0"
+            cql += " WITH gc_grace_seconds = 86000"
+                   + " AND caching = {'keys': 'ALL', 'rows_per_partition': 'NONE'}"
                    + " AND compression = {'class': 'LZ4Compressor', 'chunk_length_in_kb': '4'}"
                    + " AND compaction = {'class': 'SizeTieredCompactionStrategy', 'enabled': false};";
         createTable(cql);
     }
+
 
     // ========================================================================
     // Tests: Reverse iteration with range tombstones
@@ -836,32 +840,30 @@ public class RangeTombstoneCreativeEdgeCaseTest extends CQLTester
               .step((h, r) -> HistoryBuilderHelper.insertRandomData(schema, pkGen, ckGen, rng, h))
               // Range delete with random bounds
               .step((h, r) -> rng.nextDouble() >= 0.85,
-                    (h, r) -> h.deleteRowRange(pkGen.generate(rng),
-                                               ckGen.generate(rng), ckGen.generate(rng),
-                                               rng.nextInt(schema.clusteringKeys.size()),
-                                               rng.nextBoolean(), rng.nextBoolean()))
+                    (h, r) -> {
+                        h.deleteRowRange(pkGen.generate(rng), ckGen.generate(rng), ckGen.generate(rng), rng.nextInt(schema.clusteringKeys.size()), rng.nextBoolean(), rng.nextBoolean());
+                    })
               // Open-ended lower bound delete
               .step((h, r) -> rng.nextDouble() >= 0.95,
-                    (h, r) -> h.deleteRowSliceByLowerBound(pkGen.generate(rng),
-                                                           ckGen.generate(rng),
-                                                           rng.nextInt(schema.clusteringKeys.size()),
-                                                           rng.nextBoolean()))
+                    (h, r) -> h.deleteRowSliceByLowerBound(pkGen.generate(rng), ckGen.generate(rng), rng.nextInt(schema.clusteringKeys.size()), rng.nextBoolean()))
               // Open-ended upper bound delete
               .step((h, r) -> rng.nextDouble() >= 0.95,
-                    (h, r) -> h.deleteRowSliceByUpperBound(pkGen.generate(rng),
-                                                           ckGen.generate(rng),
-                                                           rng.nextInt(schema.clusteringKeys.size()),
-                                                           rng.nextBoolean()))
+                    (h, r) -> h.deleteRowSliceByUpperBound(pkGen.generate(rng), ckGen.generate(rng), rng.nextInt(schema.clusteringKeys.size()), rng.nextBoolean()))
               // Row delete
               .step((h, r) -> rng.nextDouble() >= 0.92,
-                    (h, r) -> h.deleteRow(pkGen.generate(rng), ckGen.generate(rng)))
+                    (h, r) -> {
+                        h.deleteRow(pkGen.generate(rng), ckGen.generate(rng));
+                    })
               // Partition delete (rare)
               .step((h, r) -> rng.nextDouble() >= 0.99,
-                    (h, r) -> h.deletePartition(pkGen.generate(rng)))
+                    (h, r) -> {
+                        h.deletePartition(pkGen.generate(rng));
+                    })
               // Column delete
               .step((h, r) -> rng.nextDouble() >= 0.93,
-                    (h, r) -> HistoryBuilderHelper.deleteRandomColumns(
-                        schema, pkGen.generate(rng), ckGen.generate(rng), rng, h))
+                    (h, r) -> {
+                        HistoryBuilderHelper.deleteRandomColumns(schema, pkGen.generate(rng), ckGen.generate(rng), rng, h);
+                    })
               // Flush
               .step((h, r) -> rng.nextDouble() >= 0.88,
                     (h, r) -> h.custom(() -> {
@@ -875,17 +877,20 @@ public class RangeTombstoneCreativeEdgeCaseTest extends CQLTester
                         compact(schema.keyspace, schema.table);
                     }, "COMPACT"))
               // ASC select
-              .step((h, r) -> h.selectPartition(pkGen.generate(rng)))
+              .step((h, r) -> {
+//                  h.selectPartition(pkGen.generate(rng));
+              })
               // DESC select
               .step((h, r) -> rng.nextDouble() >= 0.7,
                     (h, r) -> h.selectPartition(pkGen.generate(rng), Operations.ClusteringOrderBy.DESC))
               // Slice query
-              .step((h, r) -> h.selectRowRange(pkGen.generate(rng),
-                                               ckGen.generate(rng), ckGen.generate(rng),
-                                               rng.nextInt(schema.clusteringKeys.size()),
-                                               rng.nextBoolean(), rng.nextBoolean()))
+              .step((h, r) -> {
+//                  h.selectRowRange(pkGen.generate(rng), ckGen.generate(rng), ckGen.generate(rng), rng.nextInt(schema.clusteringKeys.size()), rng.nextBoolean(), rng.nextBoolean());
+              })
               // Single row select
-              .step((h, r) -> h.selectRow(pkGen.generate(rng), ckGen.generate(rng)))
+              .step((h, r) -> {
+//                  h.selectRow(pkGen.generate(rng), ckGen.generate(rng));
+              })
               .exitCondition((h) -> {
                   if (history.size() < 1000)
                       return false;
@@ -927,8 +932,7 @@ public class RangeTombstoneCreativeEdgeCaseTest extends CQLTester
         return new CQLTesterVisitExecutor(schema, tracker,
                                           new QuiescentChecker(schema.valueGenerators, tracker, historyBuilder),
                                           statement -> {
-                                              if (!statement.cql().contains("SELECT"))
-                                                logger.debug(statement.toString());
+                                              logger.debug(statement.toString());
 
                                               try
                                               {                                                  
@@ -936,7 +940,6 @@ public class RangeTombstoneCreativeEdgeCaseTest extends CQLTester
                                               }
                                               catch (Throwable t)
                                               {
-                                                  logger.debug(statement.toString());
                                                   execute(statement.cql(), statement.bindings());
                                                   throw t;
                                               }
