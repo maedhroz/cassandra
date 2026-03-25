@@ -445,7 +445,8 @@ public class BigTableReader extends SSTableReaderWithFilter implements IndexSumm
         return rowIndexEntrySerializer.deserializeForCache(input);
     }
 
-    @Override
+    // Original
+    /*@Override
     public ClusteringBound<?> getLowerBoundPrefixFromCache(DecoratedKey partitionKey, boolean isReversed)
     {
         AbstractRowIndexEntry rie = getCachedPosition(partitionKey, false);
@@ -462,6 +463,41 @@ public class BigTableReader extends SSTableReaderWithFilter implements IndexSumm
             ClusteringBound<?> bound = isReversed ? columns.lastName.asEndBound() : columns.firstName.asStartBound();
             UnfilteredRowIteratorWithLowerBound.assertBoundSize(bound, this);
             return bound.artificialLowerBound(isReversed);
+        }
+        catch (IOException e)
+        {
+            throw new RuntimeException("should never occur", e);
+        }
+    }*/
+
+    // Candidate fix
+    @Override
+    public ClusteringBound<?> getLowerBoundPrefixFromCache(DecoratedKey partitionKey, boolean isReversed)
+    {
+        // Index block bounds are not safe as lower bounds for reversed reads. A reversed
+        // iterator may emit a synthetic INCL_END_BOUND() (TOP) close marker before any real
+        // clustering row if a range tombstone from an earlier on-disk block is still open
+        // when the reversed iterator enters the last block. That marker's empty clustering
+        // sorts before any real clustering value under the reversed comparator, making any
+        // cache-derived lower bound unsafe. The metadata-based lower bound from
+        // maybeGetLowerBoundFromMetadata() handles reversed reads correctly instead.
+        if (isReversed)
+            return null;
+
+        AbstractRowIndexEntry rie = getCachedPosition(partitionKey, false);
+        if (!(rie instanceof RowIndexEntry))
+            return null;
+
+        RowIndexEntry rowIndexEntry = (RowIndexEntry) rie;
+        if (!rowIndexEntry.indexOnHeap())
+            return null;
+
+        try (RowIndexEntry.IndexInfoRetriever onHeapRetriever = rowIndexEntry.openWithIndex(null))
+        {
+            IndexInfo columns = onHeapRetriever.columnsIndex(0);
+            ClusteringBound<?> bound = ClusteringBound.inclusiveStartOf(columns.firstName);
+            UnfilteredRowIteratorWithLowerBound.assertBoundSize(bound, this);
+            return bound.artificialLowerBound(false);
         }
         catch (IOException e)
         {
